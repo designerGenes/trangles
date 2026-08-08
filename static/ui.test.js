@@ -195,6 +195,17 @@ const historyEntry = (n, title) => ({
   check("Next Issue is fixed to the viewport", win.getComputedStyle(rail).position === "fixed",
     win.getComputedStyle(rail).position);
   check("Next Issue is outside the shelf", !win.document.getElementById("organizer-shelf").contains(win.document.getElementById("btn-end")));
+  check("Finish round shown when all votes are in", win.document.getElementById("btn-end").textContent === "Finish round");
+
+  S.state = stateMsg({ participants: [
+    { id: "o", name: "Ada", organizer: true, submitted: false },
+    { id: "g", name: "Lin", organizer: false, submitted: false },
+  ] });
+  win.__test.render();
+  const next = win.document.getElementById("btn-end");
+  check("pending vote rail is desaturated", next.classList.contains("is-pending"));
+  next.click();
+  check("first pending click arms confirmation", next.textContent === "Confirm" && next.classList.contains("is-confirm"));
 
   S.state = stateMsg({ round: { number: 1, title: "PROJ-1 first", open: false, submittedCount: 1, summary: historyEntry(1, "x").summary }, history: [historyEntry(1, "PROJ-1 first")] });
   win.__test.render();

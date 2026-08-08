@@ -394,6 +394,33 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 			}
 		}
 
+	case "set_timer":
+		if !c.organizer {
+			c.trySend(errMsg("Only the organizer can start a timer."))
+			return
+		}
+		r := s.round
+		if r == nil || !r.Open {
+			c.trySend(errMsg("There is no open issue to time."))
+			return
+		}
+		if msg.Seconds <= 0 {
+			c.trySend(errMsg("Enter a timer length in seconds."))
+			return
+		}
+		secs := msg.Seconds
+		if secs > maxRoundSecs {
+			secs = maxRoundSecs
+		}
+		if r.timer != nil {
+			r.timer.Stop()
+		}
+		dl := time.Now().Add(time.Duration(secs) * time.Second)
+		r.Deadline = &dl
+		r.timer = time.AfterFunc(time.Until(dl), func() { s.timerFired(r) })
+		s.persistLocked()
+		s.broadcastStateLocked()
+
 	case "end_round":
 		if !c.organizer {
 			c.trySend(errMsg("Only the organizer can end the round."))

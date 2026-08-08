@@ -136,6 +136,20 @@ func TestPointingRoundClampsSubmissionsAndCalculatesSummary(t *testing.T) {
 	if session.round.Title != "PROJ-2" || session.round.Number != 2 {
 		t.Fatalf("second queued round was not started: %#v", session.round)
 	}
+	if len(session.round.Submissions) != 0 || len(session.round.Previews) != 0 {
+		t.Fatalf("second round inherited estimates: %#v / %#v", session.round.Submissions, session.round.Previews)
+	}
+}
+
+func TestOrganizerCanStartTimerDuringOpenRound(t *testing.T) {
+	_, session, organizer, _ := newTestSession(t, nil)
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1")})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	session.handle(organizer, &inboundMsg{Type: "set_timer", Seconds: 30})
+	if session.round.Deadline == nil || session.round.timer == nil {
+		t.Fatal("open round did not receive a timer")
+	}
+	session.round.timer.Stop()
 }
 
 func TestIssueMetadataAndSubmittedEstimatesAreImmutable(t *testing.T) {

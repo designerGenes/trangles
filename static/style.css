@@ -339,9 +339,13 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 /* Anchored to the left edge of the 680px content column and fixed, so the
    organizer can cut a round short from any scroll position — the session-view
    counterpart of the sticky launch rail in setup. */
-.end-rail { position: fixed; top: 50%; left: calc(50% - 340px - 18px); transform: translate(-100%, -50%); z-index: 30; }
+.end-rail { align-items: center; display: flex; flex-direction: column; gap: 6px; position: fixed; top: 50%; left: calc(50% - 340px - 18px); transform: translate(-100%, -50%); z-index: 30; }
 .end-float { background: var(--pencil); border-color: var(--pencil); color: var(--paper); box-shadow: 0 2px 10px rgba(30, 43, 47, 0.18); min-height: 64px; white-space: nowrap; }
 .end-float:hover:not(:disabled) { background: #a83226; border-color: #a83226; }
+.end-float.is-pending { background: #B99891; border-color: #B99891; color: #fff; }
+.end-float.is-confirm { background: var(--pencil); border-color: var(--pencil); }
+.end-vote-count { color: var(--muted); font-size: 0.78rem; }
+.end-hint { color: var(--pencil); font-size: 0.75rem; max-width: 10rem; text-align: center; }
 
 /* History ------------------------------------------------------------ */
 .history-card { border-left: 4px solid var(--border); }

@@ -36,6 +36,9 @@ const S = {
   countdown: null,
   previewRound: null,
   previewTimer: null,
+  activeRound: null,
+  nextArmed: false,
+  nextResetTimer: null,
   liveView: "overlay",
   hiddenLive: new Set(),
   history: [],
@@ -325,6 +328,8 @@ function toLanding(message) {
   if (S.ws) try { S.ws.close(); } catch (_) {}
   S.ws = null; S.state = null; S.code = null; S.submittedRound = null; S.live = false;
   S.previewRound = null;
+  S.activeRound = null;
+  resetNextConfirm();
   S.history = [];
   S.historyIndex = 0;
   setHidden($("history-card"), true);
@@ -382,6 +387,15 @@ function render() {
     $("plot-wrap").classList.add("plot-disabled");
     renderConsole(null);
     return;
+  }
+
+  if (S.activeRound !== r.number) {
+    S.activeRound = r.number;
+    S.submittedRound = null;
+    S.previewRound = null;
+    S.my = S.axes.map((_, i) => startingValue(i));
+    resetNextConfirm();
+    drawMine();
   }
 
   title.textContent = r.title;
@@ -489,19 +503,48 @@ function renderConsole(round) {
   const open = !!(round && round.open);
   const queued = S.state.queuedItems || 0;
   const pending = (S.state.participants || []).filter((person) => !person.organizer && !person.submitted);
+  const eligible = (S.state.participants || []).filter((person) => !person.organizer);
+  const submitted = eligible.length - pending.length;
+  const allSubmitted = eligible.length > 0 && pending.length === 0;
   $("btn-start").hidden = true;
+  $("btn-timer").hidden = !open;
   $("in-items").disabled = open;
   $("btn-load").disabled = open;
   // The floating action remains available after a summary while queued work
   // remains, so a closed shelf never implies the session is finished.
   setHidden($("end-rail"), !open && queued === 0);
-  $("btn-end").textContent = "Next Issue";
+  $("end-vote-count").textContent = eligible.length ? `Votes: ${submitted}/${eligible.length}` : "";
+  $("btn-end").classList.toggle("is-pending", open && !allSubmitted && !S.nextArmed);
+  $("btn-end").classList.toggle("is-confirm", open && !allSubmitted && S.nextArmed);
+  if (open && allSubmitted) {
+    resetNextConfirm();
+    $("btn-end").textContent = "Finish round";
+    $("end-hint").hidden = true;
+  } else if (open && S.nextArmed) {
+    $("btn-end").textContent = "Confirm";
+    $("end-hint").textContent = "Votes are still pending.";
+    $("end-hint").hidden = false;
+  } else {
+    $("btn-end").textContent = "Next Issue";
+    $("end-hint").hidden = true;
+  }
   $("queue-status").textContent = queued
     ? `${queued} issue${queued === 1 ? "" : "s"} ready`
     : "Load issues to begin";
-  $("pending-panel").hidden = !open || pending.length === 0;
-  $("pending-people").textContent = pending.map((person) => person.name).join(", ");
+  $("pending-panel").hidden = !open;
+  $("pending-people").textContent = pending.length ? pending.map((person) => person.name).join(", ") : "All votes submitted.";
   $("btn-remind").disabled = pending.length === 0;
+}
+
+function resetNextConfirm() {
+  S.nextArmed = false;
+  clearTimeout(S.nextResetTimer);
+  S.nextResetTimer = null;
+}
+
+function armNextConfirm() {
+  S.nextArmed = true;
+  clearTimeout(S.nextResetTimer);
 }
 
 function setupAspectNames() {
@@ -850,8 +893,26 @@ $("btn-load").onclick = () => {
   send({ type: "replace_items", items });
 };
 $("btn-start").onclick = () => advanceIssue();
+$("btn-timer").onclick = () => {
+  const secs = parseInt($("in-seconds").value, 10);
+  if (isNaN(secs) || secs <= 0) {
+    toast("Enter a timer length in seconds.");
+    return;
+  }
+  send({ type: "set_timer", seconds: secs });
+};
 $("btn-end").onclick = () => {
   advanceIssue();
+};
+$("btn-end").onmouseenter = () => clearTimeout(S.nextResetTimer);
+$("btn-end").onmouseleave = () => {
+  const round = S.state && S.state.round;
+  const pending = (S.state.participants || []).some((person) => !person.organizer && !person.submitted);
+  if (!S.nextArmed || !round || !round.open || !pending) return;
+  S.nextResetTimer = setTimeout(() => {
+    resetNextConfirm();
+    renderConsole(S.state.round);
+  }, 2500);
 };
 
 function advanceIssue() {
@@ -862,7 +923,12 @@ function advanceIssue() {
     return;
   }
   const pending = (S.state.participants || []).filter((person) => !person.organizer && !person.submitted);
-  if (pending.length && !confirm(`Move to the next issue without estimates from ${pending.map((person) => person.name).join(", ")}?`)) return;
+  if (pending.length && !S.nextArmed) {
+    armNextConfirm();
+    renderConsole(round);
+    return;
+  }
+  resetNextConfirm();
   send({ type: "end_round" });
 }
 $("btn-remind").onclick = () => send({ type: "remind" });

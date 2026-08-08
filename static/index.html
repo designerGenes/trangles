@@ -185,6 +185,8 @@
 
   <div id="end-rail" class="end-rail" hidden>
     <button id="btn-end" class="btn end-float" type="button">Next Issue</button>
+    <span id="end-vote-count" class="end-vote-count mono"></span>
+    <span id="end-hint" class="end-hint" hidden></span>
   </div>
 
   <details id="organizer-shelf" class="organizer-shelf" hidden>
@@ -197,6 +199,7 @@
         <input id="in-seconds" class="mono" type="number" min="10" max="3600"
                 placeholder="timer s" title="Optional round timer in seconds">
         <button id="btn-start" class="btn btn-primary">Next Issue</button>
+        <button id="btn-timer" class="btn" type="button" hidden>Start timer</button>
       </div>
       <div id="pending-panel" class="pending-panel" hidden>
         <span class="eyebrow">Waiting on</span>
