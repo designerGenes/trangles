@@ -17,7 +17,7 @@ import (
 var DefaultAxes = []string{"Uncertainty", "Complexity", "Toil"}
 
 const (
-	AxisMax        = 10.0
+	AxisMax        = 8.0
 	AxisMin        = 1.0
 	maxNameLen     = 24
 	maxTitleLen    = 200

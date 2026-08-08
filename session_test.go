@@ -117,7 +117,7 @@ func TestPointingRoundClampsSubmissionsAndCalculatesSummary(t *testing.T) {
 
 	session.handle(guest, &inboundMsg{Type: "submit", Values: []float64{-4, 5, 20}})
 	session.handle(organizer, &inboundMsg{Type: "submit", Values: []float64{4, 7, 2}})
-	if got := session.round.Submissions[guest.id].Values; !sameValues(got, []float64{1, 5, 10}) {
+	if got := session.round.Submissions[guest.id].Values; !sameValues(got, []float64{1, 5, 8}) {
 		t.Fatalf("submission was not clamped: %#v", got)
 	}
 
@@ -125,7 +125,7 @@ func TestPointingRoundClampsSubmissionsAndCalculatesSummary(t *testing.T) {
 	if session.round.Open || session.round.Summary == nil {
 		t.Fatal("round did not conclude with a summary")
 	}
-	if got := session.round.Summary.Averages; !sameValues(got, []float64{2.5, 6, 6}) {
+	if got := session.round.Summary.Averages; !sameValues(got, []float64{2.5, 6, 5}) {
 		t.Fatalf("averages = %#v", got)
 	}
 	if session.round.Summary.StoryPoints < 1 || session.round.Summary.StoryPoints > 13 {
@@ -172,7 +172,7 @@ func TestPointMaximumMustBeWholeNumber(t *testing.T) {
 	_, session, organizer, _ := newTestSession(t, nil)
 	session.handle(organizer, &inboundMsg{Type: "load_items", Items: []string{"PROJ-1"}, Max: 4.5})
 	expectError(t, organizer)
-	if !sameValues(session.axisMins, []float64{1, 1, 1}) || !sameValues(session.axisMaxes, []float64{10, 10, 10}) {
+	if !sameValues(session.axisMins, []float64{1, 1, 1}) || !sameValues(session.axisMaxes, []float64{8, 8, 8}) {
 		t.Fatalf("invalid max changed range: %#v / %#v", session.axisMins, session.axisMaxes)
 	}
 }

@@ -110,11 +110,13 @@ main { max-width: 680px; margin: 0 auto; padding: 8px 16px 48px; }
 .draft-item .btn-quiet { margin: 0; }
 .setup-aspects { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 12px; }
 .setup-aspects summary, .setup-drawer summary { align-items: center; color: var(--ink); cursor: pointer; display: flex; font-size: 0.82rem; font-weight: 700; justify-content: space-between; letter-spacing: 0.09em; text-transform: uppercase; }
-.stack-state { color: var(--muted); font-size: 0.65rem; font-weight: 400; letter-spacing: 0; text-transform: none; }
+.setup-aspects summary::-webkit-details-marker, .setup-drawer summary::-webkit-details-marker, .point-label-editor summary::-webkit-details-marker { display: none; }
+.setup-aspects summary::marker, .setup-drawer summary::marker, .point-label-editor summary::marker { content: ""; }
+.caret { border-bottom: 2px solid var(--muted); border-right: 2px solid var(--muted); height: 7px; margin: 0 4px; transform: rotate(45deg); transition: transform 120ms; width: 7px; }
+details[open] > summary .caret { transform: rotate(225deg); }
 .stack-body { padding-top: 12px; }
-#draft-aspects .draft-item:nth-child(1) { background: #FFEDA8; }
-#draft-aspects .draft-item:nth-child(2) { background: #FFD84D; }
-#draft-aspects .draft-item:nth-child(3) { background: #F4A62A; }
+#draft-aspects .draft-item:nth-child(odd) { background: #E1F3DE; border-color: #A9CCA8; }
+#draft-aspects .draft-item:nth-child(even) { background: #F0FAEE; border-color: #C4DEC1; }
 .setup-warning { color: var(--pencil); font-size: 0.85rem; font-weight: 600; margin: 10px 0 0; }
 .setup-drawer { background: #F6F8F4; border: 1px solid var(--border); border-radius: var(--radius); margin-top: 18px; padding: 12px; }
 .drawer-body { padding-top: 12px; }
@@ -122,7 +124,7 @@ main { max-width: 680px; margin: 0 auto; padding: 8px 16px 48px; }
 .range-field input { margin-top: 4px; }
 .drawer-body .hint { margin-top: 6px; }
 .point-label-editor { border-top: 1px solid var(--grid); margin-top: 12px; padding-top: 10px; }
-.point-label-editor summary { color: var(--muted); cursor: pointer; font-size: 0.82rem; }
+.point-label-editor summary { align-items: center; color: var(--muted); cursor: pointer; display: flex; font-size: 0.82rem; justify-content: space-between; }
 #setup-point-labels { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
 .point-label-row { align-items: center; display: grid; gap: 8px; grid-template-columns: 2rem 1fr; }
 .point-label-row span { color: var(--muted); font-family: "Spline Sans Mono", monospace; text-align: right; }

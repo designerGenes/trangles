@@ -70,7 +70,7 @@
       <button id="btn-add-item" class="btn" type="button">Add issue</button>
 
       <details id="setup-aspects-stack" class="setup-aspects" open>
-        <summary><span>Aspects</span><span class="stack-state">Show or hide aspects</span></summary>
+        <summary><span>Aspects</span><span class="caret" aria-hidden="true"></span></summary>
         <div class="stack-body">
           <div id="draft-aspects" class="draft-items"></div>
           <button id="btn-add-aspect" class="btn" type="button">Add aspect</button>
@@ -79,15 +79,15 @@
       </details>
 
       <details class="setup-drawer">
-        <summary>Session controls</summary>
+        <summary><span>Session controls</span><span class="caret" aria-hidden="true"></span></summary>
         <div class="drawer-body">
           <label class="field range-field">
             <span>Points per aspect</span>
-            <input id="setup-max" class="mono" type="number" min="2" max="100" step="1" value="10">
+            <input id="setup-max" class="mono" type="number" min="2" max="100" step="1" value="8">
           </label>
           <p class="hint">Every aspect uses the same whole-number range: 1 to this value.</p>
           <details class="point-label-editor">
-            <summary>Point hover labels (optional)</summary>
+            <summary><span>Point hover labels (optional)</span><span class="caret" aria-hidden="true"></span></summary>
             <div id="setup-point-labels"></div>
           </details>
         </div>

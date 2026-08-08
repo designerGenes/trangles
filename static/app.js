@@ -16,8 +16,8 @@ const S = {
   name: "",
   axes: ["Uncertainty", "Complexity", "Toil"],
   axisMins: [1, 1, 1],
-  axisMaxes: [10, 10, 10],
-  pointLabels: ["", "Light", "", "", "", "", "", "", "", "", "Heavy"],
+  axisMaxes: [8, 8, 8],
+  pointLabels: ["", "Light", "", "", "", "", "", "", "Heavy"],
   my: [3, 3, 3],
   submittedRound: null,   // round number my last submit belongs to
   state: null,            // latest server snapshot
@@ -44,6 +44,18 @@ const pt = (i, v) => [
   CX + Math.cos(angle(i)) * R * ((v - axisMin(i)) / (axisMax(i) - axisMin(i))),
   CY + Math.sin(angle(i)) * R * ((v - axisMin(i)) / (axisMax(i) - axisMin(i))),
 ];
+const labelPosition = (x, y, axisAngle) => {
+  const cos = Math.cos(axisAngle);
+  const sin = Math.sin(axisAngle);
+  if (cos < -0.15) return { x, y: y + (sin < 0 ? -8 : 20), anchor: "end" };
+  if (cos > 0.15) return { x, y: y + (sin < 0 ? -8 : 20), anchor: "start" };
+  return { x, y: y + (sin < 0 ? -26 : 34), anchor: "middle" };
+};
+const tickPosition = (x, y, axisAngle) => ({
+  x: x - Math.sin(axisAngle) * 9,
+  y: y + Math.cos(axisAngle) * 9 + 3,
+  anchor: -Math.sin(axisAngle) < -0.15 ? "end" : -Math.sin(axisAngle) > 0.15 ? "start" : "middle",
+});
 const polyPoints = (vals) => vals.map((v, i) => pt(i, v).join(",")).join(" ");
 
 const plot = { svg: $("plot"), avg: null, mine: null, handles: [], dragAttached: false };
@@ -74,15 +86,16 @@ function buildPlot() {
     for (const fraction of [0.2, 0.6, 1]) {
       const value = axisValue(i, fraction);
       const [tx, ty] = pt(i, value);
-      const tick = el("text", { x: tx + 4, y: ty - 4, class: "tick-label" });
+      const position = tickPosition(tx, ty, angle(i));
+      const tick = el("text", { x: position.x, y: position.y, class: "tick-label", "text-anchor": position.anchor });
       tick.textContent = formatValue(value);
       const title = el("title", {}, tick);
       title.textContent = pointLabel(value);
     }
-    const labelY = y + (Math.sin(angle(i)) < -0.5 ? -26 : 30);
+    const position = labelPosition(x, y, angle(i));
     const label = el("text", {
-      x, y: labelY, class: "axis-label", fill: axisColor(i),
-      "text-anchor": "start",
+      x: position.x, y: position.y, class: "axis-label", fill: axisColor(i),
+      "text-anchor": position.anchor,
     });
     label.textContent = name;
   });
@@ -314,7 +327,7 @@ function toLanding(message) {
   $("draft-items").innerHTML = "";
   $("draft-aspects").innerHTML = "";
   $("setup-point-labels").innerHTML = "";
-  $("setup-max").value = "10";
+  $("setup-max").value = "8";
   stopCountdown();
   $("view-session").hidden = true;
   $("view-setup").hidden = true;
@@ -391,7 +404,7 @@ function render() {
 
 function syncAxes(axes) {
   const mins = S.state.axisMins || axes.map(() => 1);
-  const maxes = S.state.axisMaxes || axes.map(() => 10);
+  const maxes = S.state.axisMaxes || axes.map(() => 8);
   const labels = S.state.pointLabels || defaultPointLabels(maxes[0]);
   if (!axes || (axes.length === S.axes.length && axes.every((axis, i) => axis === S.axes[i]) && mins.every((value, i) => value === S.axisMins[i]) && maxes.every((value, i) => value === S.axisMaxes[i]) && labels.every((value, i) => value === S.pointLabels[i]) && labels.length === S.pointLabels.length)) return;
   S.axes = axes.slice();
@@ -602,18 +615,21 @@ function drawStaticRadar(svg, axes, mins, maxes, shapes) {
     for (const fraction of [0.2, 0.6, 1]) {
       const value = mins[i] + (maxes[i] - mins[i]) * fraction;
       const [tx, ty] = point(i, value);
+      const position = tickPosition(tx, ty, staticAngle(i));
       const tick = document.createElementNS(SVGNS, "text");
-      tick.setAttribute("x", tx + 4);
-      tick.setAttribute("y", ty - 4);
+      tick.setAttribute("x", position.x);
+      tick.setAttribute("y", position.y);
+      tick.setAttribute("text-anchor", position.anchor);
       tick.setAttribute("class", "tick-label");
       tick.textContent = formatValue(value);
       svg.appendChild(tick);
     }
     const label = document.createElementNS(SVGNS, "text");
-    label.setAttribute("x", x);
-    label.setAttribute("y", y + (Math.sin(staticAngle(i)) < -0.5 ? -26 : 30));
+    const position = labelPosition(x, y, staticAngle(i));
+    label.setAttribute("x", position.x);
+    label.setAttribute("y", position.y);
     label.setAttribute("class", "axis-label");
-    label.setAttribute("text-anchor", "start");
+    label.setAttribute("text-anchor", position.anchor);
     label.textContent = axis;
     svg.appendChild(label);
   });
@@ -711,7 +727,7 @@ $("btn-create").onclick = () => {
   $("draft-items").innerHTML = "";
   $("draft-aspects").innerHTML = "";
   $("setup-point-labels").innerHTML = "";
-  $("setup-max").value = "10";
+  $("setup-max").value = "8";
   connect({ type: "create", name: S.name });
 };
 $("in-name").oninput = updateEntryActions;
