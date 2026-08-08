@@ -181,7 +181,7 @@ const historyEntry = (n, title) => ({
   check("participant: no history panel", !shown(win, "history-card"));
 }
 
-/* ── 5. Floating End round + shelf caret ───────────────────────────── */
+/* ── 5. Floating Next Issue + shelf caret ──────────────────────────── */
 {
   const win = boot();
   const S = win.__test.S;
@@ -191,14 +191,14 @@ const historyEntry = (n, title) => ({
   S.state = stateMsg();
   win.__test.render();
   const rail = win.document.getElementById("end-rail");
-  check("End round visible while round open", shown(win, "end-rail"));
-  check("End round is fixed to the viewport", win.getComputedStyle(rail).position === "fixed",
+  check("Next Issue visible while round open", shown(win, "end-rail"));
+  check("Next Issue is fixed to the viewport", win.getComputedStyle(rail).position === "fixed",
     win.getComputedStyle(rail).position);
-  check("End round is outside the shelf", !win.document.getElementById("organizer-shelf").contains(win.document.getElementById("btn-end")));
+  check("Next Issue is outside the shelf", !win.document.getElementById("organizer-shelf").contains(win.document.getElementById("btn-end")));
 
   S.state = stateMsg({ round: { number: 1, title: "PROJ-1 first", open: false, submittedCount: 1, summary: historyEntry(1, "x").summary }, history: [historyEntry(1, "PROJ-1 first")] });
   win.__test.render();
-  check("End round hidden once round concludes", !shown(win, "end-rail"));
+  check("Next Issue remains visible while queued work remains", shown(win, "end-rail"));
   check("organizer: duplicate summary card hidden", !shown(win, "summary-card"));
 
   const caret = win.document.querySelector("#organizer-shelf summary .caret");

@@ -489,12 +489,13 @@ function renderConsole(round) {
   const open = !!(round && round.open);
   const queued = S.state.queuedItems || 0;
   const pending = (S.state.participants || []).filter((person) => !person.organizer && !person.submitted);
-  $("btn-start").hidden = open || queued === 0;
+  $("btn-start").hidden = true;
   $("in-items").disabled = open;
   $("btn-load").disabled = open;
-  // End round floats outside the shelf so it stays reachable at any scroll
-  // position, letting the organizer advance whenever they choose.
-  setHidden($("end-rail"), !open);
+  // The floating action remains available after a summary while queued work
+  // remains, so a closed shelf never implies the session is finished.
+  setHidden($("end-rail"), !open && queued === 0);
+  $("btn-end").textContent = "Next Issue";
   $("queue-status").textContent = queued
     ? `${queued} issue${queued === 1 ? "" : "s"} ready`
     : "Load issues to begin";
@@ -848,15 +849,22 @@ $("btn-load").onclick = () => {
   const items = $("in-items").value.split("\n").map((title) => ({ title }));
   send({ type: "replace_items", items });
 };
-$("btn-start").onclick = () => {
-  const secs = parseInt($("in-seconds").value, 10);
-  send({ type: "start_round", seconds: isNaN(secs) ? 0 : secs });
-};
+$("btn-start").onclick = () => advanceIssue();
 $("btn-end").onclick = () => {
+  advanceIssue();
+};
+
+function advanceIssue() {
+  const round = S.state && S.state.round;
+  if (!round || !round.open) {
+    const secs = parseInt($("in-seconds").value, 10);
+    send({ type: "start_round", seconds: isNaN(secs) ? 0 : secs });
+    return;
+  }
   const pending = (S.state.participants || []).filter((person) => !person.organizer && !person.submitted);
   if (pending.length && !confirm(`Move to the next issue without estimates from ${pending.map((person) => person.name).join(", ")}?`)) return;
   send({ type: "end_round" });
-};
+}
 $("btn-remind").onclick = () => send({ type: "remind" });
 $("btn-history-prev").onclick = () => stepHistory(-1);
 $("btn-history-next").onclick = () => stepHistory(1);
