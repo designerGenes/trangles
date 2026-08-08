@@ -348,6 +348,11 @@ func TestAppendingQueuePreservesCurrentAndQueuedIssues(t *testing.T) {
 	if session.round.Title != "PROJ-1" || session.nextItem != 1 {
 		t.Fatalf("append changed current issue: %#v / next=%d", session.round, session.nextItem)
 	}
+	queuedID := session.items[2].ID
+	session.handle(organizer, &inboundMsg{Type: "delete_queued_item", ItemID: queuedID})
+	if got, want := itemTitles(session.items), []string{"PROJ-1", "PROJ-2", "PROJ-4"}; !sameStrings(got, want) {
+		t.Fatalf("queued deletion = %#v, want %#v", got, want)
+	}
 }
 
 func TestWebSocketRequiresNickname(t *testing.T) {

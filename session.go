@@ -203,6 +203,7 @@ type Submission struct {
 }
 
 type Item struct {
+	ID          string `json:"id"`
 	Title       string `json:"title"`
 	Link        string `json:"link,omitempty"`
 	Description string `json:"description,omitempty"`
@@ -230,6 +231,7 @@ type inboundMsg struct {
 	Seconds     int       `json:"seconds"`
 	Values      []float64 `json:"values"`
 	Touched     bool      `json:"touched"`
+	ItemID      string    `json:"itemId"`
 }
 
 func (s *Session) handle(c *Client, msg *inboundMsg) {
@@ -239,6 +241,22 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 		return
 	}
 	switch msg.Type {
+	case "delete_queued_item":
+		if !c.organizer {
+			c.trySend(errMsg("Only the organizer can delete queued issues."))
+			return
+		}
+		for i := s.nextItem; i < len(s.items); i++ {
+			if s.items[i].ID != msg.ItemID {
+				continue
+			}
+			s.items = append(s.items[:i], s.items[i+1:]...)
+			s.persistLocked()
+			s.broadcastStateLocked()
+			return
+		}
+		c.trySend(errMsg("That issue is no longer in the queued work."))
+
 	case "append_items":
 		if !c.organizer {
 			c.trySend(errMsg("Only the organizer can add issues to the queue."))

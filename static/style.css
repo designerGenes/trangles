@@ -331,6 +331,11 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .shelf-body { padding: 8px 0 4px; }
 .queue-editor { border-top: 1px solid var(--grid); margin-top: 14px; padding-top: 10px; }
 .queue-editor summary { color: var(--muted); cursor: pointer; font-size: 0.82rem; }
+.queue-items { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.queue-item .draft-item { margin-bottom: 5px; }
+.queue-item.confirmed .draft-item { background: #F0FAEE; border-color: #C4DEC1; }
+.queue-item.confirmed .draft-item input { color: var(--muted); }
+.queue-confirm { margin-left: auto; }
 .console-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .issue-field { flex: 1 1 260px; }
 .issue-field textarea { min-height: 88px; resize: vertical; }

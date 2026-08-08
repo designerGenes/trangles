@@ -219,6 +219,14 @@ const historyEntry = (n, title) => ({
   shelf.open = true;
   const opened = win.getComputedStyle(caret).transform;
   check("caret flips when the shelf opens", closed !== opened, { closed, opened });
+
+  win.document.getElementById("btn-add-queue-item").click();
+  const queueRow = win.document.querySelector(".queue-item");
+  const queueTitle = queueRow.querySelector(".draft-item input");
+  queueTitle.value = "PROJ-3 queued";
+  queueRow.querySelector(".queue-confirm").click();
+  check("confirmed queue row locks its title", queueRow.classList.contains("confirmed") && queueTitle.disabled);
+  check("confirmed queue row exposes deletion", !queueRow.querySelector(".btn-quiet").hidden);
 }
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURES`);

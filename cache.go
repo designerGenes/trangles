@@ -122,6 +122,10 @@ func cleanItems(items []Item) []Item {
 	const maxItems = 100
 	clean := make([]Item, 0, len(items))
 	for _, item := range items {
+		item.ID = strings.TrimSpace(item.ID)
+		if item.ID == "" {
+			item.ID = randCode(12)
+		}
 		item.Title = strings.TrimSpace(item.Title)
 		if item.Title == "" {
 			continue

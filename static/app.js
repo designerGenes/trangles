@@ -919,11 +919,7 @@ $("btn-submit").onclick = () => {
   if (r) S.submittedRound = r.number;
   render();
 };
-$("btn-load").onclick = () => {
-  const items = $("in-items").value.split("\n").map((title) => ({ title }));
-  send({ type: "append_items", items });
-  $("in-items").value = "";
-};
+$("btn-add-queue-item").onclick = () => addQueueItem();
 $("btn-start").onclick = () => advanceIssue();
 $("btn-timer").onclick = () => {
   const secs = parseInt($("in-seconds").value, 10);
@@ -1055,6 +1051,79 @@ function addDraftItem(item = {}) {
   entry.append(row, meta);
   $("draft-items").appendChild(entry);
   input.focus();
+}
+
+function addQueueItem(item = {}) {
+  const entry = document.createElement("div");
+  entry.className = "queue-item";
+  entry.dataset.itemId = item.id || itemID();
+  const row = document.createElement("div");
+  row.className = "draft-item";
+  const title = document.createElement("input");
+  title.type = "text";
+  title.maxLength = 200;
+  title.placeholder = "Issue key and summary";
+  title.value = item.title || "";
+  const confirmButton = document.createElement("button");
+  confirmButton.type = "button";
+  confirmButton.className = "btn btn-primary queue-confirm";
+  confirmButton.textContent = "Confirm";
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "btn btn-quiet";
+  remove.textContent = "Delete";
+  remove.hidden = true;
+  row.append(title, confirmButton, remove);
+  const meta = document.createElement("details");
+  meta.className = "draft-item-meta";
+  const summary = document.createElement("summary");
+  summary.textContent = "Add link or description";
+  const link = document.createElement("input");
+  link.type = "url";
+  link.className = "item-link";
+  link.placeholder = "Optional issue link";
+  link.value = item.link || "";
+  const description = document.createElement("textarea");
+  description.className = "item-description";
+  description.maxLength = 2000;
+  description.placeholder = "Optional issue description";
+  description.value = item.description || "";
+  meta.append(summary, link, description);
+  entry.append(row, meta);
+
+  confirmButton.onclick = () => {
+    const queued = {
+      id: entry.dataset.itemId,
+      title: title.value.trim(),
+      link: link.value.trim(),
+      description: description.value.trim(),
+    };
+    if (!queued.title) {
+      toast("Give the issue a title before confirming it.");
+      title.focus();
+      return;
+    }
+    send({ type: "append_items", items: [queued] });
+    entry.classList.add("confirmed");
+    title.disabled = true;
+    link.disabled = true;
+    description.disabled = true;
+    confirmButton.hidden = true;
+    remove.hidden = false;
+  };
+  remove.onclick = () => {
+    if (entry.classList.contains("confirmed")) {
+      send({ type: "delete_queued_item", itemId: entry.dataset.itemId });
+    }
+    entry.remove();
+  };
+  $("queue-items").appendChild(entry);
+  title.focus();
+}
+
+function itemID() {
+  if (globalThis.crypto && globalThis.crypto.randomUUID) return globalThis.crypto.randomUUID();
+  return `item-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function addDraftAspect(value = "") {
