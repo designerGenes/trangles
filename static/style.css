@@ -85,6 +85,24 @@ main { max-width: 680px; margin: 0 auto; padding: 8px 16px 48px; }
 .landing-rule { width: 1px; background: var(--border); }
 .hint { font-size: 0.8rem; color: var(--muted); margin: 0; }
 
+/* New session -------------------------------------------------------- */
+.setup-card { max-width: 34rem; margin: 24px auto; }
+.setup-title {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 1.7rem;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  margin: 6px 0;
+}
+.setup-sub { color: var(--muted); margin: 0 0 18px; }
+.draft-items { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.draft-item { display: flex; align-items: center; gap: 8px; }
+.draft-item input { flex: 1; }
+.draft-item .btn-quiet { margin: 0; }
+.setup-aspects { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 14px; }
+.setup-aspects textarea { width: 100%; min-height: 86px; margin-top: 8px; }
+.setup-aspects .hint { margin: 8px 0 16px; }
+
 .field { display: block; }
 .field span {
   display: block;
@@ -153,7 +171,7 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .round-title.idle { color: var(--muted); font-weight: 500; }
 
 .plot-wrap { display: flex; flex-direction: column; align-items: center; }
-#plot { width: 100%; max-width: 340px; touch-action: none; user-select: none; }
+#plot { width: 100%; max-width: 340px; touch-action: none; user-select: none; cursor: crosshair; }
 
 .readouts { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 18px; margin: 2px 0 12px; }
 .readout { text-align: center; }
@@ -177,7 +195,7 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
   stroke-dasharray: 5 4;
   stroke-linejoin: round;
 }
-.handle { cursor: grab; }
+.handle { cursor: grab; pointer-events: all; }
 .handle:active { cursor: grabbing; }
 .handle .dot { fill: #fff; stroke-width: 2.5; r: 7; }
 .handle .hit { fill: transparent; r: 20; }
@@ -231,9 +249,11 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .person.submitted .check { color: var(--pencil); }
 .person .org { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
 
-/* Console ------------------------------------------------------------ */
-.console { border-top: 1px solid var(--border); padding-top: 16px; }
-.eyebrow-console { color: var(--pencil); }
+/* Organizer shelf ---------------------------------------------------- */
+.organizer-shelf { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 8px; }
+.organizer-shelf summary { align-items: center; color: var(--muted); cursor: pointer; display: flex; font-size: 0.8rem; font-weight: 600; justify-content: space-between; letter-spacing: 0.08em; text-transform: uppercase; }
+.organizer-shelf summary::marker { color: var(--pencil); }
+.shelf-body { padding: 8px 0 4px; }
 .console-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .issue-field { flex: 1 1 260px; }
 .issue-field textarea { min-height: 88px; resize: vertical; }
@@ -242,6 +262,8 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .console-row textarea { width: 100%; font: inherit; color: var(--ink); padding: 9px 12px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
 .console-row textarea:focus-visible { outline: 2px dashed var(--pencil); outline-offset: 2px; }
 .console-row input#in-seconds { flex: 0 1 92px; }
+.setup-aspects textarea { font: inherit; color: var(--ink); padding: 9px 12px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
+.setup-aspects textarea:focus-visible { outline: 2px dashed var(--pencil); outline-offset: 2px; }
 
 /* Toast -------------------------------------------------------------- */
 .toast {

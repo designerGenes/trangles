@@ -18,6 +18,7 @@ const S = {
   my: [5, 5, 5],
   submittedRound: null,   // round number my last submit belongs to
   state: null,            // latest server snapshot
+  live: false,
   leftDeliberately: false,
   dispAvg: null,          // animated average currently drawn
   countdown: null,
@@ -35,7 +36,7 @@ const pt = (i, v) => [
 ];
 const polyPoints = (vals) => vals.map((v, i) => pt(i, v).join(",")).join(" ");
 
-const plot = { svg: $("plot"), avg: null, mine: null, handles: [] };
+const plot = { svg: $("plot"), avg: null, mine: null, handles: [], dragAttached: false };
 
 function el(tag, attrs, parent) {
   const n = document.createElementNS(SVGNS, tag);
@@ -87,7 +88,6 @@ function buildPlot() {
     el("circle", { class: "hit" }, g);
     const dot = el("circle", { class: "dot", stroke: axisColor(i) }, g);
     g._dot = dot;
-    attachDrag(g, i);
     g.addEventListener("keydown", (e) => {
       const step = { ArrowUp: 0.5, ArrowRight: 0.5, ArrowDown: -0.5, ArrowLeft: -0.5 }[e.key];
       if (step === undefined || !inputEnabled()) return;
@@ -99,18 +99,26 @@ function buildPlot() {
 
   buildReadouts();
   drawMine();
+  attachPlotDrag();
 }
 
-function attachDrag(g, i) {
-  g.addEventListener("pointerdown", (e) => {
+function attachPlotDrag() {
+  if (plot.dragAttached) return;
+  plot.dragAttached = true;
+  plot.svg.addEventListener("pointerdown", (e) => {
     if (!inputEnabled()) return;
+    const handle = e.target.closest && e.target.closest(".handle");
+    const i = handle ? plot.handles.indexOf(handle) : nearestAxis(svgPoint(e));
+    if (i < 0) return;
     e.preventDefault();
     plot.svg.setPointerCapture(e.pointerId);
     const move = (ev) => {
+      if (ev.pointerId !== e.pointerId) return;
       const p = svgPoint(ev);
       setAxis(i, Radar.projectAxis(p, { x: CX, y: CY }, angle(i), R, VMAX()));
     };
     const up = (ev) => {
+      if (ev.pointerId !== e.pointerId) return;
       plot.svg.removeEventListener("pointermove", move);
       plot.svg.removeEventListener("pointerup", up);
       plot.svg.removeEventListener("pointercancel", up);
@@ -121,6 +129,20 @@ function attachDrag(g, i) {
     plot.svg.addEventListener("pointercancel", up);
     move(e);
   });
+}
+
+function nearestAxis(point) {
+  let best = 0, distance = Infinity;
+  S.axes.forEach((_, i) => {
+    const value = Radar.quantizeAxis(Radar.projectAxis(point, { x: CX, y: CY }, angle(i), R, VMAX()), VMAX());
+    const [x, y] = pt(i, value);
+    const candidate = Math.hypot(point.x - x, point.y - y);
+    if (candidate < distance) {
+      best = i;
+      distance = candidate;
+    }
+  });
+  return best;
 }
 
 function svgPoint(evt) {
@@ -220,7 +242,8 @@ function handleMessage(msg) {
       sessionStorage.setItem("tri", JSON.stringify({
         code: S.code, name: S.name, token: S.orgToken || "",
       }));
-      showSession();
+      if (S.organizer) showSetup();
+      else showSession();
       break;
     case "state":
       S.state = msg;
@@ -244,19 +267,30 @@ function send(obj) {
 /* ── rendering ─────────────────────────────────────────────────────── */
 function showSession() {
   $("view-landing").hidden = true;
+  $("view-setup").hidden = true;
   $("view-session").hidden = false;
   $("code-chip").hidden = false;
   $("code-text").textContent = S.code;
-  $("console").hidden = !S.organizer;
+  $("organizer-shelf").hidden = !S.organizer;
   buildPlot();
+}
+
+function showSetup() {
+  $("view-landing").hidden = true;
+  $("view-session").hidden = true;
+  $("view-setup").hidden = false;
+  $("code-chip").hidden = true;
+  if ($("draft-items").children.length === 0) addDraftItem();
 }
 
 function toLanding(message) {
   S.leftDeliberately = true;
   if (S.ws) try { S.ws.close(); } catch (_) {}
-  S.ws = null; S.state = null; S.code = null; S.submittedRound = null;
+  S.ws = null; S.state = null; S.code = null; S.submittedRound = null; S.live = false;
+  $("draft-items").innerHTML = "";
   stopCountdown();
   $("view-session").hidden = true;
+  $("view-setup").hidden = true;
   $("view-landing").hidden = false;
   $("code-chip").hidden = true;
   if (message) toast(message);
@@ -266,6 +300,14 @@ function render() {
   const st = S.state;
   if (!st) return;
   syncAxes(st.axes);
+  if (st.round && !S.live) {
+    S.live = true;
+    showSession();
+  }
+  if (S.organizer && !S.live) {
+    showSetup();
+    return;
+  }
   renderPeople(st);
   const r = st.round;
   const title = $("round-title");
@@ -414,6 +456,8 @@ function escapeHTML(s) {
 /* ── wiring ────────────────────────────────────────────────────────── */
 $("btn-create").onclick = () => {
   S.name = $("in-name").value.trim() || "Anonymous";
+  S.live = false;
+  $("draft-items").innerHTML = "";
   connect({ type: "create", name: S.name });
 };
 $("btn-join").onclick = () => {
@@ -456,6 +500,45 @@ $("code-chip").onclick = () => {
     .then(() => toast("Invite link copied"))
     .catch(() => toast(`Invite link: ${link}`));
 };
+
+$("btn-add-item").onclick = () => addDraftItem();
+$("btn-launch").onclick = () => {
+  const items = draftItemValues();
+  if (items.length === 0) {
+    toast("Add at least one issue before launching.");
+    return;
+  }
+  const aspects = $("setup-custom-aspects").checked ? $("setup-aspects").value.split("\n") : [];
+  send({ type: "load_items", items, aspects });
+  send({ type: "start_round" });
+};
+$("setup-custom-aspects").onchange = () => {
+  $("setup-aspect-field").hidden = !$("setup-custom-aspects").checked;
+};
+
+function addDraftItem(value = "") {
+  const row = document.createElement("div");
+  row.className = "draft-item";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.maxLength = 200;
+  input.placeholder = "Issue key and summary";
+  input.value = value;
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "btn btn-quiet";
+  remove.textContent = "Remove";
+  remove.onclick = () => row.remove();
+  row.append(input, remove);
+  $("draft-items").appendChild(row);
+  input.focus();
+}
+
+function draftItemValues() {
+  return Array.from($("draft-items").querySelectorAll("input"))
+    .map((input) => input.value.trim())
+    .filter(Boolean);
+}
 
 function savedCreds() {
   try { return JSON.parse(sessionStorage.getItem("tri")); } catch (_) { return null; }

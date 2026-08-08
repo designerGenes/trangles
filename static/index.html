@@ -48,6 +48,29 @@
   </div>
 </main>
 
+<!-- ─────────────────────────── new session ─────────────────────────── -->
+<main id="view-setup" hidden>
+  <section class="card setup-card">
+    <span class="eyebrow">New session</span>
+    <h1 class="setup-title">Build the issues you want the team to shape.</h1>
+    <p class="setup-sub">Add, revise, or remove issues before you launch the first round.</p>
+
+    <div id="draft-items" class="draft-items"></div>
+    <button id="btn-add-item" class="btn" type="button">Add issue</button>
+
+    <div class="setup-aspects">
+      <label class="aspect-toggle"><input id="setup-custom-aspects" type="checkbox"> Use custom aspects for this issue set</label>
+      <label id="setup-aspect-field" class="field" hidden>
+        <span>Custom aspects, 2 to 8, one per line</span>
+        <textarea id="setup-aspects" maxlength="2000" placeholder="Risk&#10;Customer impact&#10;Effort"></textarea>
+      </label>
+      <p class="hint">By default, every issue uses Uncertainty, Complexity, and Toil.</p>
+    </div>
+
+    <button id="btn-launch" class="btn btn-primary" type="button">Launch first issue</button>
+  </section>
+</main>
+
 <!-- ───────────────────────────── session ───────────────────────────── -->
 <main id="view-session" hidden>
 
@@ -88,29 +111,30 @@
     <div id="people" class="people"></div>
   </section>
 
-  <section id="console" class="console" hidden>
-    <span class="eyebrow eyebrow-console">Organizer console</span>
-    <div class="console-row">
-      <label class="field issue-field">
-        <span>Issues, one per line</span>
-        <textarea id="in-items" maxlength="20000" placeholder="PROJ-42 Fix validation&#10;PROJ-43 Add import support"></textarea>
-      </label>
-      <label class="aspect-toggle"><input id="custom-aspects" type="checkbox"> Use custom aspects</label>
-      <label id="custom-aspect-field" class="field issue-field" hidden>
-        <span>Custom aspects, 2 to 8, one per line</span>
-        <textarea id="in-aspects" maxlength="2000" placeholder="Risk&#10;Customer impact&#10;Effort"></textarea>
-      </label>
-      <button id="btn-load" class="btn">Load issues</button>
-      <span id="queue-status" class="progress"></span>
+  <details id="organizer-shelf" class="organizer-shelf" hidden>
+    <summary><span>Organizer shelf</span><span id="queue-status" class="progress"></span></summary>
+    <div class="shelf-body">
+      <div class="console-row">
+        <label class="field issue-field">
+          <span>Replace remaining issues, one per line</span>
+          <textarea id="in-items" maxlength="20000" placeholder="PROJ-42 Fix validation&#10;PROJ-43 Add import support"></textarea>
+        </label>
+        <label class="aspect-toggle"><input id="custom-aspects" type="checkbox"> Use custom aspects</label>
+        <label id="custom-aspect-field" class="field issue-field" hidden>
+          <span>Custom aspects, 2 to 8, one per line</span>
+          <textarea id="in-aspects" maxlength="2000" placeholder="Risk&#10;Customer impact&#10;Effort"></textarea>
+        </label>
+        <button id="btn-load" class="btn">Replace queue</button>
+      </div>
+      <div class="console-row">
+        <input id="in-seconds" class="mono" type="number" min="10" max="3600"
+                placeholder="timer s" title="Optional round timer in seconds">
+        <button id="btn-start" class="btn btn-primary">Start next issue</button>
+        <button id="btn-end" class="btn" hidden>End round</button>
+      </div>
+      <button id="btn-close" class="btn btn-quiet">Close session for everyone</button>
     </div>
-    <div class="console-row">
-      <input id="in-seconds" class="mono" type="number" min="10" max="3600"
-              placeholder="timer s" title="Optional round timer in seconds">
-      <button id="btn-start" class="btn btn-primary">Start next issue</button>
-      <button id="btn-end" class="btn" hidden>End round</button>
-    </div>
-    <button id="btn-close" class="btn btn-quiet">Close session for everyone</button>
-  </section>
+  </details>
 
 </main>
 

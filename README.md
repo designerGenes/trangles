@@ -21,6 +21,11 @@ Sessions are held in memory and are erased the moment the last participant
 disconnects. With `REDIS_URL` set, each session mutation is also mirrored to
 Redis and removed there at the same time. No accounts are required.
 
+An organizer first sees a session-builder view, where issues can be added,
+edited, or removed before the first round launches. During a live session,
+queue replacement, timing, and close controls stay in a collapsed Organizer
+shelf so the chart remains the primary interface.
+
 ## Run locally
 
 ```sh
