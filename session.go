@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"log"
+	"math"
 	"net/http"
 	"strings"
 	"sync"
@@ -17,7 +18,7 @@ var DefaultAxes = []string{"Uncertainty", "Complexity", "Toil"}
 
 const (
 	AxisMax        = 10.0
-	AxisMin        = 0.0
+	AxisMin        = 1.0
 	maxNameLen     = 24
 	maxTitleLen    = 200
 	maxRoundSecs   = 3600
@@ -69,6 +70,7 @@ func (h *Hub) create() *Session {
 			axes:           append([]string(nil), DefaultAxes...),
 			axisMins:       defaultAxisValues(AxisMin),
 			axisMaxes:      defaultAxisValues(AxisMax),
+			pointLabels:    cleanPointLabels(nil, int(AxisMax)),
 		}
 		h.sessions[code] = s
 		return s
@@ -166,15 +168,16 @@ type Session struct {
 	hub            *Hub
 	organizerToken string
 
-	mu        sync.Mutex
-	clients   map[*Client]bool
-	round     *Round
-	items     []string
-	nextItem  int
-	axes      []string
-	axisMins  []float64
-	axisMaxes []float64
-	closed    bool
+	mu          sync.Mutex
+	clients     map[*Client]bool
+	round       *Round
+	items       []string
+	nextItem    int
+	axes        []string
+	axisMins    []float64
+	axisMaxes   []float64
+	pointLabels []string
+	closed      bool
 }
 
 type Round struct {
@@ -194,14 +197,14 @@ type Submission struct {
 }
 
 type inboundMsg struct {
-	Type    string    `json:"type"`
-	Title   string    `json:"title"`
-	Items   []string  `json:"items"`
-	Aspects []string  `json:"aspects"`
-	Mins    []float64 `json:"mins"`
-	Maxes   []float64 `json:"maxes"`
-	Seconds int       `json:"seconds"`
-	Values  []float64 `json:"values"`
+	Type        string    `json:"type"`
+	Title       string    `json:"title"`
+	Items       []string  `json:"items"`
+	Aspects     []string  `json:"aspects"`
+	Max         float64   `json:"max"`
+	PointLabels []string  `json:"pointLabels"`
+	Seconds     int       `json:"seconds"`
+	Values      []float64 `json:"values"`
 }
 
 func (s *Session) handle(c *Client, msg *inboundMsg) {
@@ -211,6 +214,25 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 		return
 	}
 	switch msg.Type {
+	case "replace_items":
+		if !c.organizer {
+			c.trySend(errMsg("Only the organizer can replace queued issues."))
+			return
+		}
+		if s.round != nil && s.round.Open {
+			c.trySend(errMsg("End the current round before replacing queued issues."))
+			return
+		}
+		items := cleanItems(msg.Items)
+		if len(items) == 0 {
+			c.trySend(errMsg("Add at least one issue to replace the queue."))
+			return
+		}
+		s.items = items
+		s.nextItem = 0
+		s.persistLocked()
+		s.broadcastStateLocked()
+
 	case "load_items":
 		if !c.organizer {
 			c.trySend(errMsg("Only the organizer can load issues."))
@@ -230,7 +252,7 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 			c.trySend(errMsg(err.Error()))
 			return
 		}
-		mins, maxes, err := cleanBounds(msg.Mins, msg.Maxes, len(aspects))
+		mins, maxes, err := cleanBounds(msg.Max, len(aspects))
 		if err != nil {
 			c.trySend(errMsg(err.Error()))
 			return
@@ -240,6 +262,7 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 		s.axes = aspects
 		s.axisMins = mins
 		s.axisMaxes = maxes
+		s.pointLabels = cleanPointLabels(msg.PointLabels, int(maxes[0]))
 		s.persistLocked()
 		s.broadcastStateLocked()
 
@@ -304,6 +327,7 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 		}
 		vals := make([]float64, len(msg.Values))
 		for i, v := range msg.Values {
+			v = math.Round(v)
 			if v < s.axisMins[i] {
 				v = s.axisMins[i]
 			}
@@ -451,6 +475,7 @@ type StateView struct {
 	AxisMax      float64           `json:"axisMax"`
 	AxisMins     []float64         `json:"axisMins"`
 	AxisMaxes    []float64         `json:"axisMaxes"`
+	PointLabels  []string          `json:"pointLabels"`
 	Participants []ParticipantView `json:"participants"`
 	QueuedItems  int               `json:"queuedItems"`
 	Round        *RoundView        `json:"round,omitempty"`
@@ -460,6 +485,7 @@ func (s *Session) broadcastStateLocked() {
 	sv := StateView{
 		Type: "state", Code: s.Code, Axes: s.axes, AxisMax: AxisMax,
 		AxisMins: s.axisMins, AxisMaxes: s.axisMaxes,
+		PointLabels: s.pointLabels,
 		QueuedItems: len(s.items) - s.nextItem,
 	}
 	for c := range s.clients {
@@ -562,7 +588,7 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 	welcome := map[string]any{
 		"type": "joined", "code": s.Code, "selfId": c.id,
 		"organizer": organizer, "axes": s.axes, "axisMax": AxisMax,
-		"axisMins": s.axisMins, "axisMaxes": s.axisMaxes,
+		"axisMins": s.axisMins, "axisMaxes": s.axisMaxes, "pointLabels": s.pointLabels,
 	}
 	if organizer {
 		welcome["organizerToken"] = s.organizerToken

@@ -14,8 +14,9 @@ const S = {
   orgToken: null,
   name: "",
   axes: ["Uncertainty", "Complexity", "Toil"],
-  axisMins: [0, 0, 0],
+  axisMins: [1, 1, 1],
   axisMaxes: [10, 10, 10],
+  pointLabels: ["", "Light", "", "", "", "", "", "", "", "", "Heavy"],
   my: [3, 3, 3],
   submittedRound: null,   // round number my last submit belongs to
   state: null,            // latest server snapshot
@@ -72,7 +73,10 @@ function buildPlot() {
     for (const fraction of [0.2, 0.6, 1]) {
       const value = axisValue(i, fraction);
       const [tx, ty] = pt(i, value);
-      el("text", { x: tx + 4, y: ty - 4, class: "tick-label" }).textContent = formatValue(value);
+      const tick = el("text", { x: tx + 4, y: ty - 4, class: "tick-label" });
+      tick.textContent = formatValue(value);
+      const title = el("title", {}, tick);
+      title.textContent = pointLabel(value);
     }
     const lx = CX + Math.cos(angle(i)) * (R + 26);
     const ly = CY + Math.sin(angle(i)) * (R + 26);
@@ -85,7 +89,7 @@ function buildPlot() {
     label.textContent = name;
   });
 
-  plot.avg = el("polygon", { points: polyPoints(S.axes.map(() => 0)), class: "avg-shape", visibility: "hidden" });
+  plot.avg = el("polygon", { points: polyPoints(S.axes.map((_, i) => axisMin(i))), class: "avg-shape", visibility: "hidden" });
   plot.mine = el("polygon", { points: polyPoints(S.my), class: "my-shape" });
 
   plot.handles = S.axes.map((name, i) => {
@@ -97,8 +101,9 @@ function buildPlot() {
     el("circle", { class: "hit" }, g);
     const dot = el("circle", { class: "dot", stroke: axisColor(i) }, g);
     g._dot = dot;
+    g._title = el("title", {}, g);
     g.addEventListener("keydown", (e) => {
-      const step = { ArrowUp: 0.5, ArrowRight: 0.5, ArrowDown: -0.5, ArrowLeft: -0.5 }[e.key];
+      const step = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 }[e.key];
       if (step === undefined || !inputEnabled()) return;
       e.preventDefault();
       setAxis(i, S.my[i] + step);
@@ -182,6 +187,7 @@ function drawMine() {
     g.setAttribute("aria-valuenow", S.my[i]);
     const ro = $("ro-" + i);
     if (ro) ro.textContent = formatValue(S.my[i]);
+    g._title.textContent = pointLabel(S.my[i]);
   });
 }
 
@@ -247,8 +253,9 @@ function handleMessage(msg) {
       S.selfId = msg.selfId;
       S.organizer = msg.organizer;
       S.axes = msg.axes;
-      S.axisMins = msg.axisMins || S.axes.map(() => 0);
+      S.axisMins = msg.axisMins || S.axes.map(() => 1);
       S.axisMaxes = msg.axisMaxes || S.axes.map(() => msg.axisMax || 10);
+      S.pointLabels = msg.pointLabels || defaultPointLabels(S.axisMaxes[0]);
       S.my = S.axes.map((_, i) => startingValue(i));
       if (msg.organizerToken) S.orgToken = msg.organizerToken;
       sessionStorage.setItem("tri", JSON.stringify({
@@ -293,7 +300,10 @@ function showSetup() {
   $("view-setup").hidden = false;
   $("code-chip").hidden = true;
   if ($("draft-items").children.length === 0) addDraftItem();
-  renderSetupBounds();
+  if ($("draft-aspects").children.length === 0) {
+    ["Uncertainty", "Complexity", "Toil"].forEach((aspect) => addDraftAspect(aspect));
+  }
+  renderSetupRange();
 }
 
 function toLanding(message) {
@@ -303,6 +313,9 @@ function toLanding(message) {
   S.previewRound = null;
   clearTimeout(S.previewTimer);
   $("draft-items").innerHTML = "";
+  $("draft-aspects").innerHTML = "";
+  $("setup-point-labels").innerHTML = "";
+  $("setup-max").value = "10";
   stopCountdown();
   $("view-session").hidden = true;
   $("view-setup").hidden = true;
@@ -376,12 +389,14 @@ function render() {
 }
 
 function syncAxes(axes) {
-  const mins = S.state.axisMins || axes.map(() => 0);
+  const mins = S.state.axisMins || axes.map(() => 1);
   const maxes = S.state.axisMaxes || axes.map(() => 10);
-  if (!axes || (axes.length === S.axes.length && axes.every((axis, i) => axis === S.axes[i]) && mins.every((value, i) => value === S.axisMins[i]) && maxes.every((value, i) => value === S.axisMaxes[i]))) return;
+  const labels = S.state.pointLabels || defaultPointLabels(maxes[0]);
+  if (!axes || (axes.length === S.axes.length && axes.every((axis, i) => axis === S.axes[i]) && mins.every((value, i) => value === S.axisMins[i]) && maxes.every((value, i) => value === S.axisMaxes[i]) && labels.every((value, i) => value === S.pointLabels[i]) && labels.length === S.pointLabels.length)) return;
   S.axes = axes.slice();
   S.axisMins = mins.slice();
   S.axisMaxes = maxes.slice();
+  S.pointLabels = labels.slice();
   S.my = S.axes.map((_, i) => startingValue(i));
   S.dispAvg = null;
   buildPlot();
@@ -392,7 +407,19 @@ function startingValue(i) {
 }
 
 function formatValue(value) {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+  return String(Math.round(value));
+}
+
+function pointLabel(value) {
+  const label = S.pointLabels[Math.round(value)];
+  return label ? `${formatValue(value)}: ${label}` : formatValue(value);
+}
+
+function defaultPointLabels(max) {
+  const labels = Array(Math.round(max) + 1).fill("");
+  labels[1] = "Light";
+  labels[Math.round(max)] = "Heavy";
+  return labels;
 }
 
 function schedulePreview() {
@@ -417,8 +444,6 @@ function renderConsole(round) {
   $("btn-start").hidden = open || queued === 0;
   $("in-items").disabled = open;
   $("btn-load").disabled = open;
-  $("custom-aspects").disabled = open;
-  $("in-aspects").disabled = open;
   $("btn-end").hidden = !open;
   $("queue-status").textContent = queued
     ? `${queued} issue${queued === 1 ? "" : "s"} ready`
@@ -426,69 +451,65 @@ function renderConsole(round) {
 }
 
 function setupAspectNames() {
-  if (!$("setup-custom-aspects").checked) return ["Uncertainty", "Complexity", "Toil"];
-  return $("setup-aspects").value.split("\n").map((value) => value.trim()).filter(Boolean);
+  return Array.from($("draft-aspects").querySelectorAll("input"))
+    .map((input) => input.value.trim())
+    .filter(Boolean);
 }
 
-function renderSetupBounds() {
-  const aspects = setupAspectNames();
-  const current = Array.from($("setup-bounds").querySelectorAll(".aspect-bound")).map((row) => ({
-    min: row.querySelector(".bound-min").value,
-    max: row.querySelector(".bound-max").value,
-  }));
-  $("setup-bounds").innerHTML = "";
-  aspects.forEach((aspect, i) => {
-    const row = document.createElement("div");
-    row.className = "aspect-bound";
-    const label = document.createElement("span");
-    label.textContent = aspect;
-    const min = document.createElement("input");
-    min.className = "bound-min mono";
-    min.type = "number";
-    min.step = "0.5";
-    min.value = current[i] ? current[i].min : "0";
-    min.setAttribute("aria-label", `${aspect} minimum`);
-    const max = document.createElement("input");
-    max.className = "bound-max mono";
-    max.type = "number";
-    max.step = "0.5";
-    max.value = current[i] ? current[i].max : "10";
-    max.setAttribute("aria-label", `${aspect} maximum`);
-    min.oninput = max.oninput = renderProspectivePlot;
-    row.append(label, min, max);
-    $("setup-bounds").appendChild(row);
-  });
+function setupMax() {
+  const max = Number($("setup-max").value);
+  return Number.isInteger(max) && max >= 2 && max <= 100 ? max : null;
+}
+
+function renderSetupRange() {
+  renderPointLabelRows();
   renderProspectivePlot();
 }
 
-function setupBounds() {
-  const rows = Array.from($("setup-bounds").querySelectorAll(".aspect-bound"));
-  const mins = rows.map((row) => Number(row.querySelector(".bound-min").value));
-  const maxes = rows.map((row) => Number(row.querySelector(".bound-max").value));
-  if (mins.some((min, i) => !Number.isFinite(min) || !Number.isFinite(maxes[i]) || min >= maxes[i])) {
-    toast("Each aspect needs a maximum greater than its minimum.");
-    return null;
+function renderPointLabelRows() {
+  const max = setupMax();
+  const current = Array.from($("setup-point-labels").querySelectorAll("input")).map((input) => input.value);
+  $("setup-point-labels").innerHTML = "";
+  if (!max) return;
+  for (let value = 1; value <= max; value++) {
+    const row = document.createElement("label");
+    row.className = "point-label-row";
+    const number = document.createElement("span");
+    number.textContent = String(value);
+    const input = document.createElement("input");
+    input.maxLength = 24;
+    input.placeholder = value === 1 ? "Light" : value === max ? "Heavy" : "Optional label";
+    input.value = current[value - 1] ?? (value === 1 ? "Light" : value === max ? "Heavy" : "");
+    row.append(number, input);
+    $("setup-point-labels").appendChild(row);
   }
-  return { mins, maxes };
+}
+
+function setupPointLabels() {
+  const max = setupMax();
+  if (!max) return [];
+  const labels = Array(max + 1).fill("");
+  Array.from($("setup-point-labels").querySelectorAll("input")).forEach((input, i) => { labels[i + 1] = input.value.trim(); });
+  if (!labels[1]) labels[1] = "Light";
+  if (!labels[max]) labels[max] = "Heavy";
+  return labels;
 }
 
 function renderProspectivePlot() {
   const aspects = setupAspectNames();
-  const bounds = setupBoundsSilent();
-  if (aspects.length < 2 || !bounds) {
+  const max = setupMax();
+  const validAspects = aspects.length >= 2;
+  $("setup-aspect-warning").hidden = validAspects;
+  $("btn-launch").disabled = !validAspects || !max;
+  $("setup-plot").hidden = !validAspects || !max;
+  if (!validAspects || !max) {
     $("setup-plot").innerHTML = "";
     return;
   }
-  const values = aspects.map((_, i) => Math.min(bounds.maxes[i], Math.max(bounds.mins[i], 3)));
-  drawStaticRadar($("setup-plot"), aspects, bounds.mins, bounds.maxes, [{ name: "Starting values", values, color: "#1E2B2F" }]);
-}
-
-function setupBoundsSilent() {
-  const rows = Array.from($("setup-bounds").querySelectorAll(".aspect-bound"));
-  const mins = rows.map((row) => Number(row.querySelector(".bound-min").value));
-  const maxes = rows.map((row) => Number(row.querySelector(".bound-max").value));
-  if (mins.length === 0 || mins.some((min, i) => !Number.isFinite(min) || !Number.isFinite(maxes[i]) || min >= maxes[i])) return null;
-  return { mins, maxes };
+  const mins = aspects.map(() => 1);
+  const maxes = aspects.map(() => max);
+  const values = aspects.map(() => Math.min(max, 3));
+  drawStaticRadar($("setup-plot"), aspects, mins, maxes, [{ name: "Starting values", values, color: "#1E2B2F" }]);
 }
 
 function renderLiveInputs(shapes) {
@@ -662,6 +683,9 @@ $("btn-create").onclick = () => {
   if (!S.name) return;
   S.live = false;
   $("draft-items").innerHTML = "";
+  $("draft-aspects").innerHTML = "";
+  $("setup-point-labels").innerHTML = "";
+  $("setup-max").value = "10";
   connect({ type: "create", name: S.name });
 };
 $("btn-join").onclick = () => {
@@ -683,11 +707,7 @@ $("btn-submit").onclick = () => {
 };
 $("btn-load").onclick = () => {
   const items = $("in-items").value.split("\n");
-  const aspects = $("custom-aspects").checked ? $("in-aspects").value.split("\n") : [];
-  send({ type: "load_items", items, aspects });
-};
-$("custom-aspects").onchange = () => {
-  $("custom-aspect-field").hidden = !$("custom-aspects").checked;
+  send({ type: "replace_items", items });
 };
 $("btn-start").onclick = () => {
   const secs = parseInt($("in-seconds").value, 10);
@@ -707,23 +727,23 @@ $("code-chip").onclick = () => {
 };
 
 $("btn-add-item").onclick = () => addDraftItem();
+$("btn-add-aspect").onclick = () => addDraftAspect();
 $("btn-launch").onclick = () => {
   const items = draftItemValues();
   if (items.length === 0) {
     toast("Add at least one issue before launching.");
     return;
   }
-  const aspects = $("setup-custom-aspects").checked ? setupAspectNames() : [];
-  const bounds = setupBounds();
-  if (!bounds) return;
-  send({ type: "load_items", items, aspects, mins: bounds.mins, maxes: bounds.maxes });
+  const aspects = setupAspectNames();
+  const max = setupMax();
+  if (aspects.length < 2 || !max) {
+    renderProspectivePlot();
+    return;
+  }
+  send({ type: "load_items", items, aspects, max, pointLabels: setupPointLabels() });
   send({ type: "start_round" });
 };
-$("setup-custom-aspects").onchange = () => {
-  $("setup-aspect-field").hidden = !$("setup-custom-aspects").checked;
-  renderSetupBounds();
-};
-$("setup-aspects").oninput = renderSetupBounds;
+$("setup-max").oninput = renderSetupRange;
 $("btn-live-overlay").onclick = () => { S.liveView = "overlay"; renderLiveInputs((S.state.round && S.state.round.liveShapes) || []); };
 $("btn-live-grid").onclick = () => { S.liveView = "grid"; renderLiveInputs((S.state.round && S.state.round.liveShapes) || []); };
 
@@ -743,6 +763,26 @@ function addDraftItem(value = "") {
   row.append(input, remove);
   $("draft-items").appendChild(row);
   input.focus();
+}
+
+function addDraftAspect(value = "") {
+  const row = document.createElement("div");
+  row.className = "draft-item";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.maxLength = 24;
+  input.placeholder = "Aspect name";
+  input.value = value;
+  input.oninput = renderProspectivePlot;
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "btn btn-quiet";
+  remove.textContent = "Remove";
+  remove.onclick = () => { row.remove(); renderProspectivePlot(); };
+  row.append(input, remove);
+  $("draft-aspects").appendChild(row);
+  input.focus();
+  renderProspectivePlot();
 }
 
 function draftItemValues() {

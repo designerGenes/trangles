@@ -7,7 +7,7 @@
   }
 
   function quantizeAxis(value, minValue, maxValue) {
-    return Math.round(Math.min(maxValue, Math.max(minValue, value)) * 2) / 2;
+    return Math.round(Math.min(maxValue, Math.max(minValue, value)));
   }
 
   const api = { projectAxis, quantizeAxis };

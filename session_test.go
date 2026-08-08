@@ -117,7 +117,7 @@ func TestPointingRoundClampsSubmissionsAndCalculatesSummary(t *testing.T) {
 
 	session.handle(guest, &inboundMsg{Type: "submit", Values: []float64{-4, 5, 20}})
 	session.handle(organizer, &inboundMsg{Type: "submit", Values: []float64{4, 7, 2}})
-	if got := session.round.Submissions[guest.id].Values; !sameValues(got, []float64{0, 5, 10}) {
+	if got := session.round.Submissions[guest.id].Values; !sameValues(got, []float64{1, 5, 10}) {
 		t.Fatalf("submission was not clamped: %#v", got)
 	}
 
@@ -125,7 +125,7 @@ func TestPointingRoundClampsSubmissionsAndCalculatesSummary(t *testing.T) {
 	if session.round.Open || session.round.Summary == nil {
 		t.Fatal("round did not conclude with a summary")
 	}
-	if got := session.round.Summary.Averages; !sameValues(got, []float64{2, 6, 6}) {
+	if got := session.round.Summary.Averages; !sameValues(got, []float64{2.5, 6, 6}) {
 		t.Fatalf("averages = %#v", got)
 	}
 	if session.round.Summary.StoryPoints < 1 || session.round.Summary.StoryPoints > 13 {
@@ -138,20 +138,23 @@ func TestPointingRoundClampsSubmissionsAndCalculatesSummary(t *testing.T) {
 	}
 }
 
-func TestAspectBoundsClampLivePreviewsAndStayOrganizerOnly(t *testing.T) {
+func TestSharedWholePointRangeClampsLivePreviewsAndStaysOrganizerOnly(t *testing.T) {
 	_, session, organizer, guest := newTestSession(t, nil)
 	session.handle(organizer, &inboundMsg{
 		Type: "load_items", Items: []string{"PROJ-1"}, Aspects: []string{"Risk", "Reach"},
-		Mins: []float64{2, 10}, Maxes: []float64{6, 20},
+		Max: 20, PointLabels: []string{"", "Light", "", "Heavy"},
 	})
-	if !sameValues(session.axisMins, []float64{2, 10}) || !sameValues(session.axisMaxes, []float64{6, 20}) {
-		t.Fatalf("aspect bounds = %#v / %#v", session.axisMins, session.axisMaxes)
+	if !sameValues(session.axisMins, []float64{1, 1}) || !sameValues(session.axisMaxes, []float64{20, 20}) {
+		t.Fatalf("point range = %#v / %#v", session.axisMins, session.axisMaxes)
+	}
+	if session.pointLabels[1] != "Light" || session.pointLabels[20] != "Heavy" {
+		t.Fatalf("point labels = %#v", session.pointLabels)
 	}
 	session.handle(organizer, &inboundMsg{Type: "start_round"})
 	drain(organizer)
 	drain(guest)
-	session.handle(guest, &inboundMsg{Type: "preview", Values: []float64{-1, 30}})
-	if got := session.round.Previews[guest.id].Values; !sameValues(got, []float64{2, 20}) {
+	session.handle(guest, &inboundMsg{Type: "preview", Values: []float64{-1, 7.6}})
+	if got := session.round.Previews[guest.id].Values; !sameValues(got, []float64{1, 8}) {
 		t.Fatalf("preview was not clamped: %#v", got)
 	}
 
@@ -162,6 +165,29 @@ func TestAspectBoundsClampLivePreviewsAndStayOrganizerOnly(t *testing.T) {
 	}
 	if len(guestState.Round.LiveShapes) != 0 {
 		t.Fatalf("guest received organizer-only previews: %#v", guestState.Round.LiveShapes)
+	}
+}
+
+func TestPointMaximumMustBeWholeNumber(t *testing.T) {
+	_, session, organizer, _ := newTestSession(t, nil)
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: []string{"PROJ-1"}, Max: 4.5})
+	expectError(t, organizer)
+	if !sameValues(session.axisMins, []float64{1, 1, 1}) || !sameValues(session.axisMaxes, []float64{10, 10, 10}) {
+		t.Fatalf("invalid max changed range: %#v / %#v", session.axisMins, session.axisMaxes)
+	}
+}
+
+func TestReplacingQueuePreservesAspectConfiguration(t *testing.T) {
+	_, session, organizer, _ := newTestSession(t, nil)
+	session.handle(organizer, &inboundMsg{
+		Type: "load_items", Items: []string{"PROJ-1"}, Aspects: []string{"Risk", "Reach"}, Max: 7,
+	})
+	session.handle(organizer, &inboundMsg{Type: "replace_items", Items: []string{"PROJ-2", "PROJ-3"}})
+	if got, want := session.items, []string{"PROJ-2", "PROJ-3"}; !sameStrings(got, want) {
+		t.Fatalf("replacement items = %#v, want %#v", got, want)
+	}
+	if !sameStrings(session.axes, []string{"Risk", "Reach"}) || !sameValues(session.axisMaxes, []float64{7, 7}) {
+		t.Fatalf("queue replacement changed aspect configuration: %#v / %#v", session.axes, session.axisMaxes)
 	}
 }
 

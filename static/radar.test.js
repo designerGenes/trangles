@@ -7,6 +7,7 @@ assert.equal(projectAxis({ x: 100, y: 50 }, { x: 50, y: 50 }, 0, 100, 0, 10), 5)
 assert.equal(projectAxis({ x: 50, y: 0 }, { x: 50, y: 50 }, -Math.PI / 2, 100, 2, 12), 7);
 assert.equal(quantizeAxis(-2, 0, 10), 0);
 assert.equal(quantizeAxis(12, 0, 10), 10);
-assert.equal(quantizeAxis(4.26, 0, 10), 4.5);
+assert.equal(quantizeAxis(4.26, 0, 10), 4);
+assert.equal(quantizeAxis(4.7, 0, 10), 5);
 
 console.log("radar geometry tests passed");

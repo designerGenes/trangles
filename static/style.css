@@ -96,16 +96,20 @@ main { max-width: 680px; margin: 0 auto; padding: 8px 16px 48px; }
 }
 .setup-sub { color: var(--muted); margin: 0 0 18px; }
 .draft-items { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
-.draft-item { display: flex; align-items: center; gap: 8px; }
+.draft-item { align-items: center; background: #fff; border: 1px solid var(--border); border-radius: 6px; display: flex; gap: 8px; padding: 7px; }
 .draft-item input { flex: 1; }
 .draft-item .btn-quiet { margin: 0; }
 .setup-aspects { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 14px; }
-.setup-aspects textarea { width: 100%; min-height: 86px; margin-top: 8px; }
-.setup-aspects .hint { margin: 8px 0 16px; }
-.setup-bounds { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 14px; }
-.aspect-bound { align-items: center; display: grid; gap: 8px; grid-template-columns: 1fr 5.5rem 5.5rem; margin-top: 8px; }
-.aspect-bound::after { content: "min\00a0\00a0\00a0 max"; grid-column: 2 / 4; grid-row: 1; color: var(--muted); font-size: 0.65rem; letter-spacing: 0.06em; pointer-events: none; text-transform: uppercase; transform: translateY(-18px); }
-.aspect-bound input { grid-row: 1; margin-top: 16px; }
+.setup-warning { color: var(--pencil); font-size: 0.85rem; font-weight: 600; margin: 10px 0 0; }
+.setup-range { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 14px; }
+.range-field { max-width: 8rem; }
+.range-field input { margin-top: 4px; }
+.setup-range .hint { margin-top: 6px; }
+.point-label-editor { border-top: 1px solid var(--grid); margin-top: 12px; padding-top: 10px; }
+.point-label-editor summary { color: var(--muted); cursor: pointer; font-size: 0.82rem; }
+#setup-point-labels { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.point-label-row { align-items: center; display: grid; gap: 8px; grid-template-columns: 2rem 1fr; }
+.point-label-row span { color: var(--muted); font-family: "Spline Sans Mono", monospace; text-align: right; }
 .prospective-chart { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 14px; }
 .prospective-chart svg { display: block; margin: 0 auto; max-width: 300px; width: 100%; }
 
@@ -287,8 +291,6 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .console-row textarea { width: 100%; font: inherit; color: var(--ink); padding: 9px 12px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
 .console-row textarea:focus-visible { outline: 2px dashed var(--pencil); outline-offset: 2px; }
 .console-row input#in-seconds { flex: 0 1 92px; }
-.setup-aspects textarea { font: inherit; color: var(--ink); padding: 9px 12px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
-.setup-aspects textarea:focus-visible { outline: 2px dashed var(--pencil); outline-offset: 2px; }
 
 /* Toast -------------------------------------------------------------- */
 .toast {

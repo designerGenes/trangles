@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"strings"
 	"time"
 
@@ -28,6 +29,7 @@ type SessionSnapshot struct {
 	Axes           []string       `json:"axes"`
 	AxisMins       []float64      `json:"axisMins"`
 	AxisMaxes      []float64      `json:"axisMaxes"`
+	PointLabels    []string       `json:"pointLabels"`
 	Round          *RoundSnapshot `json:"round,omitempty"`
 }
 
@@ -83,6 +85,7 @@ func (s *Session) snapshotLocked() SessionSnapshot {
 		Axes:           append([]string(nil), s.axes...),
 		AxisMins:       append([]float64(nil), s.axisMins...),
 		AxisMaxes:      append([]float64(nil), s.axisMaxes...),
+		PointLabels:    append([]string(nil), s.pointLabels...),
 	}
 	if s.round != nil {
 		snapshot.Round = &RoundSnapshot{
@@ -153,24 +156,39 @@ func cleanAspects(aspects []string) ([]string, error) {
 	return clean, nil
 }
 
-func cleanBounds(mins, maxes []float64, count int) ([]float64, []float64, error) {
-	if len(mins) == 0 && len(maxes) == 0 {
-		outMins := make([]float64, count)
-		outMaxes := make([]float64, count)
-		for i := range outMaxes {
-			outMaxes[i] = AxisMax
+func cleanBounds(max float64, count int) ([]float64, []float64, error) {
+	if max == 0 {
+		max = AxisMax
+	}
+	if max < 2 || max != math.Trunc(max) {
+		return nil, nil, fmt.Errorf("Point maximum must be a whole number of at least 2")
+	}
+	mins := make([]float64, count)
+	maxes := make([]float64, count)
+	for i := range mins {
+		mins[i] = AxisMin
+		maxes[i] = max
+	}
+	return mins, maxes, nil
+}
+
+func cleanPointLabels(labels []string, max int) []string {
+	clean := make([]string, max+1)
+	for i, label := range labels {
+		if i > max {
+			break
 		}
-		return outMins, outMaxes, nil
-	}
-	if len(mins) != count || len(maxes) != count {
-		return nil, nil, fmt.Errorf("Each aspect needs a minimum and maximum")
-	}
-	outMins := append([]float64(nil), mins...)
-	outMaxes := append([]float64(nil), maxes...)
-	for i := range outMins {
-		if outMins[i] >= outMaxes[i] {
-			return nil, nil, fmt.Errorf("Each aspect maximum must exceed its minimum")
+		label = strings.TrimSpace(label)
+		if len(label) > maxNameLen {
+			label = label[:maxNameLen]
 		}
+		clean[i] = label
 	}
-	return outMins, outMaxes, nil
+	if clean[1] == "" {
+		clean[1] = "Light"
+	}
+	if clean[max] == "" {
+		clean[max] = "Heavy"
+	}
+	return clean
 }
