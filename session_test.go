@@ -75,11 +75,11 @@ func expectError(t *testing.T, client *Client) {
 func TestLoadIssuesConfiguresDefaultAndCustomAspects(t *testing.T) {
 	_, session, organizer, guest := newTestSession(t, nil)
 
-	session.handle(guest, &inboundMsg{Type: "load_items", Items: []string{"PROJ-1"}})
+	session.handle(guest, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1")})
 	expectError(t, guest)
 
-	session.handle(organizer, &inboundMsg{Type: "load_items", Items: []string{"  PROJ-1 first  ", "", "PROJ-2 second"}})
-	if got, want := session.items, []string{"PROJ-1 first", "PROJ-2 second"}; !sameStrings(got, want) {
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("  PROJ-1 first  ", "", "PROJ-2 second")})
+	if got, want := itemTitles(session.items), []string{"PROJ-1 first", "PROJ-2 second"}; !sameStrings(got, want) {
 		t.Fatalf("items = %#v, want %#v", got, want)
 	}
 	if !sameStrings(session.axes, DefaultAxes) {
@@ -87,14 +87,14 @@ func TestLoadIssuesConfiguresDefaultAndCustomAspects(t *testing.T) {
 	}
 
 	session.handle(organizer, &inboundMsg{
-		Type: "load_items", Items: []string{"PROJ-3"}, Aspects: []string{"Risk", "Impact", "Effort", "Reach"},
+		Type: "load_items", Items: testItems("PROJ-3"), Aspects: []string{"Risk", "Impact", "Effort", "Reach"},
 	})
 	if got, want := session.axes, []string{"Risk", "Impact", "Effort", "Reach"}; !sameStrings(got, want) {
 		t.Fatalf("custom aspects = %#v, want %#v", got, want)
 	}
 
 	drain(organizer)
-	session.handle(organizer, &inboundMsg{Type: "load_items", Items: []string{"PROJ-4"}, Aspects: []string{"Only one"}})
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-4"), Aspects: []string{"Only one"}})
 	expectError(t, organizer)
 	if len(session.axes) != 4 {
 		t.Fatalf("invalid custom aspects changed the schema: %#v", session.axes)
@@ -109,7 +109,7 @@ func TestLoadIssuesConfiguresDefaultAndCustomAspects(t *testing.T) {
 
 func TestPointingRoundClampsSubmissionsAndCalculatesSummary(t *testing.T) {
 	_, session, organizer, guest := newTestSession(t, nil)
-	session.handle(organizer, &inboundMsg{Type: "load_items", Items: []string{"PROJ-1", "PROJ-2"}})
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1", "PROJ-2")})
 	session.handle(organizer, &inboundMsg{Type: "start_round"})
 	if session.round == nil || session.round.Title != "PROJ-1" || session.nextItem != 1 {
 		t.Fatalf("first queued round was not started: %#v", session.round)
@@ -138,10 +138,72 @@ func TestPointingRoundClampsSubmissionsAndCalculatesSummary(t *testing.T) {
 	}
 }
 
+func TestIssueMetadataAndSubmittedEstimatesAreImmutable(t *testing.T) {
+	_, session, organizer, guest := newTestSession(t, nil)
+	item := Item{Title: "PROJ-1", Link: "https://example.test/PROJ-1", Description: "Investigate the migration path."}
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: []Item{item}})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	if session.round.Link != item.Link || session.round.Description != item.Description {
+		t.Fatalf("round metadata = %#v", session.round)
+	}
+	drain(guest)
+	session.handle(guest, &inboundMsg{Type: "submit", Values: []float64{2, 3, 4}})
+	drain(guest)
+	session.handle(guest, &inboundMsg{Type: "submit", Values: []float64{8, 8, 8}})
+	expectError(t, guest)
+	if got := session.round.Submissions[guest.id].Values; !sameValues(got, []float64{2, 3, 4}) {
+		t.Fatalf("submitted estimate changed: %#v", got)
+	}
+}
+
+func TestReminderTargetsOnlyUnsubmittedParticipants(t *testing.T) {
+	_, session, organizer, guest := newTestSession(t, nil)
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1")})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	drain(organizer)
+	drain(guest)
+	session.handle(organizer, &inboundMsg{Type: "remind"})
+	select {
+	case data := <-guest.send:
+		var msg map[string]string
+		if err := json.Unmarshal(data, &msg); err != nil {
+			t.Fatal(err)
+		}
+		if msg["type"] != "reminder" {
+			t.Fatalf("reminder = %#v", msg)
+		}
+	default:
+		t.Fatal("unsubmitted participant did not receive a reminder")
+	}
+}
+
+func TestParticipantSummaryAnonymizesPeerSubmissions(t *testing.T) {
+	_, session, organizer, guest := newTestSession(t, nil)
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1")})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	drain(organizer)
+	drain(guest)
+	session.handle(guest, &inboundMsg{Type: "submit", Values: []float64{2, 3, 4}})
+	session.handle(organizer, &inboundMsg{Type: "submit", Values: []float64{4, 5, 6}})
+	drain(organizer)
+	drain(guest)
+	session.handle(organizer, &inboundMsg{Type: "end_round"})
+	organizerState := readState(t, organizer)
+	guestState := readState(t, guest)
+	if organizerState.Round.Summary.Shapes[0].Name == "Anonymous response 1" {
+		t.Fatal("organizer summary was anonymized")
+	}
+	for _, shape := range guestState.Round.Summary.Shapes {
+		if !strings.HasPrefix(shape.Name, "Anonymous response") || shape.ID != "" {
+			t.Fatalf("participant shape is identifiable: %#v", shape)
+		}
+	}
+}
+
 func TestSharedWholePointRangeClampsLivePreviewsAndStaysOrganizerOnly(t *testing.T) {
 	_, session, organizer, guest := newTestSession(t, nil)
 	session.handle(organizer, &inboundMsg{
-		Type: "load_items", Items: []string{"PROJ-1"}, Aspects: []string{"Risk", "Reach"},
+		Type: "load_items", Items: testItems("PROJ-1"), Aspects: []string{"Risk", "Reach"},
 		Max: 20, PointLabels: []string{"", "Light", "", "Heavy"},
 	})
 	if !sameValues(session.axisMins, []float64{1, 1}) || !sameValues(session.axisMaxes, []float64{20, 20}) {
@@ -170,7 +232,7 @@ func TestSharedWholePointRangeClampsLivePreviewsAndStaysOrganizerOnly(t *testing
 
 func TestPointMaximumMustBeWholeNumber(t *testing.T) {
 	_, session, organizer, _ := newTestSession(t, nil)
-	session.handle(organizer, &inboundMsg{Type: "load_items", Items: []string{"PROJ-1"}, Max: 4.5})
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1"), Max: 4.5})
 	expectError(t, organizer)
 	if !sameValues(session.axisMins, []float64{1, 1, 1}) || !sameValues(session.axisMaxes, []float64{8, 8, 8}) {
 		t.Fatalf("invalid max changed range: %#v / %#v", session.axisMins, session.axisMaxes)
@@ -180,10 +242,10 @@ func TestPointMaximumMustBeWholeNumber(t *testing.T) {
 func TestReplacingQueuePreservesAspectConfiguration(t *testing.T) {
 	_, session, organizer, _ := newTestSession(t, nil)
 	session.handle(organizer, &inboundMsg{
-		Type: "load_items", Items: []string{"PROJ-1"}, Aspects: []string{"Risk", "Reach"}, Max: 7,
+		Type: "load_items", Items: testItems("PROJ-1"), Aspects: []string{"Risk", "Reach"}, Max: 7,
 	})
-	session.handle(organizer, &inboundMsg{Type: "replace_items", Items: []string{"PROJ-2", "PROJ-3"}})
-	if got, want := session.items, []string{"PROJ-2", "PROJ-3"}; !sameStrings(got, want) {
+	session.handle(organizer, &inboundMsg{Type: "replace_items", Items: testItems("PROJ-2", "PROJ-3")})
+	if got, want := itemTitles(session.items), []string{"PROJ-2", "PROJ-3"}; !sameStrings(got, want) {
 		t.Fatalf("replacement items = %#v, want %#v", got, want)
 	}
 	if !sameStrings(session.axes, []string{"Risk", "Reach"}) || !sameValues(session.axisMaxes, []float64{7, 7}) {
@@ -251,7 +313,7 @@ func TestRedisSessionStoreSavesAndDeletesSnapshots(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	snapshot := SessionSnapshot{Code: "ABCDE", Items: []string{"PROJ-1"}, Axes: []string{"Risk", "Impact"}}
+	snapshot := SessionSnapshot{Code: "ABCDE", Items: testItems("PROJ-1"), Axes: []string{"Risk", "Impact"}}
 	if err := store.Save(snapshot); err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +325,7 @@ func TestRedisSessionStoreSavesAndDeletesSnapshots(t *testing.T) {
 	if err := json.Unmarshal([]byte(raw), &cached); err != nil {
 		t.Fatal(err)
 	}
-	if !sameStrings(cached.Axes, snapshot.Axes) || !sameStrings(cached.Items, snapshot.Items) {
+	if !sameStrings(cached.Axes, snapshot.Axes) || !sameStrings(itemTitles(cached.Items), itemTitles(snapshot.Items)) {
 		t.Fatalf("cached snapshot = %#v", cached)
 	}
 	if err := store.Delete(snapshot.Code); err != nil {
@@ -288,7 +350,7 @@ func TestWebSocketPointingSession(t *testing.T) {
 	defer guest.Close()
 	readUntil(t, guest, func(msg map[string]any) bool { return msg["type"] == "joined" })
 
-	writeWS(t, organizer, map[string]any{"type": "load_items", "items": []string{"PROJ-1"}, "aspects": []string{"Risk", "Impact"}})
+	writeWS(t, organizer, map[string]any{"type": "load_items", "items": []Item{{Title: "PROJ-1"}}, "aspects": []string{"Risk", "Impact"}})
 	readUntil(t, organizer, func(msg map[string]any) bool {
 		return msg["type"] == "state" && len(msg["axes"].([]any)) == 2
 	})
@@ -386,6 +448,22 @@ func sameStrings(a, b []string) bool {
 	return true
 }
 
+func testItems(titles ...string) []Item {
+	items := make([]Item, len(titles))
+	for i, title := range titles {
+		items[i] = Item{Title: title}
+	}
+	return items
+}
+
+func itemTitles(items []Item) []string {
+	titles := make([]string, len(items))
+	for i, item := range items {
+		titles[i] = item.Title
+	}
+	return titles
+}
+
 func sameValues(a, b []float64) bool {
 	if len(a) != len(b) {
 		return false
@@ -429,7 +507,7 @@ func TestConcludedRoundsBuildOrganizerOnlyHistory(t *testing.T) {
 	store := &recordingStore{}
 	_, session, organizer, guest := newTestSession(t, store)
 
-	session.handle(organizer, &inboundMsg{Type: "load_items", Items: []string{"PROJ-1 first", "PROJ-2 second"}})
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1 first", "PROJ-2 second")})
 
 	// Nothing has concluded yet, so there is no history to page through.
 	drain(organizer)

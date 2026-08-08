@@ -232,7 +232,7 @@ function drawAverage(target) {
 
 function inputEnabled() {
   const r = S.state && S.state.round;
-  return !!(r && r.open && !S.organizer);
+  return !!(r && r.open && !S.organizer && !selfSubmitted(S.state));
 }
 
 /* ── websocket ─────────────────────────────────────────────────────── */
@@ -281,6 +281,9 @@ function handleMessage(msg) {
     case "error":
       toast(msg.message);
       if (msg.fatal) toLanding();
+      break;
+    case "reminder":
+      toast(msg.message);
       break;
     case "closed":
       S.leftDeliberately = true;
@@ -368,6 +371,8 @@ function render() {
       ? "Post an issue below to start the first round."
       : "Waiting for the organizer to post an issue.";
     title.classList.add("idle");
+    title.removeAttribute("href");
+    $("round-description").hidden = true;
     submitBtn.disabled = true;
     $("progress").textContent = "";
     $("summary-card").hidden = true;
@@ -380,13 +385,24 @@ function render() {
   }
 
   title.textContent = r.title;
+  if (r.link) {
+    title.href = r.link;
+    title.target = "_blank";
+    title.rel = "noreferrer";
+  } else {
+    title.removeAttribute("href");
+    title.removeAttribute("target");
+    title.removeAttribute("rel");
+  }
+  $("round-description").textContent = r.description || "";
+  $("round-description").hidden = !r.description;
   title.classList.remove("idle");
   eyebrow.textContent = `Round ${r.number} — ${r.open ? "estimating" : "concluded"}`;
   $("plot-wrap").classList.toggle("plot-disabled", !r.open);
 
-  const mineIn = r.number === S.submittedRound;
-  submitBtn.disabled = !r.open;
-  submitBtn.textContent = mineIn ? "Update estimate" : "Submit estimate";
+  const mineIn = selfSubmitted(st);
+  submitBtn.disabled = !r.open || mineIn;
+  submitBtn.textContent = mineIn ? "Estimate submitted" : "Submit estimate";
   // Organizers never submit, so they must not inflate the denominator —
   // "2 of 3" could otherwise never complete.
   const estimators = st.participants.filter((person) => !person.organizer).length;
@@ -455,6 +471,11 @@ function schedulePreview() {
   S.previewTimer = setTimeout(() => send({ type: "preview", values: S.my }), 40);
 }
 
+function selfSubmitted(state) {
+  const self = state.participants && state.participants.find((person) => person.id === S.selfId);
+  return !!(self && self.submitted);
+}
+
 function renderPeople(st) {
   $("people").innerHTML = st.participants.map((p) => `
     <span class="person ${p.submitted ? "submitted" : ""}">
@@ -467,6 +488,7 @@ function renderConsole(round) {
   if (!S.organizer) return;
   const open = !!(round && round.open);
   const queued = S.state.queuedItems || 0;
+  const pending = (S.state.participants || []).filter((person) => !person.organizer && !person.submitted);
   $("btn-start").hidden = open || queued === 0;
   $("in-items").disabled = open;
   $("btn-load").disabled = open;
@@ -476,6 +498,9 @@ function renderConsole(round) {
   $("queue-status").textContent = queued
     ? `${queued} issue${queued === 1 ? "" : "s"} ready`
     : "Load issues to begin";
+  $("pending-panel").hidden = !open || pending.length === 0;
+  $("pending-people").textContent = pending.map((person) => person.name).join(", ");
+  $("btn-remind").disabled = pending.length === 0;
 }
 
 function setupAspectNames() {
@@ -820,14 +845,19 @@ $("btn-submit").onclick = () => {
   render();
 };
 $("btn-load").onclick = () => {
-  const items = $("in-items").value.split("\n");
+  const items = $("in-items").value.split("\n").map((title) => ({ title }));
   send({ type: "replace_items", items });
 };
 $("btn-start").onclick = () => {
   const secs = parseInt($("in-seconds").value, 10);
   send({ type: "start_round", seconds: isNaN(secs) ? 0 : secs });
 };
-$("btn-end").onclick = () => send({ type: "end_round" });
+$("btn-end").onclick = () => {
+  const pending = (S.state.participants || []).filter((person) => !person.organizer && !person.submitted);
+  if (pending.length && !confirm(`Move to the next issue without estimates from ${pending.map((person) => person.name).join(", ")}?`)) return;
+  send({ type: "end_round" });
+};
+$("btn-remind").onclick = () => send({ type: "remind" });
 $("btn-history-prev").onclick = () => stepHistory(-1);
 $("btn-history-next").onclick = () => stepHistory(1);
 
@@ -877,21 +907,39 @@ $("setup-max").oninput = renderSetupRange;
 $("btn-live-overlay").onclick = () => { S.liveView = "overlay"; renderLiveInputs((S.state.round && S.state.round.liveShapes) || []); };
 $("btn-live-grid").onclick = () => { S.liveView = "grid"; renderLiveInputs((S.state.round && S.state.round.liveShapes) || []); };
 
-function addDraftItem(value = "") {
+function addDraftItem(item = {}) {
+  const entry = document.createElement("div");
+  entry.className = "draft-item-entry";
   const row = document.createElement("div");
   row.className = "draft-item";
   const input = document.createElement("input");
   input.type = "text";
   input.maxLength = 200;
   input.placeholder = "Issue key and summary";
-  input.value = value;
+  input.value = item.title || "";
   const remove = document.createElement("button");
   remove.type = "button";
   remove.className = "btn btn-quiet";
   remove.textContent = "Remove";
-  remove.onclick = () => row.remove();
+  remove.onclick = () => entry.remove();
   row.append(input, remove);
-  $("draft-items").appendChild(row);
+  const meta = document.createElement("details");
+  meta.className = "draft-item-meta";
+  const summary = document.createElement("summary");
+  summary.textContent = "Add link or description";
+  const link = document.createElement("input");
+  link.type = "url";
+  link.className = "item-link";
+  link.placeholder = "Optional issue link";
+  link.value = item.link || "";
+  const description = document.createElement("textarea");
+  description.className = "item-description";
+  description.maxLength = 2000;
+  description.placeholder = "Optional issue description";
+  description.value = item.description || "";
+  meta.append(summary, link, description);
+  entry.append(row, meta);
+  $("draft-items").appendChild(entry);
   input.focus();
 }
 
@@ -916,9 +964,13 @@ function addDraftAspect(value = "") {
 }
 
 function draftItemValues() {
-  return Array.from($("draft-items").querySelectorAll("input"))
-    .map((input) => input.value.trim())
-    .filter(Boolean);
+  return Array.from($("draft-items").querySelectorAll(".draft-item-entry"))
+    .map((entry) => ({
+      title: entry.querySelector(".draft-item input").value.trim(),
+      link: entry.querySelector(".item-link").value.trim(),
+      description: entry.querySelector(".item-description").value.trim(),
+    }))
+    .filter((item) => item.title);
 }
 
 function requiredNickname() {

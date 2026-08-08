@@ -110,7 +110,8 @@
       <span id="round-eyebrow" class="eyebrow">Waiting</span>
       <span id="round-timer" class="mono timer" hidden></span>
     </div>
-    <h2 id="round-title" class="round-title">Waiting for the organizer to post an issue.</h2>
+    <h2 class="round-title"><a id="round-title">Waiting for the organizer to post an issue.</a></h2>
+    <p id="round-description" class="round-description" hidden></p>
 
     <div id="plot-wrap" class="plot-wrap">
       <svg id="plot" viewBox="-70 -45 500 434" role="img"
@@ -183,7 +184,7 @@
   </section>
 
   <div id="end-rail" class="end-rail" hidden>
-    <button id="btn-end" class="btn end-float" type="button">End round</button>
+    <button id="btn-end" class="btn end-float" type="button">Next Issue</button>
   </div>
 
   <details id="organizer-shelf" class="organizer-shelf" hidden>
@@ -195,7 +196,12 @@
       <div class="console-row">
         <input id="in-seconds" class="mono" type="number" min="10" max="3600"
                 placeholder="timer s" title="Optional round timer in seconds">
-        <button id="btn-start" class="btn btn-primary">Start next issue</button>
+        <button id="btn-start" class="btn btn-primary">Next Issue</button>
+      </div>
+      <div id="pending-panel" class="pending-panel" hidden>
+        <span class="eyebrow">Waiting on</span>
+        <span id="pending-people" class="pending-people"></span>
+        <button id="btn-remind" class="btn" type="button">Send reminder</button>
       </div>
       <details class="queue-editor">
         <summary>Replace remaining queue</summary>

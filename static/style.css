@@ -113,6 +113,12 @@ main { max-width: 680px; margin: 0 auto; padding: 8px 16px 48px; }
 .draft-item { align-items: center; background: #fff; border: 1px solid var(--border); border-radius: 6px; display: flex; gap: 8px; padding: 7px; }
 .draft-item input { flex: 1; }
 .draft-item .btn-quiet { margin: 0; }
+.draft-item-entry { margin-bottom: 8px; }
+.draft-item-entry .draft-item { margin-bottom: 5px; }
+.draft-item-meta { margin: 0 6px; }
+.draft-item-meta summary { color: var(--muted); cursor: pointer; font-size: 0.78rem; }
+.draft-item-meta .field { margin-top: 8px; }
+.draft-item-meta textarea { background: #fff; border: 1px solid var(--border); border-radius: 6px; color: var(--ink); font: inherit; min-height: 66px; padding: 8px 10px; resize: vertical; width: 100%; }
 .setup-aspects { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 12px; }
 .setup-aspects summary, .setup-drawer summary { align-items: center; color: var(--ink); cursor: pointer; display: flex; font-size: 0.82rem; font-weight: 700; justify-content: space-between; letter-spacing: 0.09em; text-transform: uppercase; }
 .setup-aspects summary::-webkit-details-marker, .setup-drawer summary::-webkit-details-marker, .point-label-editor summary::-webkit-details-marker { display: none; }
@@ -202,6 +208,9 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
   overflow-wrap: anywhere;
 }
 .round-title.idle { color: var(--muted); font-weight: 500; }
+.round-title a { color: inherit; text-decoration: none; }
+.round-title a[href] { text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 3px; }
+.round-description { color: var(--muted); margin: -2px 0 10px; white-space: pre-wrap; }
 
 .plot-wrap { display: flex; flex-direction: column; align-items: center; }
 #plot { width: 100%; max-width: 420px; touch-action: none; user-select: none; cursor: crosshair; overflow: visible; }
@@ -323,6 +332,8 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .console-row textarea { width: 100%; font: inherit; color: var(--ink); padding: 9px 12px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
 .console-row textarea:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .console-row input#in-seconds { flex: 0 1 92px; }
+.pending-panel { align-items: center; border-top: 1px solid var(--grid); display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-top: 12px; }
+.pending-people { color: var(--muted); flex: 1 1 12rem; font-size: 0.85rem; }
 
 /* Floating End round ------------------------------------------------- */
 /* Anchored to the left edge of the 680px content column and fixed, so the

@@ -211,11 +211,11 @@ type Item struct {
 // individual shape, so the organizer can page back through past issues
 // without the server keeping the live round machinery alive.
 type HistoryEntry struct {
-	Number  int      `json:"number"`
-	Title   string   `json:"title"`
-	Link    string   `json:"link,omitempty"`
-	Description string `json:"description,omitempty"`
-	Summary *Summary `json:"summary,omitempty"`
+	Number      int      `json:"number"`
+	Title       string   `json:"title"`
+	Link        string   `json:"link,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Summary     *Summary `json:"summary,omitempty"`
 }
 
 type inboundMsg struct {
@@ -606,7 +606,7 @@ func anonymizeSummary(summary *Summary) *Summary {
 		copy.Outliers[i].Name = "A teammate"
 	}
 	copy.Observations = append([]string(nil), summary.Observations...)
-	for i, shape := range summary.Shapes {
+	for _, shape := range summary.Shapes {
 		for j := range copy.Observations {
 			copy.Observations[j] = strings.ReplaceAll(copy.Observations[j], shape.Name, "a teammate")
 		}
