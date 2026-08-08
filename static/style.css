@@ -129,7 +129,7 @@ details[open] > summary .caret { transform: rotate(225deg); }
 .point-label-row { align-items: center; display: grid; gap: 8px; grid-template-columns: 2rem 1fr; }
 .point-label-row span { color: var(--muted); font-family: "Spline Sans Mono", monospace; text-align: right; }
 .setup-full-chart { margin: 22px 0 0; text-align: left; }
-.setup-full-chart svg { display: block; margin: 4px auto; max-width: 520px; overflow: visible; width: 100%; }
+.setup-full-chart svg { display: block; margin: 4px auto; max-width: 620px; overflow: visible; width: 100%; }
 
 .field { display: block; }
 .field span {
@@ -150,7 +150,7 @@ input {
   background: #fff;
 }
 input:focus-visible, button:focus-visible, .handle:focus-visible {
-  outline: 2px dashed var(--pencil);
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 
@@ -199,7 +199,7 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .round-title.idle { color: var(--muted); font-weight: 500; }
 
 .plot-wrap { display: flex; flex-direction: column; align-items: center; }
-#plot { width: 100%; max-width: 340px; touch-action: none; user-select: none; cursor: crosshair; overflow: visible; }
+#plot { width: 100%; max-width: 420px; touch-action: none; user-select: none; cursor: crosshair; overflow: visible; }
 
 .readouts { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 18px; margin: 2px 0 12px; }
 .readout { text-align: center; }
@@ -287,8 +287,7 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .live-toggle { align-items: center; display: inline-flex; font-size: 0.82rem; gap: 5px; }
 .live-toggle input { width: auto; }
 .live-toggle i { border-radius: 999px; height: 8px; width: 8px; }
-.live-overlay { margin: 0 auto; max-width: 420px; }
-.live-overlay svg { display: block; width: 100%; }
+.live-overlay { display: block; margin: 0 auto; max-width: 520px; overflow: visible; width: 100%; }
 .live-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); margin-top: 12px; }
 .live-mini { text-align: center; }
 .live-mini svg { display: block; width: 100%; }
@@ -307,7 +306,7 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .aspect-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--muted); }
 .aspect-toggle input { width: auto; }
 .console-row textarea { width: 100%; font: inherit; color: var(--ink); padding: 9px 12px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
-.console-row textarea:focus-visible { outline: 2px dashed var(--pencil); outline-offset: 2px; }
+.console-row textarea:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .console-row input#in-seconds { flex: 0 1 92px; }
 
 /* Toast -------------------------------------------------------------- */

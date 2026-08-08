@@ -150,8 +150,8 @@ func cleanAspects(aspects []string) ([]string, error) {
 		seen[key] = true
 		clean = append(clean, aspect)
 	}
-	if len(clean) < 2 || len(clean) > 8 {
-		return nil, fmt.Errorf("Custom aspects must include 2 to 8 unique names")
+	if len(clean) < 2 || len(clean) > 12 {
+		return nil, fmt.Errorf("Custom aspects must include 2 to 12 unique names")
 	}
 	return clean, nil
 }

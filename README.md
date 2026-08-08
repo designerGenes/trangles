@@ -5,7 +5,7 @@ Estimate the *shape* of the work, not a number to defend.
 Instead of a single story-point vote that averages into a sea of 3s, each
 participant stretches the aspects of the work on a radar plot. Organizers can
 use the default **Uncertainty**, **Complexity**, and **Toil** set, or attach a
-shared custom set of **2–8** aspects to a queue of issues. Two aspects render
+shared custom set of **2–12** aspects to a queue of issues. Two aspects render
 as a horizontal line; three or more render as a radar shape. The live group
 consensus is drawn in red pencil as estimates arrive. When the organizer ends
 the round, the server produces:
@@ -61,12 +61,16 @@ the project version before installing.
 ```sh
 go test ./...
 node static/radar.test.js
+node scripts/generate_radar_screenshots.js /tmp/triangulate-radars
 ```
 
 The Go suite covers issue loading, default and custom aspect validation,
 submissions, scoring, organizer permissions, WebSocket session lifecycle, and
 Redis cache cleanup. The Node test covers the pointer-to-axis calculation used
 by the draggable radar handles.
+
+The screenshot generator renders and collision-checks each supported radar
+shape from 2 through 12 aspects before writing PNG and SVG reference images.
 
 ## Deploy (single instance required)
 

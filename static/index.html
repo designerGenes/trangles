@@ -55,7 +55,7 @@
       <button id="btn-launch" class="btn btn-primary setup-launch" type="button">Launch first issue</button>
       <button id="setup-prospect" class="setup-prospect" type="button" aria-label="Show the full prospective chart">
         <span class="eyebrow">Prospective chart</span>
-        <svg id="setup-plot" viewBox="0 0 360 344" role="img" aria-label="Compact prospective estimation chart"></svg>
+        <svg id="setup-plot" viewBox="-70 -45 500 434" role="img" aria-label="Compact prospective estimation chart"></svg>
         <span class="hint">View full chart</span>
       </button>
     </aside>
@@ -74,7 +74,7 @@
         <div class="stack-body">
           <div id="draft-aspects" class="draft-items"></div>
           <button id="btn-add-aspect" class="btn" type="button">Add aspect</button>
-          <p id="setup-aspect-warning" class="setup-warning" hidden>At least 2 aspects are required to launch a session.</p>
+          <p id="setup-aspect-warning" class="setup-warning" hidden>Choose between 2 and 12 aspects to launch a session.</p>
         </div>
       </details>
 
@@ -97,7 +97,7 @@
 
   <section id="setup-full-chart" class="card setup-full-chart">
     <span class="eyebrow">Prospective chart</span>
-    <svg id="setup-full-plot" viewBox="0 0 360 344" role="img" aria-label="Full prospective estimation chart"></svg>
+    <svg id="setup-full-plot" viewBox="-70 -45 500 434" role="img" aria-label="Full prospective estimation chart"></svg>
     <p class="hint">This is the chart participants will use. Each aspect starts at 3, clamped to the shared point range.</p>
   </section>
 </main>
@@ -113,7 +113,7 @@
     <h2 id="round-title" class="round-title">Waiting for the organizer to post an issue.</h2>
 
     <div id="plot-wrap" class="plot-wrap">
-      <svg id="plot" viewBox="0 0 360 344" role="img"
+      <svg id="plot" viewBox="-70 -45 500 434" role="img"
            aria-label="Estimation chart"></svg>
       <div id="readouts" class="readouts"></div>
     </div>
@@ -128,12 +128,12 @@
     <div class="live-head">
       <div><span class="eyebrow">Live input</span><p class="hint">Unsaved charts update as the team adjusts them.</p></div>
       <div class="view-switch" role="group" aria-label="Live chart view">
-        <button id="btn-live-overlay" class="btn" type="button">Overlay</button>
-        <button id="btn-live-grid" class="btn" type="button">Small charts</button>
+        <button id="btn-live-overlay" class="btn" type="button">Sum</button>
+        <button id="btn-live-grid" class="btn" type="button">Individual</button>
       </div>
     </div>
     <div id="live-toggles" class="live-toggles"></div>
-    <div id="live-overlay" class="live-overlay"></div>
+    <svg id="live-overlay" class="live-overlay" viewBox="-70 -45 500 434" role="img" aria-label="Summed participant chart"></svg>
     <div id="live-grid" class="live-grid" hidden></div>
   </section>
 

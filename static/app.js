@@ -33,9 +33,7 @@ const S = {
 
 /* ── plot geometry ─────────────────────────────────────────────────── */
 const CX = 180, CY = 180, R = 132;
-const angle = (i) => S.axes.length === 2
-  ? (i === 0 ? Math.PI : 0)
-  : (-Math.PI / 2) + ((2 * Math.PI * i) / S.axes.length);
+const angle = (i) => Radar.axisAngle(i, S.axes.length);
 const axisColor = (i) => AXIS_COLORS[i % AXIS_COLORS.length];
 const axisMin = (i) => S.axisMins[i] ?? 0;
 const axisMax = (i) => S.axisMaxes[i] ?? 10;
@@ -44,18 +42,6 @@ const pt = (i, v) => [
   CX + Math.cos(angle(i)) * R * ((v - axisMin(i)) / (axisMax(i) - axisMin(i))),
   CY + Math.sin(angle(i)) * R * ((v - axisMin(i)) / (axisMax(i) - axisMin(i))),
 ];
-const labelPosition = (x, y, axisAngle) => {
-  const cos = Math.cos(axisAngle);
-  const sin = Math.sin(axisAngle);
-  if (cos < -0.15) return { x, y: y + (sin < 0 ? -8 : 20), anchor: "end" };
-  if (cos > 0.15) return { x, y: y + (sin < 0 ? -8 : 20), anchor: "start" };
-  return { x, y: y + (sin < 0 ? -26 : 34), anchor: "middle" };
-};
-const tickPosition = (x, y, axisAngle) => ({
-  x: x - Math.sin(axisAngle) * 9,
-  y: y + Math.cos(axisAngle) * 9 + 3,
-  anchor: -Math.sin(axisAngle) < -0.15 ? "end" : -Math.sin(axisAngle) > 0.15 ? "start" : "middle",
-});
 const polyPoints = (vals) => vals.map((v, i) => pt(i, v).join(",")).join(" ");
 
 const plot = { svg: $("plot"), avg: null, mine: null, handles: [], dragAttached: false };
@@ -83,16 +69,15 @@ function buildPlot() {
       class: "axis-line", stroke: axisColor(i),
     });
     // Tick labels along the axis (2..10) — enough to read values off the grid.
-    for (const fraction of [0.2, 0.6, 1]) {
-      const value = axisValue(i, fraction);
-      const [tx, ty] = pt(i, value);
-      const position = tickPosition(tx, ty, angle(i));
+    for (const value of [axisMax(i)]) {
+      const [tx, ty] = pt(i, axisValue(i, 0.9));
+      const position = Radar.tickPosition(tx, ty, angle(i));
       const tick = el("text", { x: position.x, y: position.y, class: "tick-label", "text-anchor": position.anchor });
       tick.textContent = formatValue(value);
       const title = el("title", {}, tick);
       title.textContent = pointLabel(value);
     }
-    const position = labelPosition(x, y, angle(i));
+    const position = Radar.labelPosition(x, y, angle(i));
     const label = el("text", {
       x: position.x, y: position.y, class: "axis-label", fill: axisColor(i),
       "text-anchor": position.anchor,
@@ -512,7 +497,7 @@ function setupPointLabels() {
 function renderProspectivePlot() {
   const aspects = setupAspectNames();
   const max = setupMax();
-  const validAspects = aspects.length >= 2;
+  const validAspects = aspects.length >= 2 && aspects.length <= 12;
   $("setup-aspect-warning").hidden = validAspects;
   $("btn-launch").disabled = !validAspects || !max;
   $("setup-plot").hidden = !validAspects || !max;
@@ -575,7 +560,7 @@ function renderLiveInputs(shapes) {
     const card = document.createElement("div");
     card.className = "live-mini";
     const svg = document.createElementNS(SVGNS, "svg");
-    svg.setAttribute("viewBox", "0 0 360 344");
+    svg.setAttribute("viewBox", "-70 -45 500 434");
     drawStaticRadar(svg, S.axes, S.axisMins, S.axisMaxes, [shape]);
     const name = document.createElement("span");
     name.textContent = shape.name;
@@ -593,7 +578,7 @@ function participantColor(id) {
 
 function drawStaticRadar(svg, axes, mins, maxes, shapes) {
   const cx = 180, cy = 180, radius = 132;
-  const staticAngle = (i) => axes.length === 2 ? (i === 0 ? Math.PI : 0) : (-Math.PI / 2) + ((2 * Math.PI * i) / axes.length);
+  const staticAngle = (i) => Radar.axisAngle(i, axes.length);
   const point = (i, value) => [
     cx + Math.cos(staticAngle(i)) * radius * ((value - mins[i]) / (maxes[i] - mins[i])),
     cy + Math.sin(staticAngle(i)) * radius * ((value - mins[i]) / (maxes[i] - mins[i])),
@@ -612,10 +597,9 @@ function drawStaticRadar(svg, axes, mins, maxes, shapes) {
     line.setAttribute("x1", cx); line.setAttribute("y1", cy); line.setAttribute("x2", x); line.setAttribute("y2", y);
     line.setAttribute("class", "axis-line");
     svg.appendChild(line);
-    for (const fraction of [0.2, 0.6, 1]) {
-      const value = mins[i] + (maxes[i] - mins[i]) * fraction;
-      const [tx, ty] = point(i, value);
-      const position = tickPosition(tx, ty, staticAngle(i));
+    for (const value of [maxes[i]]) {
+      const [tx, ty] = point(i, mins[i] + (maxes[i] - mins[i]) * 0.9);
+      const position = Radar.tickPosition(tx, ty, staticAngle(i));
       const tick = document.createElementNS(SVGNS, "text");
       tick.setAttribute("x", position.x);
       tick.setAttribute("y", position.y);
@@ -625,7 +609,7 @@ function drawStaticRadar(svg, axes, mins, maxes, shapes) {
       svg.appendChild(tick);
     }
     const label = document.createElementNS(SVGNS, "text");
-    const position = labelPosition(x, y, staticAngle(i));
+    const position = Radar.labelPosition(x, y, staticAngle(i));
     label.setAttribute("x", position.x);
     label.setAttribute("y", position.y);
     label.setAttribute("class", "axis-label");
@@ -781,7 +765,7 @@ $("btn-launch").onclick = () => {
   }
   const aspects = setupAspectNames();
   const max = setupMax();
-  if (aspects.length < 2 || !max) {
+  if (aspects.length < 2 || aspects.length > 12 || !max) {
     renderProspectivePlot();
     return;
   }

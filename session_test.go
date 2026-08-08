@@ -99,11 +99,11 @@ func TestLoadIssuesConfiguresDefaultAndCustomAspects(t *testing.T) {
 	if len(session.axes) != 4 {
 		t.Fatalf("invalid custom aspects changed the schema: %#v", session.axes)
 	}
-	if aspects, err := cleanAspects([]string{"A", "B", "C", "D", "E", "F", "G", "H"}); err != nil || len(aspects) != 8 {
-		t.Fatalf("eight custom aspects should be accepted: %#v, %v", aspects, err)
+	if aspects, err := cleanAspects([]string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"}); err != nil || len(aspects) != 12 {
+		t.Fatalf("twelve custom aspects should be accepted: %#v, %v", aspects, err)
 	}
-	if _, err := cleanAspects([]string{"A", "B", "C", "D", "E", "F", "G", "H", "I"}); err == nil {
-		t.Fatal("more than eight custom aspects should be rejected")
+	if _, err := cleanAspects([]string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M"}); err == nil {
+		t.Fatal("more than twelve custom aspects should be rejected")
 	}
 }
 
