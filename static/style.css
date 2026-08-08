@@ -102,6 +102,12 @@ main { max-width: 680px; margin: 0 auto; padding: 8px 16px 48px; }
 .setup-aspects { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 14px; }
 .setup-aspects textarea { width: 100%; min-height: 86px; margin-top: 8px; }
 .setup-aspects .hint { margin: 8px 0 16px; }
+.setup-bounds { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 14px; }
+.aspect-bound { align-items: center; display: grid; gap: 8px; grid-template-columns: 1fr 5.5rem 5.5rem; margin-top: 8px; }
+.aspect-bound::after { content: "min\00a0\00a0\00a0 max"; grid-column: 2 / 4; grid-row: 1; color: var(--muted); font-size: 0.65rem; letter-spacing: 0.06em; pointer-events: none; text-transform: uppercase; transform: translateY(-18px); }
+.aspect-bound input { grid-row: 1; margin-top: 16px; }
+.prospective-chart { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 14px; }
+.prospective-chart svg { display: block; margin: 0 auto; max-width: 300px; width: 100%; }
 
 .field { display: block; }
 .field span {
@@ -200,6 +206,7 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .handle .dot { fill: #fff; stroke-width: 2.5; r: 7; }
 .handle .hit { fill: transparent; r: 20; }
 .plot-disabled .handle { cursor: default; }
+.live-shape { cursor: help; fill-opacity: 0.13; stroke-width: 2.5; stroke-linejoin: round; }
 
 /* Summary ------------------------------------------------------------ */
 .summary-card { border-left: 4px solid var(--pencil); }
@@ -249,11 +256,29 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .person.submitted .check { color: var(--pencil); }
 .person .org { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
 
+/* Live organizer charts --------------------------------------------- */
+.live-head { align-items: start; display: flex; gap: 12px; justify-content: space-between; }
+.live-head .hint { margin-top: 3px; }
+.view-switch { display: flex; gap: 6px; }
+.view-switch .btn { font-size: 0.8rem; padding: 6px 10px; }
+.live-toggles { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 14px 0 8px; }
+.live-toggle { align-items: center; display: inline-flex; font-size: 0.82rem; gap: 5px; }
+.live-toggle input { width: auto; }
+.live-toggle i { border-radius: 999px; height: 8px; width: 8px; }
+.live-overlay { margin: 0 auto; max-width: 420px; }
+.live-overlay svg { display: block; width: 100%; }
+.live-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); margin-top: 12px; }
+.live-mini { text-align: center; }
+.live-mini svg { display: block; width: 100%; }
+.live-mini span { font-size: 0.78rem; font-weight: 600; }
+
 /* Organizer shelf ---------------------------------------------------- */
 .organizer-shelf { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 8px; }
 .organizer-shelf summary { align-items: center; color: var(--muted); cursor: pointer; display: flex; font-size: 0.8rem; font-weight: 600; justify-content: space-between; letter-spacing: 0.08em; text-transform: uppercase; }
 .organizer-shelf summary::marker { color: var(--pencil); }
 .shelf-body { padding: 8px 0 4px; }
+.queue-editor { border-top: 1px solid var(--grid); margin-top: 14px; padding-top: 10px; }
+.queue-editor summary { color: var(--muted); cursor: pointer; font-size: 0.82rem; }
 .console-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .issue-field { flex: 1 1 260px; }
 .issue-field textarea { min-height: 88px; resize: vertical; }
@@ -284,6 +309,7 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
   .landing-rule { width: auto; height: 1px; }
   .summary-head { flex-direction: column; text-align: center; }
   .axis-row { grid-template-columns: 6rem 1fr 5rem; }
+  .live-head { align-items: stretch; flex-direction: column; }
 }
 
 @media (prefers-reduced-motion: no-preference) {

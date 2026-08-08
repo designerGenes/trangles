@@ -17,6 +17,7 @@ var DefaultAxes = []string{"Uncertainty", "Complexity", "Toil"}
 
 const (
 	AxisMax        = 10.0
+	AxisMin        = 0.0
 	maxNameLen     = 24
 	maxTitleLen    = 200
 	maxRoundSecs   = 3600
@@ -66,6 +67,8 @@ func (h *Hub) create() *Session {
 			clients:        make(map[*Client]bool),
 			organizerToken: randCode(20),
 			axes:           append([]string(nil), DefaultAxes...),
+			axisMins:       defaultAxisValues(AxisMin),
+			axisMaxes:      defaultAxisValues(AxisMax),
 		}
 		h.sessions[code] = s
 		return s
@@ -163,13 +166,15 @@ type Session struct {
 	hub            *Hub
 	organizerToken string
 
-	mu       sync.Mutex
-	clients  map[*Client]bool
-	round    *Round
-	items    []string
-	nextItem int
-	axes     []string
-	closed   bool
+	mu        sync.Mutex
+	clients   map[*Client]bool
+	round     *Round
+	items     []string
+	nextItem  int
+	axes      []string
+	axisMins  []float64
+	axisMaxes []float64
+	closed    bool
 }
 
 type Round struct {
@@ -179,6 +184,7 @@ type Round struct {
 	Deadline    *time.Time
 	timer       *time.Timer
 	Submissions map[string]*Submission // keyed by client id; survives disconnects
+	Previews    map[string]*Submission // keyed by client id; current unsent chart
 	Summary     *Summary
 }
 
@@ -192,6 +198,8 @@ type inboundMsg struct {
 	Title   string    `json:"title"`
 	Items   []string  `json:"items"`
 	Aspects []string  `json:"aspects"`
+	Mins    []float64 `json:"mins"`
+	Maxes   []float64 `json:"maxes"`
 	Seconds int       `json:"seconds"`
 	Values  []float64 `json:"values"`
 }
@@ -222,9 +230,16 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 			c.trySend(errMsg(err.Error()))
 			return
 		}
+		mins, maxes, err := cleanBounds(msg.Mins, msg.Maxes, len(aspects))
+		if err != nil {
+			c.trySend(errMsg(err.Error()))
+			return
+		}
 		s.items = items
 		s.nextItem = 0
 		s.axes = aspects
+		s.axisMins = mins
+		s.axisMaxes = maxes
 		s.persistLocked()
 		s.broadcastStateLocked()
 
@@ -258,6 +273,7 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 			Title:       title,
 			Open:        true,
 			Submissions: make(map[string]*Submission),
+			Previews:    make(map[string]*Submission),
 		}
 		if msg.Seconds > 0 {
 			secs := msg.Seconds
@@ -272,27 +288,35 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 		s.persistLocked()
 		s.broadcastStateLocked()
 
-	case "submit":
+	case "preview", "submit":
 		r := s.round
 		if r == nil || !r.Open {
-			c.trySend(errMsg("No round is open for estimates right now."))
+			if msg.Type == "submit" {
+				c.trySend(errMsg("No round is open for estimates right now."))
+			}
 			return
 		}
 		if len(msg.Values) != len(s.axes) {
-			c.trySend(errMsg("Estimate must cover every axis."))
+			if msg.Type == "submit" {
+				c.trySend(errMsg("Estimate must cover every axis."))
+			}
 			return
 		}
 		vals := make([]float64, len(msg.Values))
 		for i, v := range msg.Values {
-			if v < 0 {
-				v = 0
+			if v < s.axisMins[i] {
+				v = s.axisMins[i]
 			}
-			if v > AxisMax {
-				v = AxisMax
+			if v > s.axisMaxes[i] {
+				v = s.axisMaxes[i]
 			}
 			vals[i] = v
 		}
-		r.Submissions[c.id] = &Submission{Name: c.name, Values: vals}
+		preview := &Submission{Name: c.name, Values: vals}
+		r.Previews[c.id] = preview
+		if msg.Type == "submit" {
+			r.Submissions[c.id] = preview
+		}
 		s.persistLocked()
 		s.broadcastStateLocked()
 
@@ -410,13 +434,14 @@ type ParticipantView struct {
 }
 
 type RoundView struct {
-	Number         int       `json:"number"`
-	Title          string    `json:"title"`
-	Open           bool      `json:"open"`
-	DeadlineMs     int64     `json:"deadlineMs,omitempty"`
-	SubmittedCount int       `json:"submittedCount"`
-	Average        []float64 `json:"average,omitempty"`
-	Summary        *Summary  `json:"summary,omitempty"`
+	Number         int          `json:"number"`
+	Title          string       `json:"title"`
+	Open           bool         `json:"open"`
+	DeadlineMs     int64        `json:"deadlineMs,omitempty"`
+	SubmittedCount int          `json:"submittedCount"`
+	Average        []float64    `json:"average,omitempty"`
+	LiveShapes     []NamedShape `json:"liveShapes,omitempty"`
+	Summary        *Summary     `json:"summary,omitempty"`
 }
 
 type StateView struct {
@@ -424,6 +449,8 @@ type StateView struct {
 	Code         string            `json:"code"`
 	Axes         []string          `json:"axes"`
 	AxisMax      float64           `json:"axisMax"`
+	AxisMins     []float64         `json:"axisMins"`
+	AxisMaxes    []float64         `json:"axisMaxes"`
 	Participants []ParticipantView `json:"participants"`
 	QueuedItems  int               `json:"queuedItems"`
 	Round        *RoundView        `json:"round,omitempty"`
@@ -432,6 +459,7 @@ type StateView struct {
 func (s *Session) broadcastStateLocked() {
 	sv := StateView{
 		Type: "state", Code: s.Code, Axes: s.axes, AxisMax: AxisMax,
+		AxisMins: s.axisMins, AxisMaxes: s.axisMaxes,
 		QueuedItems: len(s.items) - s.nextItem,
 	}
 	for c := range s.clients {
@@ -460,9 +488,14 @@ func (s *Session) broadcastStateLocked() {
 		}
 		sv.Round = rv
 	}
-	msg := mustJSON(sv)
 	for c := range s.clients {
-		c.trySend(msg)
+		view := sv
+		if c.organizer && sv.Round != nil && s.round.Open {
+			round := *sv.Round
+			round.LiveShapes = shapesOf(s.round.Previews)
+			view.Round = &round
+		}
+		c.trySend(mustJSON(view))
 	}
 }
 
@@ -492,7 +525,8 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 	}
 	name := strings.TrimSpace(hello.Name)
 	if name == "" {
-		name = "Anonymous"
+		closeWith(conn, "A nickname is required to join a session.")
+		return
 	}
 	if len(name) > maxNameLen {
 		name = name[:maxNameLen]
@@ -528,6 +562,7 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 	welcome := map[string]any{
 		"type": "joined", "code": s.Code, "selfId": c.id,
 		"organizer": organizer, "axes": s.axes, "axisMax": AxisMax,
+		"axisMins": s.axisMins, "axisMaxes": s.axisMaxes,
 	}
 	if organizer {
 		welcome["organizerToken"] = s.organizerToken
@@ -560,6 +595,14 @@ func randCode(n int) string {
 		b[i] = codeAlphabet[int(b[i])%len(codeAlphabet)]
 	}
 	return string(b)
+}
+
+func defaultAxisValues(value float64) []float64 {
+	values := make([]float64, len(DefaultAxes))
+	for i := range values {
+		values[i] = value
+	}
+	return values
 }
 
 func errMsg(m string) []byte {

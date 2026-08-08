@@ -26,6 +26,13 @@ edited, or removed before the first round launches. During a live session,
 queue replacement, timing, and close controls stay in a collapsed Organizer
 shelf so the chart remains the primary interface.
 
+Every participant must choose a nickname before entering. In the builder, the
+organizer configures a minimum and maximum score for every aspect and sees the
+chart's clamped starting value of **3** before launch. During an open round,
+the organizer can switch between colored, named live-chart overlays and small
+per-participant charts; individual overlay charts can be hidden without
+affecting estimates.
+
 ## Run locally
 
 ```sh
@@ -117,8 +124,9 @@ through both without extra config.
 ## Protocol (JSON over `/ws`)
 
 Client → server: `create {name}` · `join {name, code, organizerToken?}` ·
-`load_items {items, aspects?}` · `start_round {seconds}` ·
-`submit {values}` (resubmit replaces) · `end_round` · `close_session`.
+`load_items {items, aspects?, mins?, maxes?}` · `start_round {seconds}` ·
+`preview {values}` · `submit {values}` (resubmit replaces) · `end_round` ·
+`close_session`.
 
 Server → client: `joined` (identity + axis config) · `state` (full snapshot
 on every change: participants, round, live average, summary) · `error` ·

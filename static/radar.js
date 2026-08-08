@@ -1,13 +1,13 @@
 /* Shared, DOM-free radar geometry so pointer input stays easy to verify. */
 (function (root) {
-  function projectAxis(point, center, axisAngle, radius, maxValue) {
+  function projectAxis(point, center, axisAngle, radius, minValue, maxValue) {
     const dx = point.x - center.x;
     const dy = point.y - center.y;
-    return ((dx * Math.cos(axisAngle)) + (dy * Math.sin(axisAngle))) / radius * maxValue;
+    return minValue + (((dx * Math.cos(axisAngle)) + (dy * Math.sin(axisAngle))) / radius * (maxValue - minValue));
   }
 
-  function quantizeAxis(value, maxValue) {
-    return Math.round(Math.min(maxValue, Math.max(0, value)) * 2) / 2;
+  function quantizeAxis(value, minValue, maxValue) {
+    return Math.round(Math.min(maxValue, Math.max(minValue, value)) * 2) / 2;
   }
 
   const api = { projectAxis, quantizeAxis };

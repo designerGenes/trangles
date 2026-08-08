@@ -138,6 +138,46 @@ func TestPointingRoundClampsSubmissionsAndCalculatesSummary(t *testing.T) {
 	}
 }
 
+func TestAspectBoundsClampLivePreviewsAndStayOrganizerOnly(t *testing.T) {
+	_, session, organizer, guest := newTestSession(t, nil)
+	session.handle(organizer, &inboundMsg{
+		Type: "load_items", Items: []string{"PROJ-1"}, Aspects: []string{"Risk", "Reach"},
+		Mins: []float64{2, 10}, Maxes: []float64{6, 20},
+	})
+	if !sameValues(session.axisMins, []float64{2, 10}) || !sameValues(session.axisMaxes, []float64{6, 20}) {
+		t.Fatalf("aspect bounds = %#v / %#v", session.axisMins, session.axisMaxes)
+	}
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	drain(organizer)
+	drain(guest)
+	session.handle(guest, &inboundMsg{Type: "preview", Values: []float64{-1, 30}})
+	if got := session.round.Previews[guest.id].Values; !sameValues(got, []float64{2, 20}) {
+		t.Fatalf("preview was not clamped: %#v", got)
+	}
+
+	organizerState := readState(t, organizer)
+	guestState := readState(t, guest)
+	if len(organizerState.Round.LiveShapes) != 1 || organizerState.Round.LiveShapes[0].ID != guest.id {
+		t.Fatalf("organizer live shapes = %#v", organizerState.Round.LiveShapes)
+	}
+	if len(guestState.Round.LiveShapes) != 0 {
+		t.Fatalf("guest received organizer-only previews: %#v", guestState.Round.LiveShapes)
+	}
+}
+
+func TestWebSocketRequiresNickname(t *testing.T) {
+	hub := NewHub()
+	server := httptest.NewServer(http.HandlerFunc(hub.HandleWS))
+	defer server.Close()
+	url := "ws" + strings.TrimPrefix(server.URL, "http")
+	conn := dialSession(t, url, map[string]any{"type": "create", "name": "  "})
+	defer conn.Close()
+	msg := readUntil(t, conn, func(msg map[string]any) bool { return msg["type"] == "error" })
+	if msg["fatal"] != "true" || !strings.Contains(msg["message"].(string), "nickname") {
+		t.Fatalf("unexpected missing-name response: %#v", msg)
+	}
+}
+
 func TestOrganizerOnlyActions(t *testing.T) {
 	_, session, organizer, guest := newTestSession(t, nil)
 	session.handle(guest, &inboundMsg{Type: "start_round", Title: "PROJ-1"})
@@ -288,6 +328,24 @@ func readUntil(t *testing.T, conn *websocket.Conn, match func(map[string]any) bo
 	}
 	t.Fatal("did not receive the expected WebSocket message")
 	return nil
+}
+
+func readState(t *testing.T, client *Client) StateView {
+	t.Helper()
+	select {
+	case data := <-client.send:
+		var state StateView
+		if err := json.Unmarshal(data, &state); err != nil {
+			t.Fatal(err)
+		}
+		if state.Type != "state" {
+			t.Fatalf("expected state, got %#v", state)
+		}
+		return state
+	default:
+		t.Fatal("expected a state broadcast")
+		return StateView{}
+	}
 }
 
 func sameStrings(a, b []string) bool {

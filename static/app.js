@@ -14,25 +14,33 @@ const S = {
   orgToken: null,
   name: "",
   axes: ["Uncertainty", "Complexity", "Toil"],
-  axisMax: 10,
-  my: [5, 5, 5],
+  axisMins: [0, 0, 0],
+  axisMaxes: [10, 10, 10],
+  my: [3, 3, 3],
   submittedRound: null,   // round number my last submit belongs to
   state: null,            // latest server snapshot
   live: false,
   leftDeliberately: false,
   dispAvg: null,          // animated average currently drawn
   countdown: null,
+  previewRound: null,
+  previewTimer: null,
+  liveView: "overlay",
+  hiddenLive: new Set(),
 };
 
 /* ── plot geometry ─────────────────────────────────────────────────── */
-const CX = 180, CY = 180, R = 132, VMAX = () => S.axisMax;
+const CX = 180, CY = 180, R = 132;
 const angle = (i) => S.axes.length === 2
   ? (i === 0 ? Math.PI : 0)
   : (-Math.PI / 2) + ((2 * Math.PI * i) / S.axes.length);
 const axisColor = (i) => AXIS_COLORS[i % AXIS_COLORS.length];
+const axisMin = (i) => S.axisMins[i] ?? 0;
+const axisMax = (i) => S.axisMaxes[i] ?? 10;
+const axisValue = (i, fraction) => axisMin(i) + (axisMax(i) - axisMin(i)) * fraction;
 const pt = (i, v) => [
-  CX + Math.cos(angle(i)) * R * (v / VMAX()),
-  CY + Math.sin(angle(i)) * R * (v / VMAX()),
+  CX + Math.cos(angle(i)) * R * ((v - axisMin(i)) / (axisMax(i) - axisMin(i))),
+  CY + Math.sin(angle(i)) * R * ((v - axisMin(i)) / (axisMax(i) - axisMin(i))),
 ];
 const polyPoints = (vals) => vals.map((v, i) => pt(i, v).join(",")).join(" ");
 
@@ -48,22 +56,23 @@ function el(tag, attrs, parent) {
 function buildPlot() {
   plot.svg.innerHTML = "";
   // Nested radar rings make the current value easy to read at a glance.
-  for (let v = 2; v <= VMAX(); v += 2) {
+  for (let fraction = 0.2; fraction <= 1; fraction += 0.2) {
     el("polygon", {
-      points: polyPoints(S.axes.map(() => v)),
-      class: "ring" + (v === VMAX() ? " ring-outer" : ""),
+      points: polyPoints(S.axes.map((_, i) => axisValue(i, fraction))),
+      class: "ring" + (fraction === 1 ? " ring-outer" : ""),
     });
   }
   S.axes.forEach((name, i) => {
-    const [x, y] = pt(i, VMAX());
+    const [x, y] = pt(i, axisMax(i));
     el("line", {
       x1: CX, y1: CY, x2: x, y2: y,
       class: "axis-line", stroke: axisColor(i),
     });
     // Tick labels along the axis (2..10) — enough to read values off the grid.
-    for (let v = 2; v <= VMAX(); v += 4) {
-      const [tx, ty] = pt(i, v);
-      el("text", { x: tx + 4, y: ty - 4, class: "tick-label" }).textContent = v;
+    for (const fraction of [0.2, 0.6, 1]) {
+      const value = axisValue(i, fraction);
+      const [tx, ty] = pt(i, value);
+      el("text", { x: tx + 4, y: ty - 4, class: "tick-label" }).textContent = formatValue(value);
     }
     const lx = CX + Math.cos(angle(i)) * (R + 26);
     const ly = CY + Math.sin(angle(i)) * (R + 26);
@@ -82,7 +91,7 @@ function buildPlot() {
   plot.handles = S.axes.map((name, i) => {
     const g = el("g", {
       class: "handle", tabindex: 0, role: "slider",
-      "aria-label": name, "aria-valuemin": 0, "aria-valuemax": VMAX(),
+      "aria-label": name, "aria-valuemin": axisMin(i), "aria-valuemax": axisMax(i),
       "aria-valuenow": S.my[i],
     });
     el("circle", { class: "hit" }, g);
@@ -115,7 +124,7 @@ function attachPlotDrag() {
     const move = (ev) => {
       if (ev.pointerId !== e.pointerId) return;
       const p = svgPoint(ev);
-      setAxis(i, Radar.projectAxis(p, { x: CX, y: CY }, angle(i), R, VMAX()));
+      setAxis(i, Radar.projectAxis(p, { x: CX, y: CY }, angle(i), R, axisMin(i), axisMax(i)));
     };
     const up = (ev) => {
       if (ev.pointerId !== e.pointerId) return;
@@ -134,7 +143,7 @@ function attachPlotDrag() {
 function nearestAxis(point) {
   let best = 0, distance = Infinity;
   S.axes.forEach((_, i) => {
-    const value = Radar.quantizeAxis(Radar.projectAxis(point, { x: CX, y: CY }, angle(i), R, VMAX()), VMAX());
+    const value = Radar.quantizeAxis(Radar.projectAxis(point, { x: CX, y: CY }, angle(i), R, axisMin(i), axisMax(i)), axisMin(i), axisMax(i));
     const [x, y] = pt(i, value);
     const candidate = Math.hypot(point.x - x, point.y - y);
     if (candidate < distance) {
@@ -155,10 +164,11 @@ function svgPoint(evt) {
 }
 
 function setAxis(i, v) {
-  v = Radar.quantizeAxis(v, VMAX());
+  v = Radar.quantizeAxis(v, axisMin(i), axisMax(i));
   if (v === S.my[i]) return;
   S.my[i] = v;
   drawMine();
+  schedulePreview();
 }
 
 function drawMine() {
@@ -171,13 +181,13 @@ function drawMine() {
     g.querySelector(".hit").setAttribute("cy", y);
     g.setAttribute("aria-valuenow", S.my[i]);
     const ro = $("ro-" + i);
-    if (ro) ro.textContent = S.my[i].toFixed(1);
+    if (ro) ro.textContent = formatValue(S.my[i]);
   });
 }
 
 function buildReadouts() {
   $("readouts").innerHTML = S.axes.map((a, i) =>
-    `<div class="readout"><div id="ro-${i}" class="val" style="color:${axisColor(i)}">${S.my[i].toFixed(1)}</div>
+    `<div class="readout"><div id="ro-${i}" class="val" style="color:${axisColor(i)}">${formatValue(S.my[i])}</div>
      <div class="lbl">${a}</div></div>`).join("");
 }
 
@@ -237,7 +247,9 @@ function handleMessage(msg) {
       S.selfId = msg.selfId;
       S.organizer = msg.organizer;
       S.axes = msg.axes;
-      S.axisMax = msg.axisMax;
+      S.axisMins = msg.axisMins || S.axes.map(() => 0);
+      S.axisMaxes = msg.axisMaxes || S.axes.map(() => msg.axisMax || 10);
+      S.my = S.axes.map((_, i) => startingValue(i));
       if (msg.organizerToken) S.orgToken = msg.organizerToken;
       sessionStorage.setItem("tri", JSON.stringify({
         code: S.code, name: S.name, token: S.orgToken || "",
@@ -281,12 +293,15 @@ function showSetup() {
   $("view-setup").hidden = false;
   $("code-chip").hidden = true;
   if ($("draft-items").children.length === 0) addDraftItem();
+  renderSetupBounds();
 }
 
 function toLanding(message) {
   S.leftDeliberately = true;
   if (S.ws) try { S.ws.close(); } catch (_) {}
   S.ws = null; S.state = null; S.code = null; S.submittedRound = null; S.live = false;
+  S.previewRound = null;
+  clearTimeout(S.previewTimer);
   $("draft-items").innerHTML = "";
   stopCountdown();
   $("view-session").hidden = true;
@@ -323,6 +338,7 @@ function render() {
     submitBtn.disabled = true;
     $("progress").textContent = "";
     $("summary-card").hidden = true;
+    $("live-inputs").hidden = true;
     drawAverage(null);
     stopCountdown();
     $("plot-wrap").classList.add("plot-disabled");
@@ -344,19 +360,46 @@ function render() {
     drawAverage(r.average || null);
     startCountdown(r.deadlineMs);
     $("summary-card").hidden = true;
+    if (S.previewRound !== r.number) {
+      S.previewRound = r.number;
+      schedulePreview();
+    }
   } else {
     stopCountdown();
     if (r.summary) renderSummary(r.summary);
   }
   renderConsole(r);
+  if (S.organizer) {
+    $("live-inputs").hidden = !r.open;
+    if (r.open) renderLiveInputs(r.liveShapes || []);
+  }
 }
 
 function syncAxes(axes) {
-  if (!axes || (axes.length === S.axes.length && axes.every((axis, i) => axis === S.axes[i]))) return;
+  const mins = S.state.axisMins || axes.map(() => 0);
+  const maxes = S.state.axisMaxes || axes.map(() => 10);
+  if (!axes || (axes.length === S.axes.length && axes.every((axis, i) => axis === S.axes[i]) && mins.every((value, i) => value === S.axisMins[i]) && maxes.every((value, i) => value === S.axisMaxes[i]))) return;
   S.axes = axes.slice();
-  S.my = S.axes.map((_, i) => S.my[i] === undefined ? 5 : S.my[i]);
+  S.axisMins = mins.slice();
+  S.axisMaxes = maxes.slice();
+  S.my = S.axes.map((_, i) => startingValue(i));
   S.dispAvg = null;
   buildPlot();
+}
+
+function startingValue(i) {
+  return Math.min(axisMax(i), Math.max(axisMin(i), 3));
+}
+
+function formatValue(value) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function schedulePreview() {
+  const r = S.state && S.state.round;
+  if (!r || !r.open) return;
+  clearTimeout(S.previewTimer);
+  S.previewTimer = setTimeout(() => send({ type: "preview", values: S.my }), 40);
 }
 
 function renderPeople(st) {
@@ -382,6 +425,166 @@ function renderConsole(round) {
     : "Load issues to begin";
 }
 
+function setupAspectNames() {
+  if (!$("setup-custom-aspects").checked) return ["Uncertainty", "Complexity", "Toil"];
+  return $("setup-aspects").value.split("\n").map((value) => value.trim()).filter(Boolean);
+}
+
+function renderSetupBounds() {
+  const aspects = setupAspectNames();
+  const current = Array.from($("setup-bounds").querySelectorAll(".aspect-bound")).map((row) => ({
+    min: row.querySelector(".bound-min").value,
+    max: row.querySelector(".bound-max").value,
+  }));
+  $("setup-bounds").innerHTML = "";
+  aspects.forEach((aspect, i) => {
+    const row = document.createElement("div");
+    row.className = "aspect-bound";
+    const label = document.createElement("span");
+    label.textContent = aspect;
+    const min = document.createElement("input");
+    min.className = "bound-min mono";
+    min.type = "number";
+    min.step = "0.5";
+    min.value = current[i] ? current[i].min : "0";
+    min.setAttribute("aria-label", `${aspect} minimum`);
+    const max = document.createElement("input");
+    max.className = "bound-max mono";
+    max.type = "number";
+    max.step = "0.5";
+    max.value = current[i] ? current[i].max : "10";
+    max.setAttribute("aria-label", `${aspect} maximum`);
+    min.oninput = max.oninput = renderProspectivePlot;
+    row.append(label, min, max);
+    $("setup-bounds").appendChild(row);
+  });
+  renderProspectivePlot();
+}
+
+function setupBounds() {
+  const rows = Array.from($("setup-bounds").querySelectorAll(".aspect-bound"));
+  const mins = rows.map((row) => Number(row.querySelector(".bound-min").value));
+  const maxes = rows.map((row) => Number(row.querySelector(".bound-max").value));
+  if (mins.some((min, i) => !Number.isFinite(min) || !Number.isFinite(maxes[i]) || min >= maxes[i])) {
+    toast("Each aspect needs a maximum greater than its minimum.");
+    return null;
+  }
+  return { mins, maxes };
+}
+
+function renderProspectivePlot() {
+  const aspects = setupAspectNames();
+  const bounds = setupBoundsSilent();
+  if (aspects.length < 2 || !bounds) {
+    $("setup-plot").innerHTML = "";
+    return;
+  }
+  const values = aspects.map((_, i) => Math.min(bounds.maxes[i], Math.max(bounds.mins[i], 3)));
+  drawStaticRadar($("setup-plot"), aspects, bounds.mins, bounds.maxes, [{ name: "Starting values", values, color: "#1E2B2F" }]);
+}
+
+function setupBoundsSilent() {
+  const rows = Array.from($("setup-bounds").querySelectorAll(".aspect-bound"));
+  const mins = rows.map((row) => Number(row.querySelector(".bound-min").value));
+  const maxes = rows.map((row) => Number(row.querySelector(".bound-max").value));
+  if (mins.length === 0 || mins.some((min, i) => !Number.isFinite(min) || !Number.isFinite(maxes[i]) || min >= maxes[i])) return null;
+  return { mins, maxes };
+}
+
+function renderLiveInputs(shapes) {
+  const section = $("live-inputs");
+  section.hidden = false;
+  const active = shapes.map((shape) => ({
+    ...shape,
+    color: participantColor(shape.id),
+  }));
+  $("btn-live-overlay").classList.toggle("btn-primary", S.liveView === "overlay");
+  $("btn-live-grid").classList.toggle("btn-primary", S.liveView === "grid");
+  $("live-toggles").hidden = S.liveView !== "overlay";
+  $("live-overlay").hidden = S.liveView !== "overlay";
+  $("live-grid").hidden = S.liveView !== "grid";
+  $("live-toggles").innerHTML = "";
+  active.forEach((shape) => {
+    const label = document.createElement("label");
+    label.className = "live-toggle";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = !S.hiddenLive.has(shape.id);
+    checkbox.onchange = () => {
+      if (checkbox.checked) S.hiddenLive.delete(shape.id);
+      else S.hiddenLive.add(shape.id);
+      renderLiveInputs(shapes);
+    };
+    const swatch = document.createElement("i");
+    swatch.style.background = shape.color;
+    label.append(checkbox, swatch, document.createTextNode(shape.name));
+    $("live-toggles").appendChild(label);
+  });
+  drawStaticRadar($("live-overlay"), S.axes, S.axisMins, S.axisMaxes,
+    active.filter((shape) => !S.hiddenLive.has(shape.id)));
+  $("live-grid").innerHTML = "";
+  active.forEach((shape) => {
+    const card = document.createElement("div");
+    card.className = "live-mini";
+    const svg = document.createElementNS(SVGNS, "svg");
+    svg.setAttribute("viewBox", "0 0 360 344");
+    drawStaticRadar(svg, S.axes, S.axisMins, S.axisMaxes, [shape]);
+    const name = document.createElement("span");
+    name.textContent = shape.name;
+    name.style.color = shape.color;
+    card.append(svg, name);
+    $("live-grid").appendChild(card);
+  });
+}
+
+function participantColor(id) {
+  const people = (S.state && S.state.participants) || [];
+  const index = people.findIndex((person) => person.id === id);
+  return AXIS_COLORS[index < 0 ? 0 : index];
+}
+
+function drawStaticRadar(svg, axes, mins, maxes, shapes) {
+  const cx = 180, cy = 180, radius = 132;
+  const staticAngle = (i) => axes.length === 2 ? (i === 0 ? Math.PI : 0) : (-Math.PI / 2) + ((2 * Math.PI * i) / axes.length);
+  const point = (i, value) => [
+    cx + Math.cos(staticAngle(i)) * radius * ((value - mins[i]) / (maxes[i] - mins[i])),
+    cy + Math.sin(staticAngle(i)) * radius * ((value - mins[i]) / (maxes[i] - mins[i])),
+  ];
+  const points = (values) => values.map((value, i) => point(i, value).join(",")).join(" ");
+  svg.innerHTML = "";
+  for (const fraction of [0.2, 0.4, 0.6, 0.8, 1]) {
+    const ring = document.createElementNS(SVGNS, "polygon");
+    ring.setAttribute("points", points(axes.map((_, i) => mins[i] + (maxes[i] - mins[i]) * fraction)));
+    ring.setAttribute("class", fraction === 1 ? "ring ring-outer" : "ring");
+    svg.appendChild(ring);
+  }
+  axes.forEach((axis, i) => {
+    const [x, y] = point(i, maxes[i]);
+    const line = document.createElementNS(SVGNS, "line");
+    line.setAttribute("x1", cx); line.setAttribute("y1", cy); line.setAttribute("x2", x); line.setAttribute("y2", y);
+    line.setAttribute("class", "axis-line");
+    svg.appendChild(line);
+    const label = document.createElementNS(SVGNS, "text");
+    label.setAttribute("x", cx + Math.cos(staticAngle(i)) * (radius + 22));
+    label.setAttribute("y", cy + Math.sin(staticAngle(i)) * (radius + 22));
+    label.setAttribute("class", "axis-label");
+    label.setAttribute("text-anchor", Math.cos(staticAngle(i)) > 0.1 ? "end" : Math.cos(staticAngle(i)) < -0.1 ? "start" : "middle");
+    label.textContent = axis;
+    svg.appendChild(label);
+  });
+  shapes.forEach((shape) => {
+    const polygon = document.createElementNS(SVGNS, "polygon");
+    polygon.setAttribute("points", points(shape.values));
+    polygon.setAttribute("class", "live-shape");
+    polygon.setAttribute("fill", `${shape.color}22`);
+    polygon.setAttribute("stroke", shape.color);
+    const title = document.createElementNS(SVGNS, "title");
+    title.textContent = shape.name;
+    polygon.appendChild(title);
+    svg.appendChild(polygon);
+  });
+}
+
 function renderSummary(sum) {
   $("summary-card").hidden = false;
   $("points-num").textContent = sum.storyPoints;
@@ -390,8 +593,8 @@ function renderSummary(sum) {
   $("axis-stats").innerHTML = S.axes.map((a, i) => `
     <div class="axis-row">
       <span class="lbl" style="color:${axisColor(i)}">${a}</span>
-      <span class="axis-bar"><i style="width:${(sum.averages[i] / S.axisMax) * 100}%;background:${axisColor(i)}"></i></span>
-      <span class="num mono">${sum.averages[i].toFixed(1)} ± ${sum.spread[i].toFixed(1)}</span>
+      <span class="axis-bar"><i style="width:${((sum.averages[i] - axisMin(i)) / (axisMax(i) - axisMin(i))) * 100}%;background:${axisColor(i)}"></i></span>
+      <span class="num mono">${formatValue(sum.averages[i])} +/- ${formatValue(sum.spread[i])}</span>
     </div>`).join("");
 
   $("observations").innerHTML = (sum.observations || [])
@@ -406,10 +609,10 @@ function renderSummary(sum) {
 function miniSVG(shape, isOutlier) {
   const cx = 42, cy = 40, r = 30;
   const p = (i, v) => [
-    cx + Math.cos(angle(i)) * r * (v / S.axisMax),
-    cy + Math.sin(angle(i)) * r * (v / S.axisMax),
+    cx + Math.cos(angle(i)) * r * ((v - axisMin(i)) / (axisMax(i) - axisMin(i))),
+    cy + Math.sin(angle(i)) * r * ((v - axisMin(i)) / (axisMax(i) - axisMin(i))),
   ].join(",");
-  const ring = S.axes.map((_, i) => p(i, S.axisMax)).join(" ");
+  const ring = S.axes.map((_, i) => p(i, axisMax(i))).join(" ");
   const poly = shape.values.map((v, i) => p(i, v)).join(" ");
   return `<div class="mini ${isOutlier ? "is-outlier" : ""}">
     <svg viewBox="0 0 84 78"><polygon points="${ring}" class="ring"/>
@@ -455,7 +658,8 @@ function escapeHTML(s) {
 
 /* ── wiring ────────────────────────────────────────────────────────── */
 $("btn-create").onclick = () => {
-  S.name = $("in-name").value.trim() || "Anonymous";
+  S.name = requiredNickname();
+  if (!S.name) return;
   S.live = false;
   $("draft-items").innerHTML = "";
   connect({ type: "create", name: S.name });
@@ -463,7 +667,8 @@ $("btn-create").onclick = () => {
 $("btn-join").onclick = () => {
   const code = $("in-code").value.trim().toUpperCase();
   if (code.length < 4) { toast("Enter the 5-character session code."); return; }
-  S.name = $("in-name").value.trim() || "Anonymous";
+  S.name = requiredNickname();
+  if (!S.name) return;
   const saved = savedCreds();
   connect({
     type: "join", name: S.name, code,
@@ -508,13 +713,19 @@ $("btn-launch").onclick = () => {
     toast("Add at least one issue before launching.");
     return;
   }
-  const aspects = $("setup-custom-aspects").checked ? $("setup-aspects").value.split("\n") : [];
-  send({ type: "load_items", items, aspects });
+  const aspects = $("setup-custom-aspects").checked ? setupAspectNames() : [];
+  const bounds = setupBounds();
+  if (!bounds) return;
+  send({ type: "load_items", items, aspects, mins: bounds.mins, maxes: bounds.maxes });
   send({ type: "start_round" });
 };
 $("setup-custom-aspects").onchange = () => {
   $("setup-aspect-field").hidden = !$("setup-custom-aspects").checked;
+  renderSetupBounds();
 };
+$("setup-aspects").oninput = renderSetupBounds;
+$("btn-live-overlay").onclick = () => { S.liveView = "overlay"; renderLiveInputs((S.state.round && S.state.round.liveShapes) || []); };
+$("btn-live-grid").onclick = () => { S.liveView = "grid"; renderLiveInputs((S.state.round && S.state.round.liveShapes) || []); };
 
 function addDraftItem(value = "") {
   const row = document.createElement("div");
@@ -538,6 +749,12 @@ function draftItemValues() {
   return Array.from($("draft-items").querySelectorAll("input"))
     .map((input) => input.value.trim())
     .filter(Boolean);
+}
+
+function requiredNickname() {
+  const name = $("in-name").value.trim();
+  if (!name) toast("Choose a nickname before entering a session.");
+  return name;
 }
 
 function savedCreds() {

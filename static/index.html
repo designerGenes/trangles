@@ -26,14 +26,14 @@
 
   <div class="card landing-card">
     <label class="field">
-      <span>Your name</span>
+      <span>Nickname</span>
       <input id="in-name" maxlength="24" autocomplete="off" placeholder="e.g. Priya">
     </label>
 
     <div class="landing-split">
       <div class="landing-col">
         <button id="btn-create" class="btn btn-primary">Start a session</button>
-        <p class="hint">You'll get a code to share.</p>
+        <p class="hint">A nickname is required.</p>
       </div>
       <div class="landing-rule" aria-hidden="true"></div>
       <div class="landing-col">
@@ -67,6 +67,17 @@
       <p class="hint">By default, every issue uses Uncertainty, Complexity, and Toil.</p>
     </div>
 
+    <div class="setup-bounds">
+      <span class="eyebrow">Aspect point ranges</span>
+      <div id="setup-bounds"></div>
+    </div>
+
+    <div class="prospective-chart">
+      <span class="eyebrow">Prospective chart</span>
+      <svg id="setup-plot" viewBox="0 0 360 344" role="img" aria-label="Prospective estimation chart"></svg>
+      <p class="hint">Each aspect starts at 3, clamped to the configured range.</p>
+    </div>
+
     <button id="btn-launch" class="btn btn-primary" type="button">Launch first issue</button>
   </section>
 </main>
@@ -83,7 +94,7 @@
 
     <div id="plot-wrap" class="plot-wrap">
       <svg id="plot" viewBox="0 0 360 344" role="img"
-           aria-label="Estimation plot with three axes"></svg>
+           aria-label="Estimation chart"></svg>
       <div id="readouts" class="readouts"></div>
     </div>
 
@@ -91,6 +102,19 @@
       <button id="btn-submit" class="btn btn-primary" disabled>Submit estimate</button>
       <span id="progress" class="progress mono"></span>
     </div>
+  </section>
+
+  <section id="live-inputs" class="card live-inputs" hidden>
+    <div class="live-head">
+      <div><span class="eyebrow">Live input</span><p class="hint">Unsaved charts update as the team adjusts them.</p></div>
+      <div class="view-switch" role="group" aria-label="Live chart view">
+        <button id="btn-live-overlay" class="btn" type="button">Overlay</button>
+        <button id="btn-live-grid" class="btn" type="button">Small charts</button>
+      </div>
+    </div>
+    <div id="live-toggles" class="live-toggles"></div>
+    <div id="live-overlay" class="live-overlay"></div>
+    <div id="live-grid" class="live-grid" hidden></div>
   </section>
 
   <section id="summary-card" class="card summary-card" hidden>
@@ -115,23 +139,26 @@
     <summary><span>Organizer shelf</span><span id="queue-status" class="progress"></span></summary>
     <div class="shelf-body">
       <div class="console-row">
-        <label class="field issue-field">
-          <span>Replace remaining issues, one per line</span>
-          <textarea id="in-items" maxlength="20000" placeholder="PROJ-42 Fix validation&#10;PROJ-43 Add import support"></textarea>
-        </label>
-        <label class="aspect-toggle"><input id="custom-aspects" type="checkbox"> Use custom aspects</label>
-        <label id="custom-aspect-field" class="field issue-field" hidden>
-          <span>Custom aspects, 2 to 8, one per line</span>
-          <textarea id="in-aspects" maxlength="2000" placeholder="Risk&#10;Customer impact&#10;Effort"></textarea>
-        </label>
-        <button id="btn-load" class="btn">Replace queue</button>
-      </div>
-      <div class="console-row">
         <input id="in-seconds" class="mono" type="number" min="10" max="3600"
                 placeholder="timer s" title="Optional round timer in seconds">
         <button id="btn-start" class="btn btn-primary">Start next issue</button>
         <button id="btn-end" class="btn" hidden>End round</button>
       </div>
+      <details class="queue-editor">
+        <summary>Replace remaining queue</summary>
+        <div class="console-row">
+          <label class="field issue-field">
+            <span>Issues, one per line</span>
+            <textarea id="in-items" maxlength="20000" placeholder="PROJ-42 Fix validation&#10;PROJ-43 Add import support"></textarea>
+          </label>
+          <label class="aspect-toggle"><input id="custom-aspects" type="checkbox"> Use custom aspects</label>
+          <label id="custom-aspect-field" class="field issue-field" hidden>
+            <span>Custom aspects, 2 to 8, one per line</span>
+            <textarea id="in-aspects" maxlength="2000" placeholder="Risk&#10;Customer impact&#10;Effort"></textarea>
+          </label>
+          <button id="btn-load" class="btn">Replace queue</button>
+        </div>
+      </details>
       <button id="btn-close" class="btn btn-quiet">Close session for everyone</button>
     </div>
   </details>

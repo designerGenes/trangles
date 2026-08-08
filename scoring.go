@@ -22,6 +22,7 @@ var fibScale = []struct {
 }
 
 type NamedShape struct {
+	ID     string    `json:"id,omitempty"`
 	Name   string    `json:"name"`
 	Values []float64 `json:"values"`
 }
@@ -45,8 +46,8 @@ type Summary struct {
 
 func shapesOf(subs map[string]*Submission) []NamedShape {
 	out := make([]NamedShape, 0, len(subs))
-	for _, s := range subs {
-		out = append(out, NamedShape{Name: s.Name, Values: s.Values})
+	for id, s := range subs {
+		out = append(out, NamedShape{ID: id, Name: s.Name, Values: s.Values})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
