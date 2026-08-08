@@ -13,7 +13,31 @@ function setHidden(node, hidden) {
 }
 const SVGNS = "http://www.w3.org/2000/svg";
 const AXIS_COLORS = ["#6D57B8", "#2A6F8E", "#A87428", "#C03B2D", "#43775C", "#9A4E86", "#536B9B", "#875E3A"];
-const SILLY_NICKNAMES = ["Cosmic Badger", "Waffle Wizard", "Laser Pigeon", "Mango Comet", "Noodle Knight", "Pixel Yak"];
+/* The real pool lives in config/app.json and arrives from /api/config, so
+   adding names never means touching JS. These few keep the placeholder
+   working if the fetch fails or has not landed yet. */
+let SILLY_NICKNAMES = ["Cosmic Badger", "Waffle Wizard", "Laser Pigeon"];
+
+function randomNickname() {
+  return SILLY_NICKNAMES[Math.floor(Math.random() * SILLY_NICKNAMES.length)];
+}
+
+async function loadRemoteConfig() {
+  try {
+    const response = await fetch("/api/config");
+    if (!response.ok) return;
+    const config = await response.json();
+    if (Array.isArray(config.nicknames) && config.nicknames.length) {
+      SILLY_NICKNAMES = config.nicknames;
+      // The placeholder is already on screen by now; refresh it so the wider
+      // pool is visible on first load rather than only after a reload.
+      const field = $("in-name");
+      if (field && !field.value) field.placeholder = randomNickname();
+    }
+  } catch (_) {
+    /* Offline or blocked — the built-in fallback above still works. */
+  }
+}
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const S = {
@@ -364,9 +388,19 @@ function render() {
     showSetup();
     return;
   }
+  const concluded = !!st.finalSummary;
+  // The final summary reports on the whole session, so the per-round stack —
+  // round header, live inputs, that round's summary, history — is left behind
+  // entirely rather than sitting underneath it.
+  setHidden($("round-stage"), concluded);
   renderPeople(st);
   syncHistory(st.history);
   renderFinalSummary(st.finalSummary);
+  if (concluded) {
+    stopCountdown();
+    renderConsole(st.round);
+    return;
+  }
   const r = st.round;
   const title = $("round-title");
   const eyebrow = $("round-eyebrow");
@@ -466,8 +500,12 @@ function syncAxes(axes) {
   buildPlot();
 }
 
+// Aspects start low so a submitted estimate reflects a deliberate choice.
+// Starting mid-scale invites leaving the handle where it landed.
+const START_VALUE = 2;
+
 function startingValue(i) {
-  return Math.min(axisMax(i), Math.max(axisMin(i), 3));
+  return Math.min(axisMax(i), Math.max(axisMin(i), START_VALUE));
 }
 
 function formatValue(value) {
@@ -518,8 +556,13 @@ function renderConsole(round) {
   const submitted = eligible.length - pending.length;
   const allSubmitted = eligible.length > 0 && pending.length === 0;
   $("btn-start").hidden = true;
-  $("btn-timer").hidden = !open;
-  $("in-seconds").hidden = !open;
+  $("btn-timer").hidden = !open || final;
+  $("in-seconds").hidden = !open || final;
+  // Adding work after the totals are published would change what the final
+  // summary covers, so the queue editor closes and goes away until restart.
+  const queueEditor = $("queue-editor");
+  if (final) queueEditor.open = false;
+  setHidden(queueEditor, final);
   $("btn-restart-round").hidden = open || final || !round;
   // The floating action remains available after a summary while queued work
   // remains, so a closed shelf never implies the session is finished.
@@ -563,6 +606,8 @@ function renderFinalSummary(final) {
   setHidden($("final-summary-card"), !final);
   if (!final) return;
   $("final-points").textContent = final.totalPoints;
+  const count = (final.issues || []).length;
+  $("final-meta").textContent = `${count} issue${count === 1 ? "" : "s"} estimated`;
   $("final-issues").innerHTML = (final.issues || []).map((issue) => `
     <div class="final-issue"><span class="title">${escapeHTML(issue.title)}</span><span class="mono">${issue.summary ? issue.summary.storyPoints : 0}</span></div>`).join("");
 }
@@ -639,7 +684,7 @@ function renderProspectivePlot() {
   }
   const mins = aspects.map(() => 1);
   const maxes = aspects.map(() => max);
-  const values = aspects.map(() => Math.min(max, 3));
+  const values = aspects.map(() => Math.min(max, START_VALUE));
   drawStaticRadar($("setup-plot"), aspects, mins, maxes, [{ name: "Starting values", values, color: "#1E2B2F" }]);
   drawStaticRadar($("setup-full-plot"), aspects, mins, maxes, [{ name: "Starting values", values, color: "#1E2B2F" }]);
 }
@@ -662,6 +707,9 @@ function renderLiveInputs(shapes) {
   }));
   $("btn-live-overlay").classList.toggle("btn-primary", S.liveView === "overlay");
   $("btn-live-grid").classList.toggle("btn-primary", S.liveView === "grid");
+  // The active view is conveyed by colour alone otherwise.
+  $("btn-live-overlay").setAttribute("aria-pressed", String(S.liveView === "overlay"));
+  $("btn-live-grid").setAttribute("aria-pressed", String(S.liveView === "grid"));
   setHidden($("live-toggles"), S.liveView !== "overlay");
   setHidden($("live-overlay"), S.liveView !== "overlay");
   setHidden($("live-grid"), S.liveView !== "grid");
@@ -823,7 +871,7 @@ function renderSummary(sum) {
 
   $("axis-stats").innerHTML = S.axes.map((a, i) => `
     <div class="axis-row">
-      <span class="lbl" style="color:${axisColor(i)}">${a}</span>
+      <span class="lbl" style="color:${axisColor(i)}">${escapeHTML(a)}</span>
       <span class="axis-bar"><i style="width:${((sum.averages[i] - axisMin(i)) / (axisMax(i) - axisMin(i))) * 100}%;background:${axisColor(i)}"></i></span>
       <span class="num mono">${formatValue(sum.averages[i])} +/- ${formatValue(sum.spread[i])}</span>
     </div>`).join("");
@@ -1017,6 +1065,16 @@ $("setup-max").oninput = renderSetupRange;
 $("btn-live-overlay").onclick = () => { S.liveView = "overlay"; renderLiveInputs((S.state.round && S.state.round.liveShapes) || []); };
 $("btn-live-grid").onclick = () => { S.liveView = "grid"; renderLiveInputs((S.state.round && S.state.round.liveShapes) || []); };
 
+/* Every <details> in the app signals itself with this caret rather than the
+   native triangle, which style.css suppresses globally. Built here so the
+   JS-created drawers cannot drift from the ones written in index.html. */
+function caretSpan() {
+  const caret = document.createElement("span");
+  caret.className = "caret";
+  caret.setAttribute("aria-hidden", "true");
+  return caret;
+}
+
 function addDraftItem(item = {}) {
   const entry = document.createElement("div");
   entry.className = "draft-item-entry";
@@ -1036,7 +1094,7 @@ function addDraftItem(item = {}) {
   const meta = document.createElement("details");
   meta.className = "draft-item-meta";
   const summary = document.createElement("summary");
-  summary.textContent = "Add link or description";
+  summary.append(document.createTextNode("Add link or description"), caretSpan());
   const link = document.createElement("input");
   link.type = "url";
   link.className = "item-link";
@@ -1077,7 +1135,7 @@ function addQueueItem(item = {}) {
   const meta = document.createElement("details");
   meta.className = "draft-item-meta";
   const summary = document.createElement("summary");
-  summary.textContent = "Add link or description";
+  summary.append(document.createTextNode("Add link or description"), caretSpan());
   const link = document.createElement("input");
   link.type = "url";
   link.className = "item-link";
@@ -1179,12 +1237,15 @@ function savedCreds() {
   if (urlCode) $("in-code").value = urlCode.toUpperCase();
   else if (saved && saved.code) $("in-code").value = saved.code;
   if (saved && saved.name) $("in-name").value = saved.name;
-  $("in-name").placeholder = SILLY_NICKNAMES[Math.floor(Math.random() * SILLY_NICKNAMES.length)];
+  $("in-name").placeholder = randomNickname();
   updateEntryActions();
+  loadRemoteConfig();
 })();
 
 /* Test hook. Module-scope `const S` and the function declarations above are
    lexical bindings, so a headless harness cannot reach them off `window`.
-   Exposing them explicitly keeps the UI assertions running against shipped
-   code instead of a copy. Harmless in the browser; nothing reads it there. */
-window.__test = { S, render, showSession, renderHistory, stepHistory, setHidden };
+   Scoped to local hosts so the deployed app exposes no internals — jsdom runs
+   at http://localhost/, so the UI suite still tests shipped code. */
+if (["localhost", "127.0.0.1", "[::1]", ""].includes(location.hostname)) {
+  window.__test = { S, render, showSession, showSetup, renderHistory, stepHistory, setHidden, addDraftItem };
+}

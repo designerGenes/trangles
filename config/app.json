@@ -1,0 +1,46 @@
+{
+  "_comment": "Single source of truth for tunables. JSON rather than YAML on purpose: Go's standard library parses it with no dependency, and the browser parses it natively via fetch().json() — a YAML file would need a third-party parser on both sides. Every limit can be overridden by an env var (see config.go) so a Fly deploy can be retuned without a rebuild.",
+
+  "limits": {
+    "_comment": "Guardrails for a public URL. Sessions are held in RAM, so every one of these bounds memory. Generous for real meetings, tight enough that one caller cannot exhaust a 256MB machine.",
+    "maxSessions": 500,
+    "maxClientsPerSession": 60,
+    "maxConnectionsPerIP": 25,
+    "maxSessionsPerIP": 10,
+    "trustProxyHeaders": true
+  },
+
+  "nicknames": [
+    "Cosmic Badger", "Waffle Wizard", "Laser Pigeon", "Mango Comet",
+    "Noodle Knight", "Pixel Yak", "Turbo Otter", "Velvet Mongoose",
+    "Disco Walrus", "Quantum Ferret", "Rogue Biscuit", "Neon Alpaca",
+    "Thunder Muffin", "Silent Pickle", "Galactic Hedgehog", "Rusty Falcon",
+    "Bubble Sergeant", "Midnight Capybara", "Sriracha Phantom", "Wobbly Comet",
+    "Feral Accountant", "Chrome Narwhal", "Sleepy Tornado", "Marzipan Bandit",
+    "Electric Possum", "Sassy Cartographer", "Fuzzy Dreadnought", "Plaid Raccoon",
+    "Sonic Dumpling", "Reckless Librarian", "Copper Manatee", "Jazz Hamster",
+    "Vaporwave Moose", "Grumpy Sunbeam", "Tactical Pancake", "Lunar Weasel",
+    "Spicy Cartwheel", "Bewildered Ostrich", "Crimson Noodle", "Static Llama",
+    "Bashful Kraken", "Peppermint Viper", "Astro Badger", "Wandering Toaster",
+    "Emerald Sloth", "Caffeinated Puffin", "Stormy Pistachio", "Polka Dot Wolf",
+    "Rambunctious Fig", "Glacier Bandicoot", "Suspicious Croissant", "Melancholy Robot",
+    "Zesty Armadillo", "Wireless Gopher", "Tempest Quokka", "Butterscotch Ninja",
+    "Absent Minded Pelican", "Rogue Trombone", "Cobalt Chinchilla", "Mumbling Volcano",
+    "Fearless Waffle", "Interstellar Newt", "Wistful Pangolin", "Radish Overlord",
+    "Groovy Stegosaur", "Panicked Origami", "Solar Meerkat", "Bramble Wombat",
+    "Unhinged Barista", "Twilight Axolotl", "Sardonic Puffball", "Nimble Walrus",
+    "Molten Gerbil", "Whimsical Freight", "Obsidian Tapir", "Clumsy Nebula",
+    "Prickly Sorbet", "Vagabond Lemur", "Blistering Marmot", "Opalescent Skunk",
+    "Dapper Iguana", "Roaming Cinnamon", "Sullen Flamingo", "Kinetic Bumblebee",
+    "Ambitious Doorknob", "Frostbitten Puma", "Loquacious Snail", "Titanium Duckling",
+    "Meandering Basilisk", "Saffron Yeti", "Bewitched Ferryman", "Nocturnal Biscuit",
+    "Gallant Platypus", "Scrappy Meridian", "Hollow Tangerine", "Voracious Lantern",
+    "Ludicrous Salmon", "Perpetual Badger", "Iridescent Moth", "Belligerent Scone",
+    "Wandering Gnocchi", "Steadfast Okapi", "Anxious Trebuchet", "Plush Cyclone",
+    "Fickle Aardvark", "Boisterous Fern", "Sublime Wombat", "Reluctant Comet",
+    "Gilded Numbat", "Haphazard Turnip", "Serene Buffalo", "Errant Pomelo",
+    "Bombastic Newt", "Quixotic Beaver", "Wily Persimmon", "Drowsy Falcon",
+    "Truculent Muffin", "Effervescent Tapir", "Somber Kazoo", "Jubilant Ocelot",
+    "Cantankerous Fig", "Peculiar Starling", "Resolute Dumpling", "Nefarious Puffin"
+  ]
+}

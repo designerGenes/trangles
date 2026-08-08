@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -36,7 +37,7 @@ func (s *recordingStore) Delete(code string) error {
 func newTestSession(t *testing.T, store SessionStore) (*Hub, *Session, *Client, *Client) {
 	t.Helper()
 	hub := NewHubWithStore(store)
-	session := hub.create()
+	session := hub.create("test")
 	organizer := &Client{id: "organizer", name: "Ada", organizer: true, session: session, send: make(chan []byte, 64)}
 	guest := &Client{id: "guest", name: "Lin", session: session, send: make(chan []byte, 64)}
 	session.join(organizer)
@@ -652,5 +653,269 @@ func TestConcludedRoundsBuildOrganizerOnlyHistory(t *testing.T) {
 	last := store.snapshots[len(store.snapshots)-1]
 	if len(last.History) != 2 {
 		t.Fatalf("snapshot history = %#v", last.History)
+	}
+}
+
+func TestOversizedMessagesAreRejectedNotBuffered(t *testing.T) {
+	hub := NewHub()
+	server := httptest.NewServer(http.HandlerFunc(hub.HandleWS))
+	defer server.Close()
+	url := "ws" + strings.TrimPrefix(server.URL, "http")
+
+	// An oversized frame on the pre-auth handshake must close the connection
+	// rather than being read into memory.
+	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	huge := make([]byte, maxMessageBytes+1024)
+	for i := range huge {
+		huge[i] = 'a'
+	}
+	if err := conn.WriteMessage(websocket.TextMessage, huge); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	if _, _, err := conn.ReadMessage(); err == nil {
+		t.Fatal("expected the server to drop an oversized handshake")
+	}
+
+	// A normal-sized message on the same endpoint still works.
+	good, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer good.Close()
+	if err := good.WriteJSON(map[string]string{"type": "create", "name": "Ada"}); err != nil {
+		t.Fatal(err)
+	}
+	good.SetReadDeadline(time.Now().Add(2 * time.Second))
+	var welcome map[string]any
+	if err := good.ReadJSON(&welcome); err != nil {
+		t.Fatalf("normal handshake rejected: %v", err)
+	}
+	if welcome["type"] != "joined" {
+		t.Fatalf("welcome = %v", welcome)
+	}
+}
+
+// dialN opens n websockets against server and returns them plus the first
+// non-nil dial error, so a test can assert exactly where the ceiling bites.
+func dialN(t *testing.T, url string, n int, hello map[string]string) ([]*websocket.Conn, error) {
+	t.Helper()
+	conns := make([]*websocket.Conn, 0, n)
+	for i := 0; i < n; i++ {
+		conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+		if err != nil {
+			return conns, err
+		}
+		if hello != nil {
+			if err := conn.WriteJSON(hello); err != nil {
+				return conns, err
+			}
+			var reply map[string]any
+			conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+			if err := conn.ReadJSON(&reply); err != nil {
+				return conns, err
+			}
+			if reply["type"] == "error" {
+				return conns, fmt.Errorf("refused: %v", reply["message"])
+			}
+		}
+		conns = append(conns, conn)
+	}
+	return conns, nil
+}
+
+func closeAll(conns []*websocket.Conn) {
+	for _, c := range conns {
+		_ = c.Close()
+	}
+}
+
+func TestConnectionsPerIPAreCapped(t *testing.T) {
+	limits := DefaultLimits
+	limits.MaxConnectionsPerIP = 3
+	limits.TrustProxyHeaders = false
+	hub := NewHubWithLimits(nil, limits)
+	server := httptest.NewServer(http.HandlerFunc(hub.HandleWS))
+	defer server.Close()
+	url := "ws" + strings.TrimPrefix(server.URL, "http")
+
+	conns, err := dialN(t, url, 3, nil)
+	defer closeAll(conns)
+	if err != nil {
+		t.Fatalf("first %d connections should be accepted: %v", limits.MaxConnectionsPerIP, err)
+	}
+
+	// The next one is refused at the HTTP layer, before any upgrade.
+	if _, resp, err := websocket.DefaultDialer.Dial(url, nil); err == nil {
+		t.Fatal("expected the connection over the cap to be refused")
+	} else if resp == nil || resp.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("expected 429, got %v (%v)", resp, err)
+	}
+
+	// Slots are returned when a connection drops, not leaked.
+	conns[0].Close()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if extra, _, err := websocket.DefaultDialer.Dial(url, nil); err == nil {
+			extra.Close()
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("a released connection slot was never reusable")
+}
+
+func TestSessionCeilingsRefuseGracefully(t *testing.T) {
+	limits := DefaultLimits
+	limits.MaxSessions = 2
+	limits.MaxSessionsPerIP = 5
+	hub := NewHubWithLimits(nil, limits)
+
+	first := hub.create("1.2.3.4")
+	second := hub.create("1.2.3.4")
+	if first == nil || second == nil {
+		t.Fatal("sessions under the ceiling should be created")
+	}
+	if third := hub.create("1.2.3.4"); third != nil {
+		t.Fatal("expected the global session ceiling to refuse a third session")
+	}
+
+	// Removing one frees global capacity again.
+	hub.remove(first.Code)
+	if again := hub.create("1.2.3.4"); again == nil {
+		t.Fatal("capacity should be reusable after a session is removed")
+	}
+}
+
+func TestSessionsPerIPAreCapped(t *testing.T) {
+	limits := DefaultLimits
+	limits.MaxSessionsPerIP = 2
+	hub := NewHubWithLimits(nil, limits)
+
+	if hub.create("9.9.9.9") == nil || hub.create("9.9.9.9") == nil {
+		t.Fatal("sessions under the per-IP ceiling should be created")
+	}
+	if hub.create("9.9.9.9") != nil {
+		t.Fatal("expected the per-IP session ceiling to refuse")
+	}
+	// A different caller is unaffected by that IP's usage.
+	other := hub.create("8.8.8.8")
+	if other == nil {
+		t.Fatal("one noisy IP must not block everyone else")
+	}
+	// Freeing one of the first IP's sessions lets it create again.
+	for code, s := range hub.sessions {
+		if s.creatorIP == "9.9.9.9" {
+			hub.remove(code)
+			break
+		}
+	}
+	if hub.create("9.9.9.9") == nil {
+		t.Fatal("per-IP slot should be released when the session ends")
+	}
+}
+
+func TestSessionRefusesClientsOverCapacity(t *testing.T) {
+	limits := DefaultLimits
+	limits.MaxClientsPerSession = 2
+	hub := NewHubWithLimits(nil, limits)
+	session := hub.create("test")
+
+	a := &Client{id: "a", name: "Ada", session: session, send: make(chan []byte, 8)}
+	b := &Client{id: "b", name: "Bo", session: session, send: make(chan []byte, 8)}
+	c := &Client{id: "c", name: "Cy", session: session, send: make(chan []byte, 8)}
+	if !session.join(a) || !session.join(b) {
+		t.Fatal("clients under the ceiling should join")
+	}
+	if session.join(c) {
+		t.Fatal("expected the session to refuse a client over capacity")
+	}
+	// Leaving frees a seat.
+	session.leave(b)
+	if !session.join(c) {
+		t.Fatal("a seat should be reusable after someone leaves")
+	}
+}
+
+func TestClientIPPrefersProxyHeaderOnlyWhenTrusted(t *testing.T) {
+	request := httptest.NewRequest(http.MethodGet, "/ws", nil)
+	request.RemoteAddr = "10.0.0.1:5555"
+	request.Header.Set("Fly-Client-IP", "203.0.113.7")
+	request.Header.Set("X-Forwarded-For", "198.51.100.9, 10.0.0.2")
+
+	trusting := NewHubWithLimits(nil, Limits{TrustProxyHeaders: true})
+	if got := trusting.clientIP(request); got != "203.0.113.7" {
+		t.Fatalf("behind a proxy the real client IP should win, got %q", got)
+	}
+
+	// Reachable directly, the headers are attacker-controlled and must be
+	// ignored or the per-IP caps are trivially bypassed.
+	direct := NewHubWithLimits(nil, Limits{TrustProxyHeaders: false})
+	if got := direct.clientIP(request); got != "10.0.0.1" {
+		t.Fatalf("untrusted headers must be ignored, got %q", got)
+	}
+
+	noFly := httptest.NewRequest(http.MethodGet, "/ws", nil)
+	noFly.RemoteAddr = "10.0.0.1:5555"
+	noFly.Header.Set("X-Forwarded-For", "198.51.100.9, 10.0.0.2")
+	if got := trusting.clientIP(noFly); got != "198.51.100.9" {
+		t.Fatalf("left-most XFF entry is the client, got %q", got)
+	}
+}
+
+// concludeSession runs a one-issue session to its final summary.
+func concludeSession(t *testing.T, session *Session, organizer, guest *Client) {
+	t.Helper()
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: []Item{{Title: "PROJ-1"}}})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	session.handle(guest, &inboundMsg{Type: "submit", Values: []float64{2, 2, 2}})
+	session.handle(organizer, &inboundMsg{Type: "end_round"})
+	session.handle(organizer, &inboundMsg{Type: "show_final_summary"})
+	if !session.finalSummaryShown {
+		t.Fatal("session should have reached its final summary")
+	}
+}
+
+func TestConcludedSessionRejectsQueueAndTimerChanges(t *testing.T) {
+	_, session, organizer, guest := newTestSession(t, nil)
+	concludeSession(t, session, organizer, guest)
+
+	// The final total reports on a fixed set of rounds; nothing may change it.
+	before := len(session.items)
+	for _, msg := range []*inboundMsg{
+		{Type: "append_items", Items: []Item{{Title: "PROJ-9 sneaked in"}}},
+		{Type: "replace_items", Items: []Item{{Title: "PROJ-9 replacement"}}},
+		{Type: "load_items", Items: []Item{{Title: "PROJ-9 reload"}}},
+		{Type: "set_timer", Seconds: 60},
+	} {
+		drain(organizer)
+		session.handle(organizer, msg)
+		expectError(t, organizer)
+	}
+	if len(session.items) != before {
+		t.Fatalf("queue changed after the session concluded: %d -> %d", before, len(session.items))
+	}
+	if session.round != nil && session.round.Deadline != nil {
+		t.Fatal("a timer was started on a concluded session")
+	}
+
+	// Restarting reopens the session, and the same actions are allowed again.
+	drain(organizer)
+	session.handle(organizer, &inboundMsg{Type: "restart_session"})
+	if session.finalSummaryShown {
+		t.Fatal("restart should clear the final summary")
+	}
+	session.handle(organizer, &inboundMsg{Type: "append_items", Items: []Item{{Title: "PROJ-9 now allowed"}}})
+	if len(session.items) != before+1 {
+		t.Fatalf("queue should be editable again after restart: %d", len(session.items))
+	}
+	drain(organizer)
+	session.handle(organizer, &inboundMsg{Type: "set_timer", Seconds: 60})
+	if session.round == nil || session.round.Deadline == nil {
+		t.Fatal("a timer should be startable again after restart")
 	}
 }

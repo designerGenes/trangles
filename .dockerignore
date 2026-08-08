@@ -1,0 +1,9 @@
+# Test assets must not reach the runtime image — `COPY static /static`
+# would otherwise publish them at /ui.test.js and /radar.test.js.
+static/*.test.js
+node_modules
+.git
+.gitignore
+fly.toml
+README.md
+*.md

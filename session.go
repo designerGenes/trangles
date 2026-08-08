@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -28,6 +29,14 @@ const (
 	pingPeriod     = 30 * time.Second
 	helloDeadline  = 10 * time.Second
 	sendBufferSize = 32
+	// Shown whenever an organizer tries to change a session that has already
+	// produced its final summary. Hiding these controls in the UI is not
+	// enough — a stale tab can still send the message.
+	concludedMsg = "This session has concluded. Restart it to change the queue or run another round."
+	// gorilla reads a frame fully into memory before returning it, and defaults
+	// to no cap — one client could otherwise exhaust the box's RAM. The largest
+	// legitimate message is a full 100-issue queue with links and descriptions.
+	maxMessageBytes = 256 << 10
 )
 
 var upgrader = websocket.Upgrader{
@@ -45,6 +54,12 @@ type Hub struct {
 	mu       sync.Mutex
 	sessions map[string]*Session
 	store    SessionStore
+	limits   Limits
+	// Live counts per client IP. Sessions are held in RAM, so these are the
+	// ceilings that stop one caller from allocating the box out from under
+	// everyone else.
+	ipConns    map[string]int
+	ipSessions map[string]int
 }
 
 func NewHub() *Hub {
@@ -52,12 +67,50 @@ func NewHub() *Hub {
 }
 
 func NewHubWithStore(store SessionStore) *Hub {
-	return &Hub{sessions: make(map[string]*Session), store: store}
+	return NewHubWithLimits(store, DefaultLimits)
 }
 
-func (h *Hub) create() *Session {
+func NewHubWithLimits(store SessionStore, limits Limits) *Hub {
+	return &Hub{
+		sessions:   make(map[string]*Session),
+		store:      store,
+		limits:     limits,
+		ipConns:    make(map[string]int),
+		ipSessions: make(map[string]int),
+	}
+}
+
+// acquireConn reserves a connection slot for ip, or reports that the caller is
+// already holding as many as it is allowed.
+func (h *Hub) acquireConn(ip string) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	if h.ipConns[ip] >= h.limits.MaxConnectionsPerIP {
+		return false
+	}
+	h.ipConns[ip]++
+	return true
+}
+
+func (h *Hub) releaseConn(ip string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.ipConns[ip] <= 1 {
+		delete(h.ipConns, ip) // don't let the map itself become the leak
+		return
+	}
+	h.ipConns[ip]--
+}
+
+func (h *Hub) create(ip string) *Session {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if len(h.sessions) >= h.limits.MaxSessions {
+		return nil
+	}
+	if h.ipSessions[ip] >= h.limits.MaxSessionsPerIP {
+		return nil
+	}
 	for {
 		code := randCode(5)
 		if _, taken := h.sessions[code]; taken {
@@ -73,7 +126,9 @@ func (h *Hub) create() *Session {
 			axisMaxes:      defaultAxisValues(AxisMax),
 			pointLabels:    cleanPointLabels(nil, int(AxisMax)),
 		}
+		s.creatorIP = ip
 		h.sessions[code] = s
+		h.ipSessions[ip]++
 		return s
 	}
 }
@@ -87,6 +142,13 @@ func (h *Hub) get(code string) *Session {
 func (h *Hub) remove(code string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	if s, ok := h.sessions[code]; ok {
+		if h.ipSessions[s.creatorIP] <= 1 {
+			delete(h.ipSessions, s.creatorIP)
+		} else {
+			h.ipSessions[s.creatorIP]--
+		}
+	}
 	delete(h.sessions, code)
 }
 
@@ -95,6 +157,7 @@ func (h *Hub) remove(code string) {
 
 type Client struct {
 	id        string
+	ip        string
 	name      string
 	organizer bool
 	session   *Session
@@ -134,6 +197,7 @@ func (c *Client) readPump() {
 		c.session.leave(c)
 		_ = c.conn.Close()
 	}()
+	c.conn.SetReadLimit(maxMessageBytes)
 	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error {
 		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
@@ -168,6 +232,7 @@ type Session struct {
 	Code           string
 	hub            *Hub
 	organizerToken string
+	creatorIP      string
 
 	mu                sync.Mutex
 	clients           map[*Client]bool
@@ -246,6 +311,10 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 			c.trySend(errMsg("Only the organizer can delete queued issues."))
 			return
 		}
+		if s.finalSummaryShown {
+			c.trySend(errMsg(concludedMsg))
+			return
+		}
 		for i := s.nextItem; i < len(s.items); i++ {
 			if s.items[i].ID != msg.ItemID {
 				continue
@@ -262,6 +331,12 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 			c.trySend(errMsg("Only the organizer can add issues to the queue."))
 			return
 		}
+		// The final summary reports on a fixed set of rounds. Letting work be
+		// appended afterwards would silently change what that total covers.
+		if s.finalSummaryShown {
+			c.trySend(errMsg(concludedMsg))
+			return
+		}
 		items := cleanItems(msg.Items)
 		if len(items) == 0 {
 			c.trySend(errMsg("Add at least one issue to the queue."))
@@ -274,6 +349,10 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 	case "replace_items":
 		if !c.organizer {
 			c.trySend(errMsg("Only the organizer can replace queued issues."))
+			return
+		}
+		if s.finalSummaryShown {
+			c.trySend(errMsg(concludedMsg))
 			return
 		}
 		if s.round != nil && s.round.Open {
@@ -293,6 +372,10 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 	case "load_items":
 		if !c.organizer {
 			c.trySend(errMsg("Only the organizer can load issues."))
+			return
+		}
+		if s.finalSummaryShown {
+			c.trySend(errMsg(concludedMsg))
 			return
 		}
 		if s.round != nil && s.round.Open {
@@ -433,6 +516,10 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 	case "set_timer":
 		if !c.organizer {
 			c.trySend(errMsg("Only the organizer can start a timer."))
+			return
+		}
+		if s.finalSummaryShown {
+			c.trySend(errMsg(concludedMsg))
 			return
 		}
 		r := s.round
@@ -611,15 +698,21 @@ func (s *Session) endRoundLocked() {
 	s.broadcastStateLocked()
 }
 
-func (s *Session) join(c *Client) {
+// join adds the client, reporting false if the session is closed or already at
+// capacity — the caller must close the connection in that case.
+func (s *Session) join(c *Client) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
-		return
+		return false
+	}
+	if len(s.clients) >= s.hub.limits.MaxClientsPerSession {
+		return false
 	}
 	s.clients[c] = true
 	s.persistLocked()
 	s.broadcastStateLocked()
+	return true
 }
 
 func (s *Session) leave(c *Client) {
@@ -827,10 +920,29 @@ func anonymizeSummary(summary *Summary) *Summary {
 // WS handshake
 
 func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
+	ip := h.clientIP(r)
+	// Reserve the slot before upgrading: refusing with a plain HTTP status is
+	// cheaper than completing a handshake only to close it.
+	if !h.acquireConn(ip) {
+		http.Error(w, "too many connections from this address", http.StatusTooManyRequests)
+		return
+	}
+	released := false
+	release := func() {
+		if !released {
+			released = true
+			h.releaseConn(ip)
+		}
+	}
+	defer release()
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
+	// This read happens before any Client exists, so it is the one an
+	// unauthenticated caller reaches first — cap it before reading a byte.
+	conn.SetReadLimit(maxMessageBytes)
 	_ = conn.SetReadDeadline(time.Now().Add(helloDeadline))
 	_, data, err := conn.ReadMessage()
 	if err != nil {
@@ -860,7 +972,11 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 	organizer := false
 	switch hello.Type {
 	case "create":
-		s = h.create()
+		s = h.create(ip)
+		if s == nil {
+			closeWith(conn, "This server is at capacity. Try again in a few minutes.")
+			return
+		}
 		organizer = true
 	case "join":
 		s = h.get(strings.ToUpper(strings.TrimSpace(hello.Code)))
@@ -876,6 +992,7 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 
 	c := &Client{
 		id:        randCode(12),
+		ip:        ip,
 		name:      name,
 		organizer: organizer,
 		session:   s,
@@ -894,8 +1011,38 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 	c.send <- mustJSON(welcome)
 
 	go c.writePump()
-	s.join(c)
+	if !s.join(c) {
+		closeWith(conn, "That session is full.")
+		return
+	}
+	// readPump owns the connection from here; it releases the slot when the
+	// socket drops, so the deferred release must not fire first.
+	released = true
+	defer h.releaseConn(ip)
 	c.readPump()
+}
+
+// clientIP resolves the caller's address. Behind Fly's proxy the socket peer is
+// the proxy, so the real address arrives in a header — but headers are
+// caller-supplied and trivially spoofed when the app is reachable directly, so
+// they are only honoured when the deployment says it sits behind a proxy.
+func (h *Hub) clientIP(r *http.Request) string {
+	if h.limits.TrustProxyHeaders {
+		if ip := strings.TrimSpace(r.Header.Get("Fly-Client-IP")); ip != "" {
+			return ip
+		}
+		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+			// Left-most entry is the original client; the rest are proxies.
+			if ip := strings.TrimSpace(strings.Split(forwarded, ",")[0]); ip != "" {
+				return ip
+			}
+		}
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 func closeWith(conn *websocket.Conn, msg string) {
