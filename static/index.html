@@ -27,12 +27,12 @@
   <div class="card landing-card">
     <label class="field">
       <span>Nickname</span>
-      <input id="in-name" maxlength="24" autocomplete="off" placeholder="e.g. Priya">
+      <input id="in-name" maxlength="24" autocomplete="off">
     </label>
 
     <div class="landing-split">
       <div class="landing-col">
-        <button id="btn-create" class="btn btn-primary">Start a session</button>
+        <button id="btn-create" class="btn btn-primary" disabled>Start a session</button>
         <p class="hint">A nickname is required.</p>
       </div>
       <div class="landing-rule" aria-hidden="true"></div>
@@ -42,7 +42,7 @@
           <input id="in-code" class="mono" maxlength="5" autocomplete="off"
                  placeholder="ABCDE" style="text-transform:uppercase">
         </label>
-        <button id="btn-join" class="btn">Join session</button>
+        <button id="btn-join" class="btn" disabled>Join session</button>
       </div>
     </div>
   </div>
@@ -104,7 +104,7 @@
       <div id="readouts" class="readouts"></div>
     </div>
 
-    <div class="submit-row">
+    <div id="submit-row" class="submit-row">
       <button id="btn-submit" class="btn btn-primary" disabled>Submit estimate</button>
       <span id="progress" class="progress mono"></span>
     </div>

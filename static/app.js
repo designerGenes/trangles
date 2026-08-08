@@ -4,6 +4,7 @@
 const $ = (id) => document.getElementById(id);
 const SVGNS = "http://www.w3.org/2000/svg";
 const AXIS_COLORS = ["#6D57B8", "#2A6F8E", "#A87428", "#C03B2D", "#43775C", "#9A4E86", "#536B9B", "#875E3A"];
+const SILLY_NICKNAMES = ["Cosmic Badger", "Waffle Wizard", "Laser Pigeon", "Mango Comet", "Noodle Knight", "Pixel Yak"];
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const S = {
@@ -78,13 +79,10 @@ function buildPlot() {
       const title = el("title", {}, tick);
       title.textContent = pointLabel(value);
     }
-    const lx = CX + Math.cos(angle(i)) * (R + 26);
-    const ly = CY + Math.sin(angle(i)) * (R + 26);
-    const cos = Math.cos(angle(i));
-    const anchor = cos > 0.1 ? "end" : cos < -0.1 ? "start" : "middle";
+    const labelY = y + (Math.sin(angle(i)) < -0.5 ? -26 : 30);
     const label = el("text", {
-      x: lx, y: ly + 4, class: "axis-label", fill: axisColor(i),
-      "text-anchor": anchor,
+      x, y: labelY, class: "axis-label", fill: axisColor(i),
+      "text-anchor": "start",
     });
     label.textContent = name;
   });
@@ -222,7 +220,7 @@ function drawAverage(target) {
 
 function inputEnabled() {
   const r = S.state && S.state.round;
-  return !!(r && r.open);
+  return !!(r && r.open && !S.organizer);
 }
 
 /* ── websocket ─────────────────────────────────────────────────────── */
@@ -341,6 +339,8 @@ function render() {
   const title = $("round-title");
   const eyebrow = $("round-eyebrow");
   const submitBtn = $("btn-submit");
+  $("plot-wrap").hidden = S.organizer;
+  $("submit-row").hidden = S.organizer;
 
   if (!r) {
     eyebrow.textContent = "Waiting";
@@ -373,7 +373,7 @@ function render() {
     drawAverage(r.average || null);
     startCountdown(r.deadlineMs);
     $("summary-card").hidden = true;
-    if (S.previewRound !== r.number) {
+    if (!S.organizer && S.previewRound !== r.number) {
       S.previewRound = r.number;
       schedulePreview();
     }
@@ -586,10 +586,10 @@ function drawStaticRadar(svg, axes, mins, maxes, shapes) {
     line.setAttribute("class", "axis-line");
     svg.appendChild(line);
     const label = document.createElementNS(SVGNS, "text");
-    label.setAttribute("x", cx + Math.cos(staticAngle(i)) * (radius + 22));
-    label.setAttribute("y", cy + Math.sin(staticAngle(i)) * (radius + 22));
+    label.setAttribute("x", x);
+    label.setAttribute("y", y + (Math.sin(staticAngle(i)) < -0.5 ? -26 : 30));
     label.setAttribute("class", "axis-label");
-    label.setAttribute("text-anchor", Math.cos(staticAngle(i)) > 0.1 ? "end" : Math.cos(staticAngle(i)) < -0.1 ? "start" : "middle");
+    label.setAttribute("text-anchor", "start");
     label.textContent = axis;
     svg.appendChild(label);
   });
@@ -688,6 +688,8 @@ $("btn-create").onclick = () => {
   $("setup-max").value = "10";
   connect({ type: "create", name: S.name });
 };
+$("in-name").oninput = updateEntryActions;
+$("in-code").oninput = updateEntryActions;
 $("btn-join").onclick = () => {
   const code = $("in-code").value.trim().toUpperCase();
   if (code.length < 4) { toast("Enter the 5-character session code."); return; }
@@ -797,6 +799,12 @@ function requiredNickname() {
   return name;
 }
 
+function updateEntryActions() {
+  const hasNickname = $("in-name").value.trim().length > 0;
+  $("btn-create").disabled = !hasNickname;
+  $("btn-join").disabled = !hasNickname || $("in-code").value.trim().length !== 5;
+}
+
 function savedCreds() {
   try { return JSON.parse(sessionStorage.getItem("tri")); } catch (_) { return null; }
 }
@@ -808,4 +816,6 @@ function savedCreds() {
   if (urlCode) $("in-code").value = urlCode.toUpperCase();
   else if (saved && saved.code) $("in-code").value = saved.code;
   if (saved && saved.name) $("in-name").value = saved.name;
+  $("in-name").placeholder = SILLY_NICKNAMES[Math.floor(Math.random() * SILLY_NICKNAMES.length)];
+  updateEntryActions();
 })();

@@ -111,7 +111,7 @@ main { max-width: 680px; margin: 0 auto; padding: 8px 16px 48px; }
 .point-label-row { align-items: center; display: grid; gap: 8px; grid-template-columns: 2rem 1fr; }
 .point-label-row span { color: var(--muted); font-family: "Spline Sans Mono", monospace; text-align: right; }
 .prospective-chart { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 14px; }
-.prospective-chart svg { display: block; margin: 0 auto; max-width: 300px; width: 100%; }
+.prospective-chart svg { display: block; margin: 0 auto; max-width: 300px; overflow: visible; width: 100%; }
 
 .field { display: block; }
 .field span {
@@ -181,7 +181,7 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .round-title.idle { color: var(--muted); font-weight: 500; }
 
 .plot-wrap { display: flex; flex-direction: column; align-items: center; }
-#plot { width: 100%; max-width: 340px; touch-action: none; user-select: none; cursor: crosshair; }
+#plot { width: 100%; max-width: 340px; touch-action: none; user-select: none; cursor: crosshair; overflow: visible; }
 
 .readouts { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 18px; margin: 2px 0 12px; }
 .readout { text-align: center; }
