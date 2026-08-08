@@ -151,6 +151,12 @@
     <div id="minis" class="minis"></div>
   </section>
 
+  <section id="final-summary-card" class="card final-summary-card" hidden>
+    <span class="eyebrow">Final summary</span>
+    <div class="final-total"><span id="final-points" class="points-num mono"></span><span class="points-label">total story points</span></div>
+    <div id="final-issues" class="final-issues"></div>
+  </section>
+
   <section class="people-card">
     <span class="eyebrow">In the room</span>
     <div id="people" class="people"></div>
@@ -200,6 +206,7 @@
                 placeholder="timer s" title="Optional round timer in seconds">
         <button id="btn-start" class="btn btn-primary">Next Issue</button>
         <button id="btn-timer" class="btn" type="button" hidden>Start timer</button>
+        <button id="btn-restart-round" class="btn" type="button" hidden>Restart round</button>
       </div>
       <div id="pending-panel" class="pending-panel" hidden>
         <span class="eyebrow">Waiting on</span>

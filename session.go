@@ -169,17 +169,18 @@ type Session struct {
 	hub            *Hub
 	organizerToken string
 
-	mu          sync.Mutex
-	clients     map[*Client]bool
-	round       *Round
-	history     []HistoryEntry // concluded rounds, oldest first
-	items       []Item
-	nextItem    int
-	axes        []string
-	axisMins    []float64
-	axisMaxes   []float64
-	pointLabels []string
-	closed      bool
+	mu                sync.Mutex
+	clients           map[*Client]bool
+	round             *Round
+	history           []HistoryEntry // concluded rounds, oldest first
+	items             []Item
+	nextItem          int
+	axes              []string
+	axisMins          []float64
+	axisMaxes         []float64
+	pointLabels       []string
+	finalSummaryShown bool
+	closed            bool
 }
 
 type Round struct {
@@ -196,8 +197,9 @@ type Round struct {
 }
 
 type Submission struct {
-	Name   string
-	Values []float64
+	Name    string
+	Values  []float64
+	Touched bool
 }
 
 type Item struct {
@@ -227,6 +229,7 @@ type inboundMsg struct {
 	PointLabels []string  `json:"pointLabels"`
 	Seconds     int       `json:"seconds"`
 	Values      []float64 `json:"values"`
+	Touched     bool      `json:"touched"`
 }
 
 func (s *Session) handle(c *Client, msg *inboundMsg) {
@@ -366,9 +369,10 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 			}
 			vals[i] = v
 		}
-		preview := &Submission{Name: c.name, Values: vals}
+		preview := &Submission{Name: c.name, Values: vals, Touched: msg.Touched}
 		r.Previews[c.id] = preview
 		if msg.Type == "submit" {
+			preview.Touched = true
 			r.Submissions[c.id] = preview
 		}
 		s.persistLocked()
@@ -428,6 +432,60 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 		}
 		s.endRoundLocked()
 
+	case "restart_round":
+		if !c.organizer {
+			c.trySend(errMsg("Only the organizer can restart a round."))
+			return
+		}
+		r := s.round
+		if r == nil || r.Open {
+			c.trySend(errMsg("Only a concluded round can be restarted."))
+			return
+		}
+		if len(s.history) > 0 && s.history[len(s.history)-1].Number == r.Number {
+			s.history = s.history[:len(s.history)-1]
+		}
+		r.Open = true
+		r.Summary = nil
+		r.Submissions = make(map[string]*Submission)
+		r.Previews = make(map[string]*Submission)
+		s.finalSummaryShown = false
+		s.persistLocked()
+		s.broadcastStateLocked()
+
+	case "show_final_summary":
+		if !c.organizer {
+			c.trySend(errMsg("Only the organizer can show the final summary."))
+			return
+		}
+		if s.round == nil || s.round.Open || s.nextItem < len(s.items) {
+			c.trySend(errMsg("Finish every issue before showing the final summary."))
+			return
+		}
+		s.finalSummaryShown = true
+		s.persistLocked()
+		s.broadcastStateLocked()
+
+	case "restart_session":
+		if !c.organizer {
+			c.trySend(errMsg("Only the organizer can restart the session."))
+			return
+		}
+		if len(s.items) == 0 {
+			c.trySend(errMsg("There are no issues to restart."))
+			return
+		}
+		if s.round != nil && s.round.timer != nil {
+			s.round.timer.Stop()
+		}
+		s.round = nil
+		s.history = nil
+		s.nextItem = 0
+		s.finalSummaryShown = false
+		s.startNextRoundLocked(0)
+		s.persistLocked()
+		s.broadcastStateLocked()
+
 	case "close_session":
 		if !c.organizer {
 			c.trySend(errMsg("Only the organizer can close the session."))
@@ -440,13 +498,65 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 	}
 }
 
+func (s *Session) startNextRoundLocked(seconds int) {
+	if s.nextItem >= len(s.items) {
+		return
+	}
+	item := s.items[s.nextItem]
+	s.nextItem++
+	number := 1
+	if s.round != nil {
+		number = s.round.Number + 1
+	}
+	r := &Round{
+		Number:      number,
+		Title:       item.Title,
+		Link:        item.Link,
+		Description: item.Description,
+		Open:        true,
+		Submissions: make(map[string]*Submission),
+		Previews:    make(map[string]*Submission),
+	}
+	if seconds > 0 {
+		if seconds > maxRoundSecs {
+			seconds = maxRoundSecs
+		}
+		dl := time.Now().Add(time.Duration(seconds) * time.Second)
+		r.Deadline = &dl
+		r.timer = time.AfterFunc(time.Until(dl), func() { s.timerFired(r) })
+	}
+	s.round = r
+}
+
 func (s *Session) timerFired(r *Round) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed || s.round != r || !r.Open {
 		return
 	}
+	s.submitCurrentChartsLocked(r)
 	s.endRoundLocked()
+}
+
+func (s *Session) submitCurrentChartsLocked(r *Round) {
+	for c := range s.clients {
+		if c.organizer {
+			continue
+		}
+		if _, submitted := r.Submissions[c.id]; submitted {
+			continue
+		}
+		if preview := r.Previews[c.id]; preview != nil {
+			values := append([]float64(nil), preview.Values...)
+			r.Submissions[c.id] = &Submission{Name: c.name, Values: values, Touched: preview.Touched}
+			continue
+		}
+		values := make([]float64, len(s.axes))
+		for i := range values {
+			values[i] = math.Min(s.axisMaxes[i], math.Max(s.axisMins[i], 3))
+		}
+		r.Submissions[c.id] = &Submission{Name: c.name, Values: values}
+	}
 }
 
 func (s *Session) endRoundLocked() {
@@ -536,6 +646,12 @@ type ParticipantView struct {
 	Name      string `json:"name"`
 	Organizer bool   `json:"organizer"`
 	Submitted bool   `json:"submitted"`
+	Responded bool   `json:"responded"`
+}
+
+type FinalSummary struct {
+	Issues      []HistoryEntry `json:"issues"`
+	TotalPoints int            `json:"totalPoints"`
 }
 
 type RoundView struct {
@@ -562,6 +678,7 @@ type StateView struct {
 	Participants []ParticipantView `json:"participants"`
 	QueuedItems  int               `json:"queuedItems"`
 	Round        *RoundView        `json:"round,omitempty"`
+	FinalSummary *FinalSummary     `json:"finalSummary,omitempty"`
 	// History is sent to the organizer only — participants estimate the
 	// issue in front of them and shouldn't be anchored by past results.
 	History []HistoryEntry `json:"history,omitempty"`
@@ -576,11 +693,15 @@ func (s *Session) broadcastStateLocked() {
 	}
 	for c := range s.clients {
 		submitted := false
+		responded := false
 		if s.round != nil {
-			_, submitted = s.round.Submissions[c.id]
+			if submission := s.round.Submissions[c.id]; submission != nil {
+				submitted = true
+				responded = submission.Touched
+			}
 		}
 		sv.Participants = append(sv.Participants, ParticipantView{
-			ID: c.id, Name: c.name, Organizer: c.organizer, Submitted: submitted,
+			ID: c.id, Name: c.name, Organizer: c.organizer, Submitted: submitted, Responded: responded,
 		})
 	}
 	if r := s.round; r != nil {
@@ -602,6 +723,9 @@ func (s *Session) broadcastStateLocked() {
 		}
 		sv.Round = rv
 	}
+	if s.finalSummaryShown {
+		sv.FinalSummary = finalSummaryOf(s.history)
+	}
 	for c := range s.clients {
 		view := sv
 		if c.organizer {
@@ -616,8 +740,34 @@ func (s *Session) broadcastStateLocked() {
 			round.Summary = anonymizeSummary(sv.Round.Summary)
 			view.Round = &round
 		}
+		if !c.organizer && sv.FinalSummary != nil {
+			view.FinalSummary = anonymizeFinalSummary(sv.FinalSummary)
+		}
 		c.trySend(mustJSON(view))
 	}
+}
+
+func finalSummaryOf(history []HistoryEntry) *FinalSummary {
+	issues := append([]HistoryEntry(nil), history...)
+	final := &FinalSummary{Issues: issues}
+	for _, issue := range issues {
+		if issue.Summary != nil {
+			final.TotalPoints += issue.Summary.StoryPoints
+		}
+	}
+	return final
+}
+
+func anonymizeFinalSummary(final *FinalSummary) *FinalSummary {
+	copy := *final
+	copy.Issues = make([]HistoryEntry, len(final.Issues))
+	for i, issue := range final.Issues {
+		copy.Issues[i] = issue
+		if issue.Summary != nil {
+			copy.Issues[i].Summary = anonymizeSummary(issue.Summary)
+		}
+	}
+	return &copy
 }
 
 func anonymizeSummary(summary *Summary) *Summary {

@@ -22,16 +22,17 @@ type SessionStore interface {
 }
 
 type SessionSnapshot struct {
-	Code           string         `json:"code"`
-	OrganizerToken string         `json:"organizerToken"`
-	Items          []Item         `json:"items"`
-	NextItem       int            `json:"nextItem"`
-	Axes           []string       `json:"axes"`
-	AxisMins       []float64      `json:"axisMins"`
-	AxisMaxes      []float64      `json:"axisMaxes"`
-	PointLabels    []string       `json:"pointLabels"`
-	History        []HistoryEntry `json:"history,omitempty"`
-	Round          *RoundSnapshot `json:"round,omitempty"`
+	Code              string         `json:"code"`
+	OrganizerToken    string         `json:"organizerToken"`
+	Items             []Item         `json:"items"`
+	NextItem          int            `json:"nextItem"`
+	Axes              []string       `json:"axes"`
+	AxisMins          []float64      `json:"axisMins"`
+	AxisMaxes         []float64      `json:"axisMaxes"`
+	PointLabels       []string       `json:"pointLabels"`
+	History           []HistoryEntry `json:"history,omitempty"`
+	FinalSummaryShown bool           `json:"finalSummaryShown"`
+	Round             *RoundSnapshot `json:"round,omitempty"`
 }
 
 type RoundSnapshot struct {
@@ -81,15 +82,16 @@ func (s *Session) persistLocked() {
 
 func (s *Session) snapshotLocked() SessionSnapshot {
 	snapshot := SessionSnapshot{
-		Code:           s.Code,
-		OrganizerToken: s.organizerToken,
-		Items:          append([]Item(nil), s.items...),
-		NextItem:       s.nextItem,
-		Axes:           append([]string(nil), s.axes...),
-		AxisMins:       append([]float64(nil), s.axisMins...),
-		AxisMaxes:      append([]float64(nil), s.axisMaxes...),
-		PointLabels:    append([]string(nil), s.pointLabels...),
-		History:        append([]HistoryEntry(nil), s.history...),
+		Code:              s.Code,
+		OrganizerToken:    s.organizerToken,
+		Items:             append([]Item(nil), s.items...),
+		NextItem:          s.nextItem,
+		Axes:              append([]string(nil), s.axes...),
+		AxisMins:          append([]float64(nil), s.axisMins...),
+		AxisMaxes:         append([]float64(nil), s.axisMaxes...),
+		PointLabels:       append([]string(nil), s.pointLabels...),
+		History:           append([]HistoryEntry(nil), s.history...),
+		FinalSummaryShown: s.finalSummaryShown,
 	}
 	if s.round != nil {
 		snapshot.Round = &RoundSnapshot{

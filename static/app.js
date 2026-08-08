@@ -37,8 +37,10 @@ const S = {
   previewRound: null,
   previewTimer: null,
   activeRound: null,
+  activeRoundOpen: false,
   nextArmed: false,
   nextResetTimer: null,
+  touched: false,
   liveView: "overlay",
   hiddenLive: new Set(),
   history: [],
@@ -185,6 +187,7 @@ function setAxis(i, v) {
   v = Radar.quantizeAxis(v, axisMin(i), axisMax(i));
   if (v === S.my[i]) return;
   S.my[i] = v;
+  S.touched = true;
   drawMine();
   schedulePreview();
 }
@@ -329,6 +332,8 @@ function toLanding(message) {
   S.ws = null; S.state = null; S.code = null; S.submittedRound = null; S.live = false;
   S.previewRound = null;
   S.activeRound = null;
+  S.activeRoundOpen = false;
+  S.touched = false;
   resetNextConfirm();
   S.history = [];
   S.historyIndex = 0;
@@ -361,6 +366,7 @@ function render() {
   }
   renderPeople(st);
   syncHistory(st.history);
+  renderFinalSummary(st.finalSummary);
   const r = st.round;
   const title = $("round-title");
   const eyebrow = $("round-eyebrow");
@@ -389,14 +395,16 @@ function render() {
     return;
   }
 
-  if (S.activeRound !== r.number) {
+  if (S.activeRound !== r.number || (r.open && !S.activeRoundOpen)) {
     S.activeRound = r.number;
     S.submittedRound = null;
     S.previewRound = null;
     S.my = S.axes.map((_, i) => startingValue(i));
+    S.touched = false;
     resetNextConfirm();
     drawMine();
   }
+  S.activeRoundOpen = r.open;
 
   title.textContent = r.title;
   if (r.link) {
@@ -482,7 +490,7 @@ function schedulePreview() {
   const r = S.state && S.state.round;
   if (!r || !r.open) return;
   clearTimeout(S.previewTimer);
-  S.previewTimer = setTimeout(() => send({ type: "preview", values: S.my }), 40);
+  S.previewTimer = setTimeout(() => send({ type: "preview", values: S.my, touched: S.touched }), 40);
 }
 
 function selfSubmitted(state) {
@@ -495,6 +503,7 @@ function renderPeople(st) {
     <span class="person ${p.submitted ? "submitted" : ""}">
       <span class="check">✓</span>${escapeHTML(p.name)}${p.id === S.selfId ? " (you)" : ""}
       ${p.organizer ? '<span class="org">org</span>' : ""}
+      ${S.organizer && p.submitted && !p.responded ? '<span class="default-vote">default</span>' : ""}
     </span>`).join("");
 }
 
@@ -502,23 +511,39 @@ function renderConsole(round) {
   if (!S.organizer) return;
   const open = !!(round && round.open);
   const queued = S.state.queuedItems || 0;
+  const final = !!S.state.finalSummary;
+  const finished = !!round && !open && queued === 0;
   const pending = (S.state.participants || []).filter((person) => !person.organizer && !person.submitted);
   const eligible = (S.state.participants || []).filter((person) => !person.organizer);
   const submitted = eligible.length - pending.length;
   const allSubmitted = eligible.length > 0 && pending.length === 0;
   $("btn-start").hidden = true;
   $("btn-timer").hidden = !open;
+  $("in-seconds").hidden = !open;
+  $("btn-restart-round").hidden = open || final || !round;
   $("in-items").disabled = open;
   $("btn-load").disabled = open;
   // The floating action remains available after a summary while queued work
   // remains, so a closed shelf never implies the session is finished.
-  setHidden($("end-rail"), !open && queued === 0);
-  $("end-vote-count").textContent = eligible.length ? `Votes: ${submitted}/${eligible.length}` : "";
+  setHidden($("end-rail"), !round || (!open && queued === 0 && !finished && !final));
+  $("end-vote-count").textContent = open && eligible.length ? `Votes: ${submitted}/${eligible.length}` : "";
   $("btn-end").classList.toggle("is-pending", open && !allSubmitted && !S.nextArmed);
   $("btn-end").classList.toggle("is-confirm", open && !allSubmitted && S.nextArmed);
-  if (open && allSubmitted) {
+  if (final) {
     resetNextConfirm();
-    $("btn-end").textContent = "Finish round";
+    $("btn-end").textContent = "Restart Session";
+    $("end-hint").hidden = true;
+  } else if (!open && queued === 0) {
+    resetNextConfirm();
+    $("btn-end").textContent = "Final Summary";
+    $("end-hint").hidden = true;
+  } else if (!open) {
+    resetNextConfirm();
+    $("btn-end").textContent = "Next Issue";
+    $("end-hint").hidden = true;
+  } else if (allSubmitted) {
+    resetNextConfirm();
+    $("btn-end").textContent = "End Round";
     $("end-hint").hidden = true;
   } else if (open && S.nextArmed) {
     $("btn-end").textContent = "Confirm";
@@ -534,6 +559,14 @@ function renderConsole(round) {
   $("pending-panel").hidden = !open;
   $("pending-people").textContent = pending.length ? pending.map((person) => person.name).join(", ") : "All votes submitted.";
   $("btn-remind").disabled = pending.length === 0;
+}
+
+function renderFinalSummary(final) {
+  setHidden($("final-summary-card"), !final);
+  if (!final) return;
+  $("final-points").textContent = final.totalPoints;
+  $("final-issues").innerHTML = (final.issues || []).map((issue) => `
+    <div class="final-issue"><span class="title">${escapeHTML(issue.title)}</span><span class="mono">${issue.summary ? issue.summary.storyPoints : 0}</span></div>`).join("");
 }
 
 function resetNextConfirm() {
@@ -917,9 +950,16 @@ $("btn-end").onmouseleave = () => {
 
 function advanceIssue() {
   const round = S.state && S.state.round;
+  if (S.state && S.state.finalSummary) {
+    send({ type: "restart_session" });
+    return;
+  }
   if (!round || !round.open) {
-    const secs = parseInt($("in-seconds").value, 10);
-    send({ type: "start_round", seconds: isNaN(secs) ? 0 : secs });
+    if (S.state && S.state.queuedItems === 0) {
+      send({ type: "show_final_summary" });
+      return;
+    }
+    send({ type: "start_round", seconds: 0 });
     return;
   }
   const pending = (S.state.participants || []).filter((person) => !person.organizer && !person.submitted);
@@ -932,6 +972,7 @@ function advanceIssue() {
   send({ type: "end_round" });
 }
 $("btn-remind").onclick = () => send({ type: "remind" });
+$("btn-restart-round").onclick = () => send({ type: "restart_round" });
 $("btn-history-prev").onclick = () => stepHistory(-1);
 $("btn-history-next").onclick = () => stepHistory(1);
 

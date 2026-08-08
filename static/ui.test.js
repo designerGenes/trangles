@@ -195,7 +195,7 @@ const historyEntry = (n, title) => ({
   check("Next Issue is fixed to the viewport", win.getComputedStyle(rail).position === "fixed",
     win.getComputedStyle(rail).position);
   check("Next Issue is outside the shelf", !win.document.getElementById("organizer-shelf").contains(win.document.getElementById("btn-end")));
-  check("Finish round shown when all votes are in", win.document.getElementById("btn-end").textContent === "Finish round");
+  check("End Round shown when all votes are in", win.document.getElementById("btn-end").textContent === "End Round");
 
   S.state = stateMsg({ participants: [
     { id: "o", name: "Ada", organizer: true, submitted: false },

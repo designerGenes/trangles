@@ -152,6 +152,58 @@ func TestOrganizerCanStartTimerDuringOpenRound(t *testing.T) {
 	session.round.timer.Stop()
 }
 
+func TestTimerExpirySubmitsCurrentOrDefaultChartsWithoutAdvancing(t *testing.T) {
+	_, session, organizer, guest := newTestSession(t, nil)
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1", "PROJ-2")})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	session.handle(guest, &inboundMsg{Type: "preview", Values: []float64{4, 3, 2}, Touched: true})
+	session.timerFired(session.round)
+	if session.round.Open || session.nextItem != 1 {
+		t.Fatalf("timer advanced the queue: round=%#v next=%d", session.round, session.nextItem)
+	}
+	submission := session.round.Submissions[guest.id]
+	if !sameValues(submission.Values, []float64{4, 3, 2}) || !submission.Touched {
+		t.Fatalf("timer did not preserve preview: %#v", submission)
+	}
+
+	_, secondSession, secondOrganizer, secondGuest := newTestSession(t, nil)
+	secondSession.handle(secondOrganizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1")})
+	secondSession.handle(secondOrganizer, &inboundMsg{Type: "start_round"})
+	secondSession.timerFired(secondSession.round)
+	defaultSubmission := secondSession.round.Submissions[secondGuest.id]
+	if !sameValues(defaultSubmission.Values, []float64{3, 3, 3}) || defaultSubmission.Touched {
+		t.Fatalf("timer default submission = %#v", defaultSubmission)
+	}
+}
+
+func TestRestartRoundAndSessionLifecycle(t *testing.T) {
+	_, session, organizer, guest := newTestSession(t, nil)
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1", "PROJ-2")})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	session.handle(guest, &inboundMsg{Type: "submit", Values: []float64{3, 3, 3}})
+	session.handle(organizer, &inboundMsg{Type: "end_round"})
+	session.handle(organizer, &inboundMsg{Type: "restart_round"})
+	if !session.round.Open || len(session.round.Submissions) != 0 || len(session.history) != 0 {
+		t.Fatalf("round restart state = %#v / %#v", session.round, session.history)
+	}
+	session.handle(organizer, &inboundMsg{Type: "end_round"})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	session.handle(organizer, &inboundMsg{Type: "end_round"})
+	session.handle(organizer, &inboundMsg{Type: "show_final_summary"})
+	drain(organizer)
+	drain(guest)
+	session.broadcastStateLocked()
+	organizerState := readState(t, organizer)
+	guestState := readState(t, guest)
+	if organizerState.FinalSummary == nil || guestState.FinalSummary == nil {
+		t.Fatal("final summary was not broadcast")
+	}
+	session.handle(organizer, &inboundMsg{Type: "restart_session"})
+	if session.round == nil || !session.round.Open || session.round.Title != "PROJ-1" || len(session.history) != 0 {
+		t.Fatalf("session restart state = %#v / %#v", session.round, session.history)
+	}
+}
+
 func TestIssueMetadataAndSubmittedEstimatesAreImmutable(t *testing.T) {
 	_, session, organizer, guest := newTestSession(t, nil)
 	item := Item{Title: "PROJ-1", Link: "https://example.test/PROJ-1", Description: "Investigate the migration path."}

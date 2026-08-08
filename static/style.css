@@ -255,6 +255,12 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 
 /* Summary ------------------------------------------------------------ */
 .summary-card { border-left: 4px solid var(--pencil); }
+.final-summary-card { border-left: 4px solid var(--ink); }
+.final-total { align-items: baseline; display: flex; gap: 10px; margin: 8px 0 14px; }
+.final-total .points-num { color: var(--ink); font-size: 2.4rem; }
+.final-issues { display: flex; flex-direction: column; gap: 8px; }
+.final-issue { align-items: baseline; border-top: 1px solid var(--grid); display: flex; gap: 10px; justify-content: space-between; padding-top: 8px; }
+.final-issue .title { font-weight: 600; }
 .summary-head { display: flex; gap: 18px; align-items: center; margin-bottom: 12px; }
 .points-block { text-align: center; min-width: 92px; }
 .points-num {
@@ -300,6 +306,7 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .person .check { color: var(--border); font-weight: 700; }
 .person.submitted .check { color: var(--pencil); }
 .person .org { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.person .default-vote { color: var(--muted); font-size: 0.68rem; letter-spacing: 0.04em; text-transform: uppercase; }
 
 /* Live organizer charts --------------------------------------------- */
 .live-head { align-items: start; display: flex; gap: 12px; justify-content: space-between; }

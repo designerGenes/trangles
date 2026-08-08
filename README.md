@@ -132,9 +132,9 @@ through both without extra config.
 
 Client → server: `create {name}` · `join {name, code, organizerToken?}` ·
 `load_items {items, aspects, max?, pointLabels?}` · `replace_items {items}` ·
-`start_round {seconds}` · `remind` ·
+`start_round {seconds}` · `set_timer {seconds}` · `remind` ·
 `preview {values}` · `submit {values}` (one final submission per issue) · `end_round` ·
-`close_session`.
+`restart_round` · `show_final_summary` · `restart_session` · `close_session`.
 
 Server → client: `joined` (identity + axis config) · `state` (full snapshot
 on every change: participants, round, live average, summary) · `error` ·
