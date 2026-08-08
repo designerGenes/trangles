@@ -521,8 +521,6 @@ function renderConsole(round) {
   $("btn-timer").hidden = !open;
   $("in-seconds").hidden = !open;
   $("btn-restart-round").hidden = open || final || !round;
-  $("in-items").disabled = open;
-  $("btn-load").disabled = open;
   // The floating action remains available after a summary while queued work
   // remains, so a closed shelf never implies the session is finished.
   setHidden($("end-rail"), !round || (!open && queued === 0 && !finished && !final));
@@ -555,7 +553,7 @@ function renderConsole(round) {
   }
   $("queue-status").textContent = queued
     ? `${queued} issue${queued === 1 ? "" : "s"} ready`
-    : "Load issues to begin";
+    : "";
   $("pending-panel").hidden = !open;
   $("pending-people").textContent = pending.length ? pending.map((person) => person.name).join(", ") : "All votes submitted.";
   $("btn-remind").disabled = pending.length === 0;
@@ -923,7 +921,8 @@ $("btn-submit").onclick = () => {
 };
 $("btn-load").onclick = () => {
   const items = $("in-items").value.split("\n").map((title) => ({ title }));
-  send({ type: "replace_items", items });
+  send({ type: "append_items", items });
+  $("in-items").value = "";
 };
 $("btn-start").onclick = () => advanceIssue();
 $("btn-timer").onclick = () => {

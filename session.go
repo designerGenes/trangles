@@ -239,6 +239,20 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 		return
 	}
 	switch msg.Type {
+	case "append_items":
+		if !c.organizer {
+			c.trySend(errMsg("Only the organizer can add issues to the queue."))
+			return
+		}
+		items := cleanItems(msg.Items)
+		if len(items) == 0 {
+			c.trySend(errMsg("Add at least one issue to the queue."))
+			return
+		}
+		s.items = append(s.items, items...)
+		s.persistLocked()
+		s.broadcastStateLocked()
+
 	case "replace_items":
 		if !c.organizer {
 			c.trySend(errMsg("Only the organizer can replace queued issues."))

@@ -177,7 +177,8 @@ func TestTimerExpirySubmitsCurrentOrDefaultChartsWithoutAdvancing(t *testing.T) 
 }
 
 func TestRestartRoundAndSessionLifecycle(t *testing.T) {
-	_, session, organizer, guest := newTestSession(t, nil)
+	hub, session, organizer, guest := newTestSession(t, nil)
+	code := session.Code
 	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1", "PROJ-2")})
 	session.handle(organizer, &inboundMsg{Type: "start_round"})
 	session.handle(guest, &inboundMsg{Type: "submit", Values: []float64{3, 3, 3}})
@@ -201,6 +202,23 @@ func TestRestartRoundAndSessionLifecycle(t *testing.T) {
 	session.handle(organizer, &inboundMsg{Type: "restart_session"})
 	if session.round == nil || !session.round.Open || session.round.Title != "PROJ-1" || len(session.history) != 0 {
 		t.Fatalf("session restart state = %#v / %#v", session.round, session.history)
+	}
+	if session.Code != code || hub.get(code) != session {
+		t.Fatal("session restart changed the session code")
+	}
+
+	session.handle(organizer, &inboundMsg{Type: "end_round"})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	session.handle(organizer, &inboundMsg{Type: "end_round"})
+	session.handle(organizer, &inboundMsg{Type: "show_final_summary"})
+	session.leave(guest)
+	if hub.get(code) == nil {
+		t.Fatal("session was removed while organizer remained in final summary")
+	}
+	returning := &Client{id: "returning", name: "Lin", session: session, send: make(chan []byte, 8)}
+	session.join(returning)
+	if !session.clients[returning] {
+		t.Fatal("participant could not rejoin final summary session")
 	}
 }
 
@@ -316,6 +334,19 @@ func TestReplacingQueuePreservesAspectConfiguration(t *testing.T) {
 	}
 	if !sameStrings(session.axes, []string{"Risk", "Reach"}) || !sameValues(session.axisMaxes, []float64{7, 7}) {
 		t.Fatalf("queue replacement changed aspect configuration: %#v / %#v", session.axes, session.axisMaxes)
+	}
+}
+
+func TestAppendingQueuePreservesCurrentAndQueuedIssues(t *testing.T) {
+	_, session, organizer, _ := newTestSession(t, nil)
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1", "PROJ-2")})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	session.handle(organizer, &inboundMsg{Type: "append_items", Items: testItems("PROJ-3", "PROJ-4")})
+	if got, want := itemTitles(session.items), []string{"PROJ-1", "PROJ-2", "PROJ-3", "PROJ-4"}; !sameStrings(got, want) {
+		t.Fatalf("appended queue = %#v, want %#v", got, want)
+	}
+	if session.round.Title != "PROJ-1" || session.nextItem != 1 {
+		t.Fatalf("append changed current issue: %#v / next=%d", session.round, session.nextItem)
 	}
 }
 

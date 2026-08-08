@@ -131,7 +131,7 @@ through both without extra config.
 ## Protocol (JSON over `/ws`)
 
 Client → server: `create {name}` · `join {name, code, organizerToken?}` ·
-`load_items {items, aspects, max?, pointLabels?}` · `replace_items {items}` ·
+`load_items {items, aspects, max?, pointLabels?}` · `append_items {items}` ·
 `start_round {seconds}` · `set_timer {seconds}` · `remind` ·
 `preview {values}` · `submit {values}` (one final submission per issue) · `end_round` ·
 `restart_round` · `show_final_summary` · `restart_session` · `close_session`.
