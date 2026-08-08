@@ -397,3 +397,80 @@ func sameValues(a, b []float64) bool {
 	}
 	return true
 }
+
+func lastState(t *testing.T, client *Client) StateView {
+	t.Helper()
+	var view StateView
+	found := false
+	for {
+		select {
+		case data := <-client.send:
+			var probe map[string]any
+			if err := json.Unmarshal(data, &probe); err != nil {
+				t.Fatal(err)
+			}
+			if probe["type"] != "state" {
+				continue
+			}
+			if err := json.Unmarshal(data, &view); err != nil {
+				t.Fatal(err)
+			}
+			found = true
+		default:
+			if !found {
+				t.Fatal("expected a state broadcast")
+			}
+			return view
+		}
+	}
+}
+
+func TestConcludedRoundsBuildOrganizerOnlyHistory(t *testing.T) {
+	store := &recordingStore{}
+	_, session, organizer, guest := newTestSession(t, store)
+
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: []string{"PROJ-1 first", "PROJ-2 second"}})
+
+	// Nothing has concluded yet, so there is no history to page through.
+	drain(organizer)
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	if view := lastState(t, organizer); len(view.History) != 0 {
+		t.Fatalf("history before any round concluded = %#v", view.History)
+	}
+
+	session.handle(guest, &inboundMsg{Type: "submit", Values: []float64{5, 4, 3}})
+	session.handle(organizer, &inboundMsg{Type: "end_round"})
+
+	view := lastState(t, organizer)
+	if len(view.History) != 1 {
+		t.Fatalf("history after one concluded round = %d entries", len(view.History))
+	}
+	entry := view.History[0]
+	if entry.Title != "PROJ-1 first" || entry.Number != 1 {
+		t.Fatalf("history entry = %+v", entry)
+	}
+	if entry.Summary == nil || len(entry.Summary.Shapes) != 1 {
+		t.Fatalf("history entry lost its summary: %+v", entry.Summary)
+	}
+
+	// Participants must not receive it — past results would anchor them.
+	if guestView := lastState(t, guest); len(guestView.History) != 0 {
+		t.Fatalf("guest received history: %#v", guestView.History)
+	}
+
+	// A second round appends rather than replacing, oldest first.
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	session.handle(guest, &inboundMsg{Type: "submit", Values: []float64{2, 2, 2}})
+	session.handle(organizer, &inboundMsg{Type: "end_round"})
+	view = lastState(t, organizer)
+	if len(view.History) != 2 || view.History[0].Number != 1 || view.History[1].Number != 2 {
+		t.Fatalf("history order = %#v", view.History)
+	}
+
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	last := store.snapshots[len(store.snapshots)-1]
+	if len(last.History) != 2 {
+		t.Fatalf("snapshot history = %#v", last.History)
+	}
+}

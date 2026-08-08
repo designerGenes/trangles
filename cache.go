@@ -24,18 +24,21 @@ type SessionStore interface {
 type SessionSnapshot struct {
 	Code           string         `json:"code"`
 	OrganizerToken string         `json:"organizerToken"`
-	Items          []string       `json:"items"`
+	Items          []Item         `json:"items"`
 	NextItem       int            `json:"nextItem"`
 	Axes           []string       `json:"axes"`
 	AxisMins       []float64      `json:"axisMins"`
 	AxisMaxes      []float64      `json:"axisMaxes"`
 	PointLabels    []string       `json:"pointLabels"`
+	History        []HistoryEntry `json:"history,omitempty"`
 	Round          *RoundSnapshot `json:"round,omitempty"`
 }
 
 type RoundSnapshot struct {
 	Number      int                    `json:"number"`
 	Title       string                 `json:"title"`
+	Link        string                 `json:"link,omitempty"`
+	Description string                 `json:"description,omitempty"`
 	Open        bool                   `json:"open"`
 	Deadline    *time.Time             `json:"deadline,omitempty"`
 	Submissions map[string]*Submission `json:"submissions"`
@@ -80,17 +83,20 @@ func (s *Session) snapshotLocked() SessionSnapshot {
 	snapshot := SessionSnapshot{
 		Code:           s.Code,
 		OrganizerToken: s.organizerToken,
-		Items:          append([]string(nil), s.items...),
+		Items:          append([]Item(nil), s.items...),
 		NextItem:       s.nextItem,
 		Axes:           append([]string(nil), s.axes...),
 		AxisMins:       append([]float64(nil), s.axisMins...),
 		AxisMaxes:      append([]float64(nil), s.axisMaxes...),
 		PointLabels:    append([]string(nil), s.pointLabels...),
+		History:        append([]HistoryEntry(nil), s.history...),
 	}
 	if s.round != nil {
 		snapshot.Round = &RoundSnapshot{
 			Number:      s.round.Number,
 			Title:       s.round.Title,
+			Link:        s.round.Link,
+			Description: s.round.Description,
 			Open:        s.round.Open,
 			Deadline:    s.round.Deadline,
 			Submissions: s.round.Submissions,
@@ -110,16 +116,21 @@ func (h *Hub) deleteCached(code string) {
 	}
 }
 
-func cleanItems(items []string) []string {
+func cleanItems(items []Item) []Item {
 	const maxItems = 100
-	clean := make([]string, 0, len(items))
+	clean := make([]Item, 0, len(items))
 	for _, item := range items {
-		item = strings.TrimSpace(item)
-		if item == "" {
+		item.Title = strings.TrimSpace(item.Title)
+		if item.Title == "" {
 			continue
 		}
-		if len(item) > maxTitleLen {
-			item = item[:maxTitleLen]
+		if len(item.Title) > maxTitleLen {
+			item.Title = item.Title[:maxTitleLen]
+		}
+		item.Link = strings.TrimSpace(item.Link)
+		item.Description = strings.TrimSpace(item.Description)
+		if len(item.Description) > 2000 {
+			item.Description = item.Description[:2000]
 		}
 		clean = append(clean, item)
 		if len(clean) == maxItems {

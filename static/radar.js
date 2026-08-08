@@ -23,11 +23,21 @@
     return { x, y: y + (sin < 0 ? -28 : 36), anchor: "middle" };
   }
 
+  // Tick numbers sit ON their own axis, inset radially from the ring they
+  // name. The offset used to be perpendicular to the axis, which broke
+  // mirror symmetry: reflected axes (e.g. left and right on a 4-aspect
+  // chart) got their numbers on opposite sides of the axis line and at
+  // different heights, so a symmetric chart carried askew labels. A radial
+  // inset mirrors correctly by construction, keeps every number on the axis
+  // it describes, and never lands inside the polygon.
+  const TICK_INSET = 12;
+  const TICK_BASELINE = 3.5; // half the 9px tick font's cap height
+
   function tickPosition(x, y, axisAngle) {
     return {
-      x: x - Math.sin(axisAngle) * 9,
-      y: y + Math.cos(axisAngle) * 9 + 3,
-      anchor: -Math.sin(axisAngle) < -0.15 ? "end" : -Math.sin(axisAngle) > 0.15 ? "start" : "middle",
+      x: x - (Math.cos(axisAngle) * TICK_INSET),
+      y: y - (Math.sin(axisAngle) * TICK_INSET) + TICK_BASELINE,
+      anchor: "middle",
     };
   }
 

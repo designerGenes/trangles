@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"log"
 	"math"
 	"net/http"
@@ -171,7 +172,8 @@ type Session struct {
 	mu          sync.Mutex
 	clients     map[*Client]bool
 	round       *Round
-	items       []string
+	history     []HistoryEntry // concluded rounds, oldest first
+	items       []Item
 	nextItem    int
 	axes        []string
 	axisMins    []float64
@@ -183,6 +185,8 @@ type Session struct {
 type Round struct {
 	Number      int
 	Title       string
+	Link        string
+	Description string
 	Open        bool
 	Deadline    *time.Time
 	timer       *time.Timer
@@ -196,10 +200,28 @@ type Submission struct {
 	Values []float64
 }
 
+type Item struct {
+	Title       string `json:"title"`
+	Link        string `json:"link,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+// HistoryEntry is a round that has been concluded. It carries the finished
+// summary, which already holds the averages, spread, outliers and every
+// individual shape, so the organizer can page back through past issues
+// without the server keeping the live round machinery alive.
+type HistoryEntry struct {
+	Number  int      `json:"number"`
+	Title   string   `json:"title"`
+	Link    string   `json:"link,omitempty"`
+	Description string `json:"description,omitempty"`
+	Summary *Summary `json:"summary,omitempty"`
+}
+
 type inboundMsg struct {
 	Type        string    `json:"type"`
 	Title       string    `json:"title"`
-	Items       []string  `json:"items"`
+	Items       []Item    `json:"items"`
 	Aspects     []string  `json:"aspects"`
 	Max         float64   `json:"max"`
 	PointLabels []string  `json:"pointLabels"`
@@ -275,17 +297,17 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 			c.trySend(errMsg("End the current round before starting a new one."))
 			return
 		}
-		title := strings.TrimSpace(msg.Title)
-		if title == "" && s.nextItem < len(s.items) {
-			title = s.items[s.nextItem]
+		item := Item{Title: strings.TrimSpace(msg.Title)}
+		if item.Title == "" && s.nextItem < len(s.items) {
+			item = s.items[s.nextItem]
 			s.nextItem++
 		}
-		if title == "" {
+		if item.Title == "" {
 			c.trySend(errMsg("Load issues or give the round a title."))
 			return
 		}
-		if len(title) > maxTitleLen {
-			title = title[:maxTitleLen]
+		if len(item.Title) > maxTitleLen {
+			item.Title = item.Title[:maxTitleLen]
 		}
 		num := 1
 		if s.round != nil {
@@ -293,7 +315,9 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 		}
 		r := &Round{
 			Number:      num,
-			Title:       title,
+			Title:       item.Title,
+			Link:        item.Link,
+			Description: item.Description,
 			Open:        true,
 			Submissions: make(map[string]*Submission),
 			Previews:    make(map[string]*Submission),
@@ -325,6 +349,12 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 			}
 			return
 		}
+		if _, submitted := r.Submissions[c.id]; submitted {
+			if msg.Type == "submit" {
+				c.trySend(errMsg("Your estimate has already been submitted for this issue."))
+			}
+			return
+		}
 		vals := make([]float64, len(msg.Values))
 		for i, v := range msg.Values {
 			v = math.Round(v)
@@ -343,6 +373,26 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 		}
 		s.persistLocked()
 		s.broadcastStateLocked()
+
+	case "remind":
+		if !c.organizer {
+			c.trySend(errMsg("Only the organizer can send reminders."))
+			return
+		}
+		r := s.round
+		if r == nil || !r.Open {
+			c.trySend(errMsg("There is no open issue to remind people about."))
+			return
+		}
+		reminder := mustJSON(map[string]string{"type": "reminder", "message": "A gentle reminder: please submit your estimate when you are ready."})
+		for participant := range s.clients {
+			if participant.organizer {
+				continue
+			}
+			if _, submitted := r.Submissions[participant.id]; !submitted {
+				participant.trySend(reminder)
+			}
+		}
 
 	case "end_round":
 		if !c.organizer {
@@ -384,6 +434,10 @@ func (s *Session) endRoundLocked() {
 	}
 	r.Deadline = nil
 	r.Summary = computeSummary(shapesOf(r.Submissions), s.axes)
+	// A round concludes once, so this is the one place history grows.
+	s.history = append(s.history, HistoryEntry{
+		Number: r.Number, Title: r.Title, Link: r.Link, Description: r.Description, Summary: r.Summary,
+	})
 	s.persistLocked()
 	s.broadcastStateLocked()
 }
@@ -460,6 +514,8 @@ type ParticipantView struct {
 type RoundView struct {
 	Number         int          `json:"number"`
 	Title          string       `json:"title"`
+	Link           string       `json:"link,omitempty"`
+	Description    string       `json:"description,omitempty"`
 	Open           bool         `json:"open"`
 	DeadlineMs     int64        `json:"deadlineMs,omitempty"`
 	SubmittedCount int          `json:"submittedCount"`
@@ -479,6 +535,9 @@ type StateView struct {
 	Participants []ParticipantView `json:"participants"`
 	QueuedItems  int               `json:"queuedItems"`
 	Round        *RoundView        `json:"round,omitempty"`
+	// History is sent to the organizer only — participants estimate the
+	// issue in front of them and shouldn't be anchored by past results.
+	History []HistoryEntry `json:"history,omitempty"`
 }
 
 func (s *Session) broadcastStateLocked() {
@@ -501,6 +560,8 @@ func (s *Session) broadcastStateLocked() {
 		rv := &RoundView{
 			Number:         r.Number,
 			Title:          r.Title,
+			Link:           r.Link,
+			Description:    r.Description,
 			Open:           r.Open,
 			SubmittedCount: len(r.Submissions),
 			Summary:        r.Summary,
@@ -516,13 +577,41 @@ func (s *Session) broadcastStateLocked() {
 	}
 	for c := range s.clients {
 		view := sv
-		if c.organizer && sv.Round != nil && s.round.Open {
+		if c.organizer {
+			view.History = s.history
+			if sv.Round != nil && s.round.Open {
+				round := *sv.Round
+				round.LiveShapes = shapesOf(s.round.Previews)
+				view.Round = &round
+			}
+		} else if sv.Round != nil && !sv.Round.Open && sv.Round.Summary != nil {
 			round := *sv.Round
-			round.LiveShapes = shapesOf(s.round.Previews)
+			round.Summary = anonymizeSummary(sv.Round.Summary)
 			view.Round = &round
 		}
 		c.trySend(mustJSON(view))
 	}
+}
+
+func anonymizeSummary(summary *Summary) *Summary {
+	copy := *summary
+	copy.Shapes = make([]NamedShape, len(summary.Shapes))
+	for i, shape := range summary.Shapes {
+		copy.Shapes[i] = shape
+		copy.Shapes[i].ID = ""
+		copy.Shapes[i].Name = fmt.Sprintf("Anonymous response %d", i+1)
+	}
+	copy.Outliers = append([]Outlier(nil), summary.Outliers...)
+	for i := range copy.Outliers {
+		copy.Outliers[i].Name = "A teammate"
+	}
+	copy.Observations = append([]string(nil), summary.Observations...)
+	for i, shape := range summary.Shapes {
+		for j := range copy.Observations {
+			copy.Observations[j] = strings.ReplaceAll(copy.Observations[j], shape.Name, "a teammate")
+		}
+	}
+	return &copy
 }
 
 // ---------------------------------------------------------------------------

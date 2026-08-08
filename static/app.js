@@ -2,6 +2,15 @@
 "use strict";
 
 const $ = (id) => document.getElementById(id);
+
+/* SVGElement has no `hidden` IDL property — assigning `.hidden` on an <svg>
+   silently sets a JS expando and the element stays on screen. Drive the
+   attribute directly so HTML and SVG behave the same. */
+function setHidden(node, hidden) {
+  if (!node) return;
+  if (hidden) node.setAttribute("hidden", "");
+  else node.removeAttribute("hidden");
+}
 const SVGNS = "http://www.w3.org/2000/svg";
 const AXIS_COLORS = ["#6D57B8", "#2A6F8E", "#A87428", "#C03B2D", "#43775C", "#9A4E86", "#536B9B", "#875E3A"];
 const SILLY_NICKNAMES = ["Cosmic Badger", "Waffle Wizard", "Laser Pigeon", "Mango Comet", "Noodle Knight", "Pixel Yak"];
@@ -29,6 +38,8 @@ const S = {
   previewTimer: null,
   liveView: "overlay",
   hiddenLive: new Set(),
+  history: [],
+  historyIndex: 0,      // which completed issue the organizer is viewing
 };
 
 /* ── plot geometry ─────────────────────────────────────────────────── */
@@ -70,7 +81,10 @@ function buildPlot() {
     });
     // Tick labels along the axis (2..10) — enough to read values off the grid.
     for (const value of [axisMax(i)]) {
-      const [tx, ty] = pt(i, axisValue(i, 0.9));
+      // Anchor the tick to the ring for the value it prints — it used to be
+      // pinned at 0.9 of the axis while printing the max, so the number sat
+      // between two rings and named neither.
+      const [tx, ty] = pt(i, value);
       const position = Radar.tickPosition(tx, ty, angle(i));
       const tick = el("text", { x: position.x, y: position.y, class: "tick-label", "text-anchor": position.anchor });
       tick.textContent = formatValue(value);
@@ -308,6 +322,10 @@ function toLanding(message) {
   if (S.ws) try { S.ws.close(); } catch (_) {}
   S.ws = null; S.state = null; S.code = null; S.submittedRound = null; S.live = false;
   S.previewRound = null;
+  S.history = [];
+  S.historyIndex = 0;
+  setHidden($("history-card"), true);
+  setHidden($("end-rail"), true);
   clearTimeout(S.previewTimer);
   $("draft-items").innerHTML = "";
   $("draft-aspects").innerHTML = "";
@@ -334,12 +352,15 @@ function render() {
     return;
   }
   renderPeople(st);
+  syncHistory(st.history);
   const r = st.round;
   const title = $("round-title");
   const eyebrow = $("round-eyebrow");
   const submitBtn = $("btn-submit");
-  $("plot-wrap").hidden = S.organizer;
-  $("submit-row").hidden = S.organizer;
+  // The organizer observes; they never contribute an estimate, so they get
+  // neither their own chart nor a submit control.
+  setHidden($("plot-wrap"), S.organizer);
+  setHidden($("submit-row"), S.organizer);
 
   if (!r) {
     eyebrow.textContent = "Waiting";
@@ -366,7 +387,10 @@ function render() {
   const mineIn = r.number === S.submittedRound;
   submitBtn.disabled = !r.open;
   submitBtn.textContent = mineIn ? "Update estimate" : "Submit estimate";
-  $("progress").textContent = `${r.submittedCount} of ${st.participants.length} estimated`;
+  // Organizers never submit, so they must not inflate the denominator —
+  // "2 of 3" could otherwise never complete.
+  const estimators = st.participants.filter((person) => !person.organizer).length;
+  $("progress").textContent = `${r.submittedCount} of ${estimators} estimated`;
 
   if (r.open) {
     drawAverage(r.average || null);
@@ -378,7 +402,10 @@ function render() {
     }
   } else {
     stopCountdown();
-    if (r.summary) renderSummary(r.summary);
+    // The organizer reads concluded rounds in the history panel, which
+    // auto-selects the newest entry — no need to show the same result twice.
+    setHidden($("summary-card"), S.organizer);
+    if (r.summary && !S.organizer) renderSummary(r.summary);
   }
   renderConsole(r);
   if (S.organizer) {
@@ -443,7 +470,9 @@ function renderConsole(round) {
   $("btn-start").hidden = open || queued === 0;
   $("in-items").disabled = open;
   $("btn-load").disabled = open;
-  $("btn-end").hidden = !open;
+  // End round floats outside the shelf so it stays reachable at any scroll
+  // position, letting the organizer advance whenever they choose.
+  setHidden($("end-rail"), !open);
   $("queue-status").textContent = queued
     ? `${queued} issue${queued === 1 ? "" : "s"} ready`
     : "Load issues to begin";
@@ -533,9 +562,9 @@ function renderLiveInputs(shapes) {
   }));
   $("btn-live-overlay").classList.toggle("btn-primary", S.liveView === "overlay");
   $("btn-live-grid").classList.toggle("btn-primary", S.liveView === "grid");
-  $("live-toggles").hidden = S.liveView !== "overlay";
-  $("live-overlay").hidden = S.liveView !== "overlay";
-  $("live-grid").hidden = S.liveView !== "grid";
+  setHidden($("live-toggles"), S.liveView !== "overlay");
+  setHidden($("live-overlay"), S.liveView !== "overlay");
+  setHidden($("live-grid"), S.liveView !== "grid");
   $("live-toggles").innerHTML = "";
   active.forEach((shape) => {
     const label = document.createElement("label");
@@ -598,7 +627,7 @@ function drawStaticRadar(svg, axes, mins, maxes, shapes) {
     line.setAttribute("class", "axis-line");
     svg.appendChild(line);
     for (const value of [maxes[i]]) {
-      const [tx, ty] = point(i, mins[i] + (maxes[i] - mins[i]) * 0.9);
+      const [tx, ty] = point(i, value);
       const position = Radar.tickPosition(tx, ty, staticAngle(i));
       const tick = document.createElementNS(SVGNS, "text");
       tick.setAttribute("x", position.x);
@@ -628,6 +657,63 @@ function drawStaticRadar(svg, axes, mins, maxes, shapes) {
     polygon.appendChild(title);
     svg.appendChild(polygon);
   });
+}
+
+/* ── organizer history ─────────────────────────────────────────────── */
+function syncHistory(entries) {
+  const next = entries || [];
+  const grew = next.length > S.history.length;
+  S.history = next;
+  // Land on the newest issue as each round concludes; otherwise hold the
+  // organizer's place so a routine state broadcast doesn't yank the view.
+  if (grew) S.historyIndex = next.length - 1;
+  S.historyIndex = Math.min(Math.max(S.historyIndex, 0), Math.max(next.length - 1, 0));
+  renderHistory();
+}
+
+function renderHistory() {
+  // Nothing has been completed yet — there is no history to offer.
+  const has = S.organizer && S.history.length > 0;
+  setHidden($("history-card"), !has);
+  if (!has) return;
+
+  const entry = S.history[S.historyIndex];
+  const summary = entry.summary || {};
+  $("history-title").textContent = entry.title;
+  $("history-position").textContent = `${S.historyIndex + 1} of ${S.history.length}`;
+  $("btn-history-prev").disabled = S.historyIndex === 0;
+  $("btn-history-next").disabled = S.historyIndex === S.history.length - 1;
+  $("history-points").textContent = summary.storyPoints ?? "—";
+
+  const averages = summary.averages || [];
+  $("history-stats").innerHTML = S.axes.map((axis, i) => `
+    <div class="axis-row">
+      <span class="lbl" style="color:${axisColor(i)}">${escapeHTML(axis)}</span>
+      <span class="axis-bar"><i style="width:${averages[i] === undefined ? 0 : ((averages[i] - axisMin(i)) / (axisMax(i) - axisMin(i))) * 100}%;background:${axisColor(i)}"></i></span>
+      <span class="num mono">${averages[i] === undefined ? "—" : formatValue(averages[i])}</span>
+    </div>`).join("");
+
+  $("history-observations").innerHTML = (summary.observations || [])
+    .map((observation) => `<li>${escapeHTML(observation)}</li>`).join("");
+
+  // Every individual shape plus the group consensus, so the organizer can
+  // still see who diverged on an issue they have already moved past.
+  const shapes = (summary.shapes || []).map((shape, i) => ({
+    id: `history-${i}`, name: shape.name, values: shape.values,
+    color: AXIS_COLORS[i % AXIS_COLORS.length],
+  }));
+  if (averages.length) {
+    shapes.push({ id: "history-avg", name: "Group", values: averages, color: "var(--pencil)" });
+  }
+  drawStaticRadar($("history-chart"), S.axes, S.axisMins, S.axisMaxes, shapes);
+}
+
+function stepHistory(delta) {
+  if (!S.organizer || S.history.length === 0) return;
+  const next = Math.min(Math.max(S.historyIndex + delta, 0), S.history.length - 1);
+  if (next === S.historyIndex) return;
+  S.historyIndex = next;
+  renderHistory();
 }
 
 function renderSummary(sum) {
@@ -742,6 +828,21 @@ $("btn-start").onclick = () => {
   send({ type: "start_round", seconds: isNaN(secs) ? 0 : secs });
 };
 $("btn-end").onclick = () => send({ type: "end_round" });
+$("btn-history-prev").onclick = () => stepHistory(-1);
+$("btn-history-next").onclick = () => stepHistory(1);
+
+// Arrow keys page through completed issues. Participants use the same keys to
+// nudge their chart handles, so this only binds for the organizer and steps
+// aside whenever a field or a focusable control has the keystroke.
+document.addEventListener("keydown", (event) => {
+  if (!S.organizer || S.history.length === 0) return;
+  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+  if (event.metaKey || event.ctrlKey || event.altKey) return;
+  const target = event.target;
+  if (target && target.closest && target.closest("input, textarea, select, [contenteditable=''], [contenteditable='true']")) return;
+  event.preventDefault();
+  stepHistory(event.key === "ArrowLeft" ? -1 : 1);
+});
 $("btn-close").onclick = () => {
   if (confirm("Close the session for everyone? All rounds are erased.")) {
     send({ type: "close_session" });
@@ -846,3 +947,9 @@ function savedCreds() {
   $("in-name").placeholder = SILLY_NICKNAMES[Math.floor(Math.random() * SILLY_NICKNAMES.length)];
   updateEntryActions();
 })();
+
+/* Test hook. Module-scope `const S` and the function declarations above are
+   lexical bindings, so a headless harness cannot reach them off `window`.
+   Exposing them explicitly keeps the UI assertions running against shipped
+   code instead of a copy. Harmless in the browser; nothing reads it there. */
+window.__test = { S, render, showSession, renderHistory, stepHistory, setHidden };

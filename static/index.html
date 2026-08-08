@@ -155,14 +155,47 @@
     <div id="people" class="people"></div>
   </section>
 
+  <section id="history-card" class="card history-card" hidden>
+    <div class="history-head">
+      <span class="eyebrow">Completed issues</span>
+      <div class="history-nav">
+        <button id="btn-history-prev" class="btn history-arrow" type="button"
+                aria-label="Previous completed issue">&#8592;</button>
+        <span id="history-position" class="progress mono"></span>
+        <button id="btn-history-next" class="btn history-arrow" type="button"
+                aria-label="Next completed issue">&#8594;</button>
+      </div>
+    </div>
+    <h3 id="history-title" class="history-title"></h3>
+    <div class="history-body">
+      <svg id="history-chart" viewBox="-70 -45 500 434" role="img"
+           aria-label="Chart for the selected completed issue"></svg>
+      <div class="history-facts">
+        <div class="points-block">
+          <span id="history-points" class="points-num mono"></span>
+          <span class="points-label">story points</span>
+        </div>
+        <div id="history-stats" class="axis-stats"></div>
+        <ul id="history-observations" class="observations"></ul>
+      </div>
+    </div>
+    <p class="hint">Use the left and right arrow keys to page through issues.</p>
+  </section>
+
+  <div id="end-rail" class="end-rail" hidden>
+    <button id="btn-end" class="btn end-float" type="button">End round</button>
+  </div>
+
   <details id="organizer-shelf" class="organizer-shelf" hidden>
-    <summary><span>Organizer shelf</span><span id="queue-status" class="progress"></span></summary>
+    <summary>
+      <span>Organizer shelf</span>
+      <span class="shelf-meta"><span id="queue-status" class="progress"></span><span class="caret" aria-hidden="true"></span></span>
+    </summary>
     <div class="shelf-body">
       <div class="console-row">
         <input id="in-seconds" class="mono" type="number" min="10" max="3600"
                 placeholder="timer s" title="Optional round timer in seconds">
         <button id="btn-start" class="btn btn-primary">Start next issue</button>
-        <button id="btn-end" class="btn" hidden>End round</button>
       </div>
       <details class="queue-editor">
         <summary>Replace remaining queue</summary>
