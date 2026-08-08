@@ -50,41 +50,55 @@
 
 <!-- ─────────────────────────── new session ─────────────────────────── -->
 <main id="view-setup" hidden>
-  <section class="card setup-card">
-    <span class="eyebrow">New session</span>
-    <h1 class="setup-title">Build the issues you want the team to shape.</h1>
-    <p class="setup-sub">Add, revise, or remove issues before you launch the first round.</p>
+  <div class="setup-layout">
+    <aside class="setup-rail">
+      <button id="btn-launch" class="btn btn-primary setup-launch" type="button">Launch first issue</button>
+      <button id="setup-prospect" class="setup-prospect" type="button" aria-label="Show the full prospective chart">
+        <span class="eyebrow">Prospective chart</span>
+        <svg id="setup-plot" viewBox="0 0 360 344" role="img" aria-label="Compact prospective estimation chart"></svg>
+        <span class="hint">View full chart</span>
+      </button>
+    </aside>
 
-    <span class="eyebrow">Issues</span>
-    <div id="draft-items" class="draft-items"></div>
-    <button id="btn-add-item" class="btn" type="button">Add issue</button>
+    <section class="card setup-card">
+      <span class="eyebrow">New session</span>
+      <h1 class="setup-title">Build the issues you want the team to shape.</h1>
+      <p class="setup-sub">Add, revise, or remove issues before you launch the first round.</p>
 
-    <div class="setup-aspects">
-      <span class="eyebrow">Aspects</span>
-      <div id="draft-aspects" class="draft-items"></div>
-      <button id="btn-add-aspect" class="btn" type="button">Add aspect</button>
-      <p id="setup-aspect-warning" class="setup-warning" hidden>At least 2 aspects are required to launch a session.</p>
-    </div>
+      <span class="eyebrow">Issues</span>
+      <div id="draft-items" class="draft-items"></div>
+      <button id="btn-add-item" class="btn" type="button">Add issue</button>
 
-    <div class="setup-range">
-      <label class="field range-field">
-        <span>Points per aspect</span>
-        <input id="setup-max" class="mono" type="number" min="2" max="100" step="1" value="10">
-      </label>
-      <p class="hint">Every aspect uses the same whole-number range: 1 to this value.</p>
-      <details class="point-label-editor">
-        <summary>Point hover labels (optional)</summary>
-        <div id="setup-point-labels"></div>
+      <details id="setup-aspects-stack" class="setup-aspects" open>
+        <summary><span>Aspects</span><span class="stack-state">Show or hide aspects</span></summary>
+        <div class="stack-body">
+          <div id="draft-aspects" class="draft-items"></div>
+          <button id="btn-add-aspect" class="btn" type="button">Add aspect</button>
+          <p id="setup-aspect-warning" class="setup-warning" hidden>At least 2 aspects are required to launch a session.</p>
+        </div>
       </details>
-    </div>
 
-    <div class="prospective-chart">
-      <span class="eyebrow">Prospective chart</span>
-      <svg id="setup-plot" viewBox="0 0 360 344" role="img" aria-label="Prospective estimation chart"></svg>
-      <p class="hint">Each aspect starts at 3, clamped to the shared point range.</p>
-    </div>
+      <details class="setup-drawer">
+        <summary>Session controls</summary>
+        <div class="drawer-body">
+          <label class="field range-field">
+            <span>Points per aspect</span>
+            <input id="setup-max" class="mono" type="number" min="2" max="100" step="1" value="10">
+          </label>
+          <p class="hint">Every aspect uses the same whole-number range: 1 to this value.</p>
+          <details class="point-label-editor">
+            <summary>Point hover labels (optional)</summary>
+            <div id="setup-point-labels"></div>
+          </details>
+        </div>
+      </details>
+    </section>
+  </div>
 
-    <button id="btn-launch" class="btn btn-primary" type="button">Launch first issue</button>
+  <section id="setup-full-chart" class="card setup-full-chart">
+    <span class="eyebrow">Prospective chart</span>
+    <svg id="setup-full-plot" viewBox="0 0 360 344" role="img" aria-label="Full prospective estimation chart"></svg>
+    <p class="hint">This is the chart participants will use. Each aspect starts at 3, clamped to the shared point range.</p>
   </section>
 </main>
 

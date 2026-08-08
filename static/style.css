@@ -86,7 +86,16 @@ main { max-width: 680px; margin: 0 auto; padding: 8px 16px 48px; }
 .hint { font-size: 0.8rem; color: var(--muted); margin: 0; }
 
 /* New session -------------------------------------------------------- */
-.setup-card { max-width: 34rem; margin: 24px auto; }
+#view-setup { max-width: 940px; }
+.setup-layout { align-items: start; display: grid; gap: 22px; grid-template-columns: 172px minmax(0, 1fr); margin-top: 20px; }
+.setup-rail { display: flex; flex-direction: column; gap: 18px; position: sticky; top: 18px; }
+.setup-launch { background: #5DCB74; border-color: #2C7B45; color: #102819; min-height: 64px; }
+.setup-launch:hover:not(:disabled) { background: #79DB8C; }
+.setup-prospect { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); color: var(--ink); cursor: pointer; padding: 10px; text-align: left; }
+.setup-prospect:hover { border-color: var(--ink); }
+.setup-prospect svg { display: block; margin: 4px auto; overflow: visible; width: 100%; }
+.setup-prospect .hint { display: block; text-align: center; }
+.setup-card { margin: 0; }
 .setup-title {
   font-family: "Bricolage Grotesque", sans-serif;
   font-size: 1.7rem;
@@ -99,19 +108,26 @@ main { max-width: 680px; margin: 0 auto; padding: 8px 16px 48px; }
 .draft-item { align-items: center; background: #fff; border: 1px solid var(--border); border-radius: 6px; display: flex; gap: 8px; padding: 7px; }
 .draft-item input { flex: 1; }
 .draft-item .btn-quiet { margin: 0; }
-.setup-aspects { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 14px; }
+.setup-aspects { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 12px; }
+.setup-aspects summary, .setup-drawer summary { align-items: center; color: var(--ink); cursor: pointer; display: flex; font-size: 0.82rem; font-weight: 700; justify-content: space-between; letter-spacing: 0.09em; text-transform: uppercase; }
+.stack-state { color: var(--muted); font-size: 0.65rem; font-weight: 400; letter-spacing: 0; text-transform: none; }
+.stack-body { padding-top: 12px; }
+#draft-aspects .draft-item:nth-child(1) { background: #FFEDA8; }
+#draft-aspects .draft-item:nth-child(2) { background: #FFD84D; }
+#draft-aspects .draft-item:nth-child(3) { background: #F4A62A; }
 .setup-warning { color: var(--pencil); font-size: 0.85rem; font-weight: 600; margin: 10px 0 0; }
-.setup-range { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 14px; }
+.setup-drawer { background: #F6F8F4; border: 1px solid var(--border); border-radius: var(--radius); margin-top: 18px; padding: 12px; }
+.drawer-body { padding-top: 12px; }
 .range-field { max-width: 8rem; }
 .range-field input { margin-top: 4px; }
-.setup-range .hint { margin-top: 6px; }
+.drawer-body .hint { margin-top: 6px; }
 .point-label-editor { border-top: 1px solid var(--grid); margin-top: 12px; padding-top: 10px; }
 .point-label-editor summary { color: var(--muted); cursor: pointer; font-size: 0.82rem; }
 #setup-point-labels { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
 .point-label-row { align-items: center; display: grid; gap: 8px; grid-template-columns: 2rem 1fr; }
 .point-label-row span { color: var(--muted); font-family: "Spline Sans Mono", monospace; text-align: right; }
-.prospective-chart { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 14px; }
-.prospective-chart svg { display: block; margin: 0 auto; max-width: 300px; overflow: visible; width: 100%; }
+.setup-full-chart { margin: 22px 0 0; text-align: left; }
+.setup-full-chart svg { display: block; margin: 4px auto; max-width: 520px; overflow: visible; width: 100%; }
 
 .field { display: block; }
 .field span {
@@ -309,6 +325,10 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 @media (max-width: 560px) {
   .landing-split { flex-direction: column; }
   .landing-rule { width: auto; height: 1px; }
+  .setup-layout { display: flex; flex-direction: column; }
+  .setup-rail { position: static; width: 100%; }
+  .setup-prospect { display: none; }
+  .setup-launch { width: 100%; }
   .summary-head { flex-direction: column; text-align: center; }
   .axis-row { grid-template-columns: 6rem 1fr 5rem; }
   .live-head { align-items: stretch; flex-direction: column; }

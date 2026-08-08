@@ -302,6 +302,7 @@ function showSetup() {
     ["Uncertainty", "Complexity", "Toil"].forEach((aspect) => addDraftAspect(aspect));
   }
   renderSetupRange();
+  observeFullSetupChart();
 }
 
 function toLanding(message) {
@@ -502,14 +503,27 @@ function renderProspectivePlot() {
   $("setup-aspect-warning").hidden = validAspects;
   $("btn-launch").disabled = !validAspects || !max;
   $("setup-plot").hidden = !validAspects || !max;
+  $("setup-full-chart").hidden = !validAspects || !max;
+  $("setup-prospect").hidden = !validAspects || !max || fullSetupChartVisible;
   if (!validAspects || !max) {
     $("setup-plot").innerHTML = "";
+    $("setup-full-plot").innerHTML = "";
     return;
   }
   const mins = aspects.map(() => 1);
   const maxes = aspects.map(() => max);
   const values = aspects.map(() => Math.min(max, 3));
   drawStaticRadar($("setup-plot"), aspects, mins, maxes, [{ name: "Starting values", values, color: "#1E2B2F" }]);
+  drawStaticRadar($("setup-full-plot"), aspects, mins, maxes, [{ name: "Starting values", values, color: "#1E2B2F" }]);
+}
+
+function observeFullSetupChart() {
+  if (setupChartObserver || !window.IntersectionObserver) return;
+  setupChartObserver = new IntersectionObserver(([entry]) => {
+    fullSetupChartVisible = entry.isIntersecting;
+    $("setup-prospect").hidden = entry.isIntersecting;
+  }, { threshold: 0.55 });
+  setupChartObserver.observe($("setup-full-chart"));
 }
 
 function renderLiveInputs(shapes) {
@@ -585,6 +599,16 @@ function drawStaticRadar(svg, axes, mins, maxes, shapes) {
     line.setAttribute("x1", cx); line.setAttribute("y1", cy); line.setAttribute("x2", x); line.setAttribute("y2", y);
     line.setAttribute("class", "axis-line");
     svg.appendChild(line);
+    for (const fraction of [0.2, 0.6, 1]) {
+      const value = mins[i] + (maxes[i] - mins[i]) * fraction;
+      const [tx, ty] = point(i, value);
+      const tick = document.createElementNS(SVGNS, "text");
+      tick.setAttribute("x", tx + 4);
+      tick.setAttribute("y", ty - 4);
+      tick.setAttribute("class", "tick-label");
+      tick.textContent = formatValue(value);
+      svg.appendChild(tick);
+    }
     const label = document.createElementNS(SVGNS, "text");
     label.setAttribute("x", x);
     label.setAttribute("y", y + (Math.sin(staticAngle(i)) < -0.5 ? -26 : 30));
@@ -663,6 +687,8 @@ function stopCountdown() {
 
 /* ── misc ──────────────────────────────────────────────────────────── */
 let toastTimer = null;
+let setupChartObserver = null;
+let fullSetupChartVisible = false;
 function toast(text) {
   const t = $("toast");
   t.textContent = text;
@@ -730,6 +756,7 @@ $("code-chip").onclick = () => {
 
 $("btn-add-item").onclick = () => addDraftItem();
 $("btn-add-aspect").onclick = () => addDraftAspect();
+$("setup-prospect").onclick = () => $("setup-full-chart").scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "start" });
 $("btn-launch").onclick = () => {
   const items = draftItemValues();
   if (items.length === 0) {
