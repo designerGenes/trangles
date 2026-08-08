@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Triangulate — estimate the shape, not the number</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Public+Sans:wght@400;600&family=Spline+Sans+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wordmark">Tri<span class="wordmark-angle">▲</span>ngulate</div>
+  <button id="code-chip" class="code-chip" hidden title="Copy invite link">
+    session <span id="code-text" class="mono"></span>
+  </button>
+</header>
+
+<!-- ───────────────────────────── landing ───────────────────────────── -->
+<main id="view-landing" class="landing">
+  <h1 class="pitch">Estimate the <em>shape</em> of the work,<br>not a number to defend.</h1>
+  <p class="pitch-sub">Each person stretches three axes — Uncertainty, Complexity, Toil —
+     instead of averaging everything into a 3. Sessions vanish when the last person leaves.</p>
+
+  <div class="card landing-card">
+    <label class="field">
+      <span>Your name</span>
+      <input id="in-name" maxlength="24" autocomplete="off" placeholder="e.g. Priya">
+    </label>
+
+    <div class="landing-split">
+      <div class="landing-col">
+        <button id="btn-create" class="btn btn-primary">Start a session</button>
+        <p class="hint">You'll get a code to share.</p>
+      </div>
+      <div class="landing-rule" aria-hidden="true"></div>
+      <div class="landing-col">
+        <label class="field">
+          <span>Session code</span>
+          <input id="in-code" class="mono" maxlength="5" autocomplete="off"
+                 placeholder="ABCDE" style="text-transform:uppercase">
+        </label>
+        <button id="btn-join" class="btn">Join session</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ───────────────────────────── session ───────────────────────────── -->
+<main id="view-session" hidden>
+
+  <section class="card round-card">
+    <div class="round-head">
+      <span id="round-eyebrow" class="eyebrow">Waiting</span>
+      <span id="round-timer" class="mono timer" hidden></span>
+    </div>
+    <h2 id="round-title" class="round-title">Waiting for the organizer to post an issue.</h2>
+
+    <div id="plot-wrap" class="plot-wrap">
+      <svg id="plot" viewBox="0 0 360 344" role="img"
+           aria-label="Estimation plot with three axes"></svg>
+      <div id="readouts" class="readouts"></div>
+    </div>
+
+    <div class="submit-row">
+      <button id="btn-submit" class="btn btn-primary" disabled>Submit estimate</button>
+      <span id="progress" class="progress mono"></span>
+    </div>
+  </section>
+
+  <section id="summary-card" class="card summary-card" hidden>
+    <div class="summary-head">
+      <div class="points-block">
+        <span id="points-num" class="points-num mono">3</span>
+        <span class="points-label">story points</span>
+      </div>
+      <p id="points-why" class="points-why"></p>
+    </div>
+    <div id="axis-stats" class="axis-stats"></div>
+    <ul id="observations" class="observations"></ul>
+    <div id="minis" class="minis"></div>
+  </section>
+
+  <section class="people-card">
+    <span class="eyebrow">In the room</span>
+    <div id="people" class="people"></div>
+  </section>
+
+  <section id="console" class="console" hidden>
+    <span class="eyebrow eyebrow-console">Organizer console</span>
+    <div class="console-row">
+      <label class="field issue-field">
+        <span>Issues, one per line</span>
+        <textarea id="in-items" maxlength="20000" placeholder="PROJ-42 Fix validation&#10;PROJ-43 Add import support"></textarea>
+      </label>
+      <label class="aspect-toggle"><input id="custom-aspects" type="checkbox"> Use custom aspects</label>
+      <label id="custom-aspect-field" class="field issue-field" hidden>
+        <span>Custom aspects, 2 to 8, one per line</span>
+        <textarea id="in-aspects" maxlength="2000" placeholder="Risk&#10;Customer impact&#10;Effort"></textarea>
+      </label>
+      <button id="btn-load" class="btn">Load issues</button>
+      <span id="queue-status" class="progress"></span>
+    </div>
+    <div class="console-row">
+      <input id="in-seconds" class="mono" type="number" min="10" max="3600"
+              placeholder="timer s" title="Optional round timer in seconds">
+      <button id="btn-start" class="btn btn-primary">Start next issue</button>
+      <button id="btn-end" class="btn" hidden>End round</button>
+    </div>
+    <button id="btn-close" class="btn btn-quiet">Close session for everyone</button>
+  </section>
+
+</main>
+
+<div id="toast" class="toast" role="status" hidden></div>
+
+  <script src="radar.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
