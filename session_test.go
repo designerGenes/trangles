@@ -919,3 +919,125 @@ func TestConcludedSessionRejectsQueueAndTimerChanges(t *testing.T) {
 		t.Fatal("a timer should be startable again after restart")
 	}
 }
+
+func TestParticipantColorsAreAssignedAndUnique(t *testing.T) {
+	_, session, organizer, guest := newTestSession(t, nil)
+
+	if organizer.color != "" {
+		t.Fatalf("the organizer submits no shape and should hold no colour: %q", organizer.color)
+	}
+	if guest.color != ShapeColors[0] {
+		t.Fatalf("first participant colour = %q, want %q", guest.color, ShapeColors[0])
+	}
+
+	second := &Client{id: "second", name: "Ravi", session: session, send: make(chan []byte, 64)}
+	session.join(second)
+	drain(second)
+	if second.color != ShapeColors[1] {
+		t.Fatalf("second participant colour = %q, want %q", second.color, ShapeColors[1])
+	}
+
+	// A colour someone else holds stays theirs.
+	drain(second)
+	session.handle(second, &inboundMsg{Type: "set_color", Color: guest.color})
+	expectError(t, second)
+	if second.color != ShapeColors[1] {
+		t.Fatalf("a rejected pick changed the colour: %q", second.color)
+	}
+
+	// A restore after a refresh loses the race quietly.
+	drain(second)
+	session.handle(second, &inboundMsg{Type: "set_color", Color: guest.color, Restore: true})
+	select {
+	case data := <-second.send:
+		t.Fatalf("a failed restore should say nothing, sent %s", data)
+	default:
+	}
+
+	// Anything outside the pool is refused, including a plausible hex colour.
+	drain(second)
+	session.handle(second, &inboundMsg{Type: "set_color", Color: "#ff0000"})
+	expectError(t, second)
+
+	drain(second)
+	session.handle(second, &inboundMsg{Type: "set_color", Color: ShapeColors[4]})
+	if second.color != ShapeColors[4] {
+		t.Fatalf("a free colour should be granted, got %q", second.color)
+	}
+
+	// Organizers have no shape to colour.
+	drain(organizer)
+	session.handle(organizer, &inboundMsg{Type: "set_color", Color: ShapeColors[6]})
+	expectError(t, organizer)
+}
+
+func TestManualEndConsumesTheChartsOnScreen(t *testing.T) {
+	_, session, organizer, guest := newTestSession(t, nil)
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1")})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+
+	// Nobody has pressed submit; the guest has only moved their handles.
+	session.handle(guest, &inboundMsg{Type: "preview", Values: []float64{6, 5, 4}, Touched: true})
+	if len(session.round.Submissions) != 0 {
+		t.Fatalf("a preview is not a submission: %#v", session.round.Submissions)
+	}
+
+	session.handle(organizer, &inboundMsg{Type: "end_round"})
+	submission := session.round.Submissions["guest"]
+	if submission == nil {
+		t.Fatal("ending the round should consume the chart in front of each person")
+	}
+	if !sameValues(submission.Values, []float64{6, 5, 4}) {
+		t.Fatalf("consumed values = %#v, want the live chart", submission.Values)
+	}
+	if session.round.Summary == nil {
+		t.Fatal("the round should have a summary")
+	}
+}
+
+func TestTimerStopsAndResumesWhereItLeftOff(t *testing.T) {
+	_, session, organizer, guest := newTestSession(t, nil)
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1")})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+
+	drain(guest)
+	session.handle(guest, &inboundMsg{Type: "pause_timer"})
+	expectError(t, guest)
+
+	drain(organizer)
+	session.handle(organizer, &inboundMsg{Type: "pause_timer"})
+	expectError(t, organizer) // nothing running yet
+
+	session.handle(organizer, &inboundMsg{Type: "set_timer", Seconds: 120})
+	if session.round.Deadline == nil {
+		t.Fatal("the timer should be running")
+	}
+
+	session.handle(organizer, &inboundMsg{Type: "pause_timer"})
+	if session.round.Deadline != nil {
+		t.Fatal("a stopped timer has no deadline")
+	}
+	if left := session.round.Paused; left <= 110*time.Second || left > 120*time.Second {
+		t.Fatalf("paused remainder = %v, want just under two minutes", left)
+	}
+
+	// An empty length picks the round back up rather than restarting it.
+	remaining := session.round.Paused
+	session.handle(organizer, &inboundMsg{Type: "set_timer", Seconds: 0})
+	if session.round.Paused != 0 {
+		t.Fatalf("resuming should clear the paused remainder: %v", session.round.Paused)
+	}
+	if session.round.Deadline == nil {
+		t.Fatal("resuming should set a new deadline")
+	}
+	if left := time.Until(*session.round.Deadline); left > remaining+time.Second {
+		t.Fatalf("resumed with %v, want no more than the %v that was left", left, remaining)
+	}
+
+	// With nothing paused and no length given, there is nothing to do.
+	session.handle(organizer, &inboundMsg{Type: "pause_timer"})
+	session.round.Paused = 0
+	drain(organizer)
+	session.handle(organizer, &inboundMsg{Type: "set_timer", Seconds: 0})
+	expectError(t, organizer)
+}

@@ -42,6 +42,7 @@ type RoundSnapshot struct {
 	Description string                 `json:"description,omitempty"`
 	Open        bool                   `json:"open"`
 	Deadline    *time.Time             `json:"deadline,omitempty"`
+	PausedMs    int64                  `json:"pausedMs,omitempty"`
 	Submissions map[string]*Submission `json:"submissions"`
 	Previews    map[string]*Submission `json:"previews"`
 	Summary     *Summary               `json:"summary,omitempty"`
@@ -101,6 +102,7 @@ func (s *Session) snapshotLocked() SessionSnapshot {
 			Description: s.round.Description,
 			Open:        s.round.Open,
 			Deadline:    s.round.Deadline,
+			PausedMs:    s.round.Paused.Milliseconds(),
 			Submissions: s.round.Submissions,
 			Previews:    s.round.Previews,
 			Summary:     s.round.Summary,

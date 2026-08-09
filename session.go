@@ -159,10 +159,50 @@ type Client struct {
 	id        string
 	ip        string
 	name      string
+	color     string
 	organizer bool
 	session   *Session
 	conn      *websocket.Conn
 	send      chan []byte
+}
+
+// ShapeColors is the fixed pool participants pick from. It is sent to the
+// client on join so the palette lives in exactly one place, and uniqueness
+// within a session is enforced here rather than trusted from the browser.
+var ShapeColors = []string{
+	"#6D57B8", "#2A6F8E", "#A87428", "#C03B2D",
+	"#43775C", "#9A4E86", "#536B9B", "#875E3A",
+}
+
+func validShapeColor(want string) bool {
+	for _, color := range ShapeColors {
+		if strings.EqualFold(color, want) {
+			return true
+		}
+	}
+	return false
+}
+
+// colorTakenLocked reports whether anyone other than `self` already holds it.
+func (s *Session) colorTakenLocked(want string, self *Client) bool {
+	for other := range s.clients {
+		if other != self && strings.EqualFold(other.color, want) {
+			return true
+		}
+	}
+	return false
+}
+
+// freeColorLocked hands out the first unclaimed colour. A session larger than
+// the palette leaves the surplus empty, and the client falls back to a slot
+// colour — better than two people sharing one on the overlay by default.
+func (s *Session) freeColorLocked(self *Client) string {
+	for _, color := range ShapeColors {
+		if !s.colorTakenLocked(color, self) {
+			return color
+		}
+	}
+	return ""
 }
 
 func (c *Client) writePump() {
@@ -255,6 +295,9 @@ type Round struct {
 	Description string
 	Open        bool
 	Deadline    *time.Time
+	// Paused holds what was left on the clock when the organizer stopped it,
+	// so resuming continues the round rather than restarting it.
+	Paused      time.Duration
 	timer       *time.Timer
 	Submissions map[string]*Submission // keyed by client id; survives disconnects
 	Previews    map[string]*Submission // keyed by client id; current unsent chart
@@ -297,6 +340,8 @@ type inboundMsg struct {
 	Values      []float64 `json:"values"`
 	Touched     bool      `json:"touched"`
 	ItemID      string    `json:"itemId"`
+	Color       string    `json:"color"`
+	Restore     bool      `json:"restore"`
 }
 
 func (s *Session) handle(c *Client, msg *inboundMsg) {
@@ -493,6 +538,30 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 		s.persistLocked()
 		s.broadcastStateLocked()
 
+	case "set_color":
+		if c.organizer {
+			c.trySend(errMsg("The organizer does not submit a shape, so has no colour."))
+			return
+		}
+		want := strings.TrimSpace(msg.Color)
+		if !validShapeColor(want) {
+			c.trySend(errMsg("That is not one of the available colours."))
+			return
+		}
+		if s.colorTakenLocked(want, c) {
+			// A restore is a best-effort reclaim after a refresh, not a
+			// deliberate pick — losing the race is not worth a toast.
+			if !msg.Restore {
+				c.trySend(errMsg("Someone else already has that colour."))
+			}
+			return
+		}
+		if strings.EqualFold(c.color, want) {
+			return
+		}
+		c.color = want
+		s.broadcastStateLocked()
+
 	case "remind":
 		if !c.organizer {
 			c.trySend(errMsg("Only the organizer can send reminders."))
@@ -527,20 +596,48 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 			c.trySend(errMsg("There is no open issue to time."))
 			return
 		}
+		left := time.Duration(msg.Seconds) * time.Second
 		if msg.Seconds <= 0 {
-			c.trySend(errMsg("Enter a timer length in seconds."))
-			return
+			// No length given: pick up a paused clock where it stopped.
+			if r.Paused <= 0 {
+				c.trySend(errMsg("Enter a round length like 90s or 5m."))
+				return
+			}
+			left = r.Paused
 		}
-		secs := msg.Seconds
-		if secs > maxRoundSecs {
-			secs = maxRoundSecs
+		if left > maxRoundSecs*time.Second {
+			left = maxRoundSecs * time.Second
 		}
 		if r.timer != nil {
 			r.timer.Stop()
 		}
-		dl := time.Now().Add(time.Duration(secs) * time.Second)
+		r.Paused = 0
+		dl := time.Now().Add(left)
 		r.Deadline = &dl
 		r.timer = time.AfterFunc(time.Until(dl), func() { s.timerFired(r) })
+		s.persistLocked()
+		s.broadcastStateLocked()
+
+	case "pause_timer":
+		if !c.organizer {
+			c.trySend(errMsg("Only the organizer can pause the timer."))
+			return
+		}
+		r := s.round
+		if r == nil || !r.Open || r.Deadline == nil {
+			c.trySend(errMsg("There is no running timer to stop."))
+			return
+		}
+		left := time.Until(*r.Deadline)
+		if left < 0 {
+			left = 0
+		}
+		if r.timer != nil {
+			r.timer.Stop()
+			r.timer = nil
+		}
+		r.Deadline = nil
+		r.Paused = left
 		s.persistLocked()
 		s.broadcastStateLocked()
 
@@ -653,7 +750,6 @@ func (s *Session) timerFired(r *Round) {
 	if s.closed || s.round != r || !r.Open {
 		return
 	}
-	s.submitCurrentChartsLocked(r)
 	s.endRoundLocked()
 }
 
@@ -683,12 +779,17 @@ func (s *Session) endRoundLocked() {
 	if r == nil || !r.Open {
 		return
 	}
+	// However the round ends — timer expiry or the organizer calling it — the
+	// chart in front of each person is their answer. Waiting for an explicit
+	// submit would silently drop everyone who was still deliberating.
+	s.submitCurrentChartsLocked(r)
 	r.Open = false
 	if r.timer != nil {
 		r.timer.Stop()
 		r.timer = nil
 	}
 	r.Deadline = nil
+	r.Paused = 0
 	r.Summary = computeSummary(shapesOf(r.Submissions), s.axes)
 	// A round concludes once, so this is the one place history grows.
 	s.history = append(s.history, HistoryEntry{
@@ -708,6 +809,10 @@ func (s *Session) join(c *Client) bool {
 	}
 	if len(s.clients) >= s.hub.limits.MaxClientsPerSession {
 		return false
+	}
+	// The organizer only observes, so they never consume a colour.
+	if !c.organizer && c.color == "" {
+		c.color = s.freeColorLocked(c)
 	}
 	s.clients[c] = true
 	s.persistLocked()
@@ -769,6 +874,7 @@ func (s *Session) closeLocked(reason string) {
 type ParticipantView struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
+	Color     string `json:"color,omitempty"`
 	Organizer bool   `json:"organizer"`
 	Submitted bool   `json:"submitted"`
 	Responded bool   `json:"responded"`
@@ -786,6 +892,7 @@ type RoundView struct {
 	Description    string       `json:"description,omitempty"`
 	Open           bool         `json:"open"`
 	DeadlineMs     int64        `json:"deadlineMs,omitempty"`
+	PausedMs       int64        `json:"pausedMs,omitempty"`
 	SubmittedCount int          `json:"submittedCount"`
 	Average        []float64    `json:"average,omitempty"`
 	LiveShapes     []NamedShape `json:"liveShapes,omitempty"`
@@ -826,7 +933,8 @@ func (s *Session) broadcastStateLocked() {
 			}
 		}
 		sv.Participants = append(sv.Participants, ParticipantView{
-			ID: c.id, Name: c.name, Organizer: c.organizer, Submitted: submitted, Responded: responded,
+			ID: c.id, Name: c.name, Color: c.color,
+			Organizer: c.organizer, Submitted: submitted, Responded: responded,
 		})
 	}
 	if r := s.round; r != nil {
@@ -841,6 +949,9 @@ func (s *Session) broadcastStateLocked() {
 		}
 		if r.Deadline != nil {
 			rv.DeadlineMs = r.Deadline.UnixMilli()
+		}
+		if r.Paused > 0 {
+			rv.PausedMs = r.Paused.Milliseconds()
 		}
 		// Live group average while the round is open (revealed as it forms).
 		if r.Open && len(r.Submissions) > 0 {
@@ -1004,6 +1115,7 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 		"type": "joined", "code": s.Code, "selfId": c.id,
 		"organizer": organizer, "axes": s.axes, "axisMax": AxisMax,
 		"axisMins": s.axisMins, "axisMaxes": s.axisMaxes, "pointLabels": s.pointLabels,
+		"colors": ShapeColors,
 	}
 	if organizer {
 		welcome["organizerToken"] = s.organizerToken

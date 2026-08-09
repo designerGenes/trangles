@@ -13,6 +13,10 @@ function setHidden(node, hidden) {
 }
 const SVGNS = "http://www.w3.org/2000/svg";
 const AXIS_COLORS = ["#6D57B8", "#2A6F8E", "#A87428", "#C03B2D", "#43775C", "#9A4E86", "#536B9B", "#875E3A"];
+/* Participants pick their own shape colour from this pool. The server owns the
+   authoritative list and sends it on join — uniqueness is enforced there — so
+   this copy is only the fallback for a boot that never reached a session. */
+let PALETTE = AXIS_COLORS.slice();
 /* The real pool lives in config/app.json and arrives from /api/config, so
    adding names never means touching JS. These few keep the placeholder
    working if the fetch fails or has not landed yet. */
@@ -66,6 +70,7 @@ const S = {
   nextResetTimer: null,
   touched: false,
   liveView: "overlay",
+  color: null,            // my chosen shape colour, remembered across rounds
   hiddenLive: new Set(),
   history: [],
   historyIndex: 0,      // which completed issue the organizer is viewing
@@ -218,6 +223,11 @@ function setAxis(i, v) {
 
 function drawMine() {
   plot.mine.setAttribute("points", polyPoints(S.my));
+  // .my-shape sets fill and stroke in the stylesheet, which outranks a
+  // presentation attribute — the personal colour has to go on inline style.
+  const color = selfColor();
+  plot.mine.style.stroke = color || "";
+  plot.mine.style.fill = color ? `${color}1A` : "";
   plot.handles.forEach((g, i) => {
     const [x, y] = pt(i, S.my[i]);
     g._dot.setAttribute("cx", x);
@@ -293,13 +303,18 @@ function handleMessage(msg) {
       S.selfId = msg.selfId;
       S.organizer = msg.organizer;
       S.axes = msg.axes;
+      if (Array.isArray(msg.colors) && msg.colors.length) PALETTE = msg.colors.slice();
       S.axisMins = msg.axisMins || S.axes.map(() => 1);
       S.axisMaxes = msg.axisMaxes || S.axes.map(() => msg.axisMax || 10);
       S.pointLabels = msg.pointLabels || defaultPointLabels(S.axisMaxes[0]);
       S.my = S.axes.map((_, i) => startingValue(i));
       if (msg.organizerToken) S.orgToken = msg.organizerToken;
+      // A refresh makes a new client with a freshly assigned colour, so ask
+      // for the old one back. `restore` keeps the server quiet if someone
+      // else has taken it in the meantime.
+      if (!S.organizer && S.color) send({ type: "set_color", color: S.color, restore: true });
       sessionStorage.setItem("tri", JSON.stringify({
-        code: S.code, name: S.name, token: S.orgToken || "",
+        code: S.code, name: S.name, token: S.orgToken || "", color: S.color || "",
       }));
       if (S.organizer) showSetup();
       else showSession();
@@ -394,6 +409,8 @@ function render() {
   // entirely rather than sitting underneath it.
   setHidden($("round-stage"), concluded);
   renderPeople(st);
+  renderColorPicker(st);
+  drawMine();
   syncHistory(st.history);
   renderFinalSummary(st.finalSummary);
   if (concluded) {
@@ -429,6 +446,9 @@ function render() {
     return;
   }
 
+  // "Finish round" ends the round; this is the transition that follows, and the
+  // summary is what the room should be looking at when it lands.
+  const justConcluded = S.activeRound === r.number && S.activeRoundOpen && !r.open;
   if (S.activeRound !== r.number || (r.open && !S.activeRoundOpen)) {
     S.activeRound = r.number;
     S.submittedRound = null;
@@ -441,8 +461,9 @@ function render() {
   S.activeRoundOpen = r.open;
 
   title.textContent = r.title;
-  if (r.link) {
-    title.href = r.link;
+  const href = safeLink(r.link);
+  if (href) {
+    title.href = href;
     title.target = "_blank";
     title.rel = "noreferrer";
   } else {
@@ -466,7 +487,8 @@ function render() {
 
   if (r.open) {
     drawAverage(r.average || null);
-    startCountdown(r.deadlineMs);
+    if (r.pausedMs) showPausedClock(r.pausedMs);
+    else startCountdown(r.deadlineMs);
     $("summary-card").hidden = true;
     if (!S.organizer && S.previewRound !== r.number) {
       S.previewRound = r.number;
@@ -484,6 +506,15 @@ function render() {
     $("live-inputs").hidden = !r.open;
     if (r.open) renderLiveInputs(r.liveShapes || []);
   }
+  if (justConcluded) revealRoundSummary();
+}
+
+// The organizer reads results in the history pager, everyone else in the
+// per-round summary card.
+function revealRoundSummary() {
+  const card = S.organizer ? $("history-card") : $("summary-card");
+  if (!card || card.hidden || typeof card.scrollIntoView !== "function") return;
+  card.scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "start" });
 }
 
 function syncAxes(axes) {
@@ -506,6 +537,40 @@ const START_VALUE = 2;
 
 function startingValue(i) {
   return Math.min(axisMax(i), Math.max(axisMin(i), START_VALUE));
+}
+
+/* An issue link is free text the organizer typed. A bare word like "abcdef"
+   would resolve against our own host (/abcdef), and a javascript: link would
+   run in every browser in the room — so only absolute http(s) links become
+   anchors, and something that merely looks like a host gets a scheme. */
+function safeLink(raw) {
+  const text = String(raw || "").trim();
+  if (!text) return null;
+  const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(text);
+  const looksLikeHost = /^[^\s/:]+\.[^\s/:]+/.test(text);
+  const candidate = hasScheme ? text : (looksLikeHost ? `https://${text}` : null);
+  if (!candidate) return null;
+  try {
+    const url = new URL(candidate);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/* Round lengths read better as durations than as a raw second count:
+   "90", "90s", "5m", "1m30s" and "5:30" all mean what they look like. */
+function parseDuration(text) {
+  const raw = String(text || "").trim().toLowerCase().replace(/\s+/g, "");
+  if (!raw) return null;
+  if (/^\d+$/.test(raw)) return Number(raw);
+  const clock = /^(\d+):([0-5]\d)$/.exec(raw);
+  if (clock) return Number(clock[1]) * 60 + Number(clock[2]);
+  if (!/^(\d+[hms])+$/.test(raw)) return null;
+  const unit = { h: 3600, m: 60, s: 1 };
+  let total = 0;
+  for (const match of raw.matchAll(/(\d+)([hms])/g)) total += Number(match[1]) * unit[match[2]];
+  return total;
 }
 
 function formatValue(value) {
@@ -539,7 +604,7 @@ function selfSubmitted(state) {
 function renderPeople(st) {
   $("people").innerHTML = st.participants.map((p) => `
     <span class="person ${p.submitted ? "submitted" : ""}">
-      <span class="check">✓</span>${escapeHTML(p.name)}${p.id === S.selfId ? " (you)" : ""}
+      <span class="check" style="color:${p.organizer || !p.color ? "" : escapeHTML(p.color)}">✓</span>${escapeHTML(p.name)}${p.id === S.selfId ? " (you)" : ""}
       ${p.organizer ? '<span class="org">org</span>' : ""}
       ${S.organizer && p.submitted && !p.responded ? '<span class="default-vote">default</span>' : ""}
     </span>`).join("");
@@ -555,48 +620,52 @@ function renderConsole(round) {
   const eligible = (S.state.participants || []).filter((person) => !person.organizer);
   const submitted = eligible.length - pending.length;
   const allSubmitted = eligible.length > 0 && pending.length === 0;
-  $("btn-start").hidden = true;
-  $("btn-timer").hidden = !open || final;
-  $("in-seconds").hidden = !open || final;
+  const canTime = open && !final;
+  const canRestart = !!round && !open && !final;
+  $("btn-timer").hidden = !canTime;
+  $("in-seconds").hidden = !canTime;
+  // One button for the whole clock: it starts, stops, and picks back up.
+  const running = canTime && !!round.deadlineMs;
+  $("btn-timer").textContent = running ? "Stop timer" : "Start timer";
+  $("btn-restart-round").hidden = !canRestart;
+  // A group whose every control is hidden would otherwise leave a bare heading
+  // floating in the shelf.
+  setHidden($("round-group"), !canTime && !canRestart);
   // Adding work after the totals are published would change what the final
-  // summary covers, so the queue editor closes and goes away until restart.
-  const queueEditor = $("queue-editor");
-  if (final) queueEditor.open = false;
-  setHidden(queueEditor, final);
-  $("btn-restart-round").hidden = open || final || !round;
+  // summary covers, so the queue editor goes away until restart.
+  setHidden($("queue-editor"), final);
   // The floating action remains available after a summary while queued work
   // remains, so a closed shelf never implies the session is finished.
   setHidden($("end-rail"), !round || (!open && queued === 0 && !finished && !final));
   $("end-vote-count").textContent = open && eligible.length ? `Votes: ${submitted}/${eligible.length}` : "";
   $("btn-end").classList.toggle("is-pending", open && !allSubmitted && !S.nextArmed);
   $("btn-end").classList.toggle("is-confirm", open && !allSubmitted && S.nextArmed);
+  // One action, one meaning: while a round is live the button ends that round
+  // and lands on its summary; only from the summary does it advance.
   if (final) {
     resetNextConfirm();
-    $("btn-end").textContent = "Restart Session";
+    $("btn-end").textContent = "Restart session";
     $("end-hint").hidden = true;
   } else if (!open && queued === 0) {
     resetNextConfirm();
-    $("btn-end").textContent = "Final Summary";
+    $("btn-end").textContent = "Final summary";
     $("end-hint").hidden = true;
   } else if (!open) {
     resetNextConfirm();
-    $("btn-end").textContent = "Next Issue";
+    $("btn-end").textContent = "Next issue";
     $("end-hint").hidden = true;
   } else if (allSubmitted) {
     resetNextConfirm();
-    $("btn-end").textContent = "End Round";
+    $("btn-end").textContent = "Finish round";
     $("end-hint").hidden = true;
   } else if (open && S.nextArmed) {
     $("btn-end").textContent = "Confirm";
     $("end-hint").textContent = "Votes are still pending.";
     $("end-hint").hidden = false;
   } else {
-    $("btn-end").textContent = "Next Issue";
+    $("btn-end").textContent = "Finish round";
     $("end-hint").hidden = true;
   }
-  $("queue-status").textContent = queued
-    ? `${queued} issue${queued === 1 ? "" : "s"} ready`
-    : "";
   $("pending-panel").hidden = !open;
   $("pending-people").textContent = pending.length ? pending.map((person) => person.name).join(", ") : "All votes submitted.";
   $("btn-remind").disabled = pending.length === 0;
@@ -691,10 +760,12 @@ function renderProspectivePlot() {
 
 function observeFullSetupChart() {
   if (setupChartObserver || !window.IntersectionObserver) return;
+  // Any part of the full chart being visible is enough — two copies of the
+  // same drawing on screen at once is the thing worth avoiding.
   setupChartObserver = new IntersectionObserver(([entry]) => {
     fullSetupChartVisible = entry.isIntersecting;
     $("setup-prospect").hidden = entry.isIntersecting;
-  }, { threshold: 0.55 });
+  }, { threshold: 0 });
   setupChartObserver.observe($("setup-full-chart"));
 }
 
@@ -750,7 +821,62 @@ function renderLiveInputs(shapes) {
 function participantColor(id) {
   const people = (S.state && S.state.participants) || [];
   const index = people.findIndex((person) => person.id === id);
-  return AXIS_COLORS[index < 0 ? 0 : index];
+  if (index >= 0 && people[index].color) return people[index].color;
+  return PALETTE[(index < 0 ? 0 : index) % PALETTE.length];
+}
+
+// My own colour, or null before the server has assigned one.
+function selfColor() {
+  const people = (S.state && S.state.participants) || [];
+  const self = people.find((person) => person.id === S.selfId);
+  return (self && self.color) || null;
+}
+
+// History outlives the people in it, so a shape whose author has left falls
+// back to a stable palette slot rather than borrowing whoever holds that id now.
+function knownColor(id) {
+  if (!id) return null;
+  const people = (S.state && S.state.participants) || [];
+  const person = people.find((candidate) => candidate.id === id);
+  return (person && person.color) || null;
+}
+
+function renderColorPicker(st) {
+  // The organizer never submits a shape, so they have no colour to pick.
+  setHidden($("color-picker"), S.organizer);
+  if (S.organizer) return;
+  const mine = selfColor();
+  if (mine) S.color = mine;
+  $("btn-color").style.background = mine || "var(--ink)";
+  const taken = new Set((st.participants || [])
+    .filter((person) => person.id !== S.selfId && person.color)
+    .map((person) => person.color.toLowerCase()));
+  const box = $("color-options");
+  box.innerHTML = "";
+  PALETTE.forEach((color) => {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "color-option";
+    option.style.background = color;
+    const isMine = !!mine && color.toLowerCase() === mine.toLowerCase();
+    // A colour in use elsewhere stays visible but unpickable — two identical
+    // polygons on the overlay would be unreadable.
+    option.disabled = taken.has(color.toLowerCase());
+    option.classList.toggle("is-mine", isMine);
+    option.setAttribute("aria-label", option.disabled ? `${color} — already taken` : color);
+    option.setAttribute("aria-pressed", String(isMine));
+    option.onclick = () => {
+      S.color = color;
+      send({ type: "set_color", color });
+      openColorPicker(false);
+    };
+    box.appendChild(option);
+  });
+}
+
+function openColorPicker(open) {
+  setHidden($("color-options"), !open);
+  $("btn-color").setAttribute("aria-expanded", String(open));
 }
 
 function drawStaticRadar(svg, axes, mins, maxes, shapes) {
@@ -848,7 +974,7 @@ function renderHistory() {
   // still see who diverged on an issue they have already moved past.
   const shapes = (summary.shapes || []).map((shape, i) => ({
     id: `history-${i}`, name: shape.name, values: shape.values,
-    color: AXIS_COLORS[i % AXIS_COLORS.length],
+    color: knownColor(shape.id) || PALETTE[i % PALETTE.length],
   }));
   if (averages.length) {
     shapes.push({ id: "history-avg", name: "Group", values: averages, color: "var(--pencil)" });
@@ -900,16 +1026,28 @@ function miniSVG(shape, isOutlier) {
 }
 
 /* ── countdown ─────────────────────────────────────────────────────── */
+function clockText(ms) {
+  const s = Math.ceil(Math.max(0, ms) / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+// A stopped clock keeps its reading but drops the running colour, so nobody
+// watches a red number that is never going to move.
+function showPausedClock(remainingMs) {
+  stopCountdown();
+  const elT = $("round-timer");
+  elT.hidden = false;
+  elT.classList.add("is-paused");
+  elT.textContent = clockText(remainingMs);
+}
+
 function startCountdown(deadlineMs) {
   stopCountdown();
   const elT = $("round-timer");
+  elT.classList.remove("is-paused");
   if (!deadlineMs) { elT.hidden = true; return; }
   elT.hidden = false;
-  const tick = () => {
-    const left = Math.max(0, deadlineMs - Date.now());
-    const s = Math.ceil(left / 1000);
-    elT.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-  };
+  const tick = () => { elT.textContent = clockText(deadlineMs - Date.now()); };
   tick();
   S.countdown = setInterval(tick, 250);
 }
@@ -951,10 +1089,11 @@ $("btn-create").onclick = () => {
 $("in-name").oninput = updateEntryActions;
 $("in-code").oninput = updateEntryActions;
 $("btn-join").onclick = () => {
+  const name = requiredNickname();
+  if (!name) return;
   const code = $("in-code").value.trim().toUpperCase();
   if (code.length < 4) { toast("Enter the 5-character session code."); return; }
-  S.name = requiredNickname();
-  if (!S.name) return;
+  S.name = name;
   const saved = savedCreds();
   connect({
     type: "join", name: S.name, code,
@@ -968,11 +1107,25 @@ $("btn-submit").onclick = () => {
   render();
 };
 $("btn-add-queue-item").onclick = () => addQueueItem();
-$("btn-start").onclick = () => advanceIssue();
 $("btn-timer").onclick = () => {
-  const secs = parseInt($("in-seconds").value, 10);
-  if (isNaN(secs) || secs <= 0) {
-    toast("Enter a timer length in seconds.");
+  const round = S.state && S.state.round;
+  if (round && round.deadlineMs) {
+    send({ type: "pause_timer" });
+    return;
+  }
+  const typed = $("in-seconds").value.trim();
+  // Nothing typed on a stopped clock means "carry on from where we were".
+  if (!typed && round && round.pausedMs) {
+    send({ type: "set_timer", seconds: 0 });
+    return;
+  }
+  const secs = parseDuration(typed);
+  if (secs === null) {
+    toast("Enter a round length like 90s, 5m or 1m30s.");
+    return;
+  }
+  if (secs <= 0) {
+    toast("The round length has to be more than zero.");
     return;
   }
   send({ type: "set_timer", seconds: secs });
@@ -1014,6 +1167,17 @@ function advanceIssue() {
   resetNextConfirm();
   send({ type: "end_round" });
 }
+$("btn-color").onclick = () => {
+  openColorPicker($("color-options").hasAttribute("hidden"));
+};
+// A palette floating over the chart has to get out of the way on the next
+// click or key, or it sits on top of the handles the person came to drag.
+document.addEventListener("pointerdown", (event) => {
+  if (!$("color-picker").contains(event.target)) openColorPicker(false);
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") openColorPicker(false);
+});
 $("btn-remind").onclick = () => send({ type: "remind" });
 $("btn-restart-round").onclick = () => send({ type: "restart_round" });
 $("btn-history-prev").onclick = () => stepHistory(-1);
@@ -1091,10 +1255,20 @@ function addDraftItem(item = {}) {
   remove.textContent = "Remove";
   remove.onclick = () => entry.remove();
   row.append(input, remove);
+  entry.append(row, itemMeta(item));
+  $("draft-items").appendChild(entry);
+  input.focus();
+}
+
+/* The link and description belong to the issue above them, so they live inside
+   the same container and are spaced apart rather than stacked border-to-border. */
+function itemMeta(item) {
   const meta = document.createElement("details");
   meta.className = "draft-item-meta";
   const summary = document.createElement("summary");
   summary.append(document.createTextNode("Add link or description"), caretSpan());
+  const fields = document.createElement("div");
+  fields.className = "draft-meta-fields";
   const link = document.createElement("input");
   link.type = "url";
   link.className = "item-link";
@@ -1105,10 +1279,9 @@ function addDraftItem(item = {}) {
   description.maxLength = 2000;
   description.placeholder = "Optional issue description";
   description.value = item.description || "";
-  meta.append(summary, link, description);
-  entry.append(row, meta);
-  $("draft-items").appendChild(entry);
-  input.focus();
+  fields.append(link, description);
+  meta.append(summary, fields);
+  return meta;
 }
 
 function addQueueItem(item = {}) {
@@ -1132,21 +1305,9 @@ function addQueueItem(item = {}) {
   remove.textContent = "Delete";
   remove.hidden = true;
   row.append(title, confirmButton, remove);
-  const meta = document.createElement("details");
-  meta.className = "draft-item-meta";
-  const summary = document.createElement("summary");
-  summary.append(document.createTextNode("Add link or description"), caretSpan());
-  const link = document.createElement("input");
-  link.type = "url";
-  link.className = "item-link";
-  link.placeholder = "Optional issue link";
-  link.value = item.link || "";
-  const description = document.createElement("textarea");
-  description.className = "item-description";
-  description.maxLength = 2000;
-  description.placeholder = "Optional issue description";
-  description.value = item.description || "";
-  meta.append(summary, link, description);
+  const meta = itemMeta(item);
+  const link = meta.querySelector(".item-link");
+  const description = meta.querySelector(".item-description");
   entry.append(row, meta);
 
   confirmButton.onclick = () => {
@@ -1216,14 +1377,15 @@ function draftItemValues() {
 
 function requiredNickname() {
   const name = $("in-name").value.trim();
-  if (!name) toast("Choose a nickname before entering a session.");
+  setHidden($("entry-warning"), !!name);
+  if (!name) $("in-name").focus();
   return name;
 }
 
 function updateEntryActions() {
-  const hasNickname = $("in-name").value.trim().length > 0;
-  $("btn-create").disabled = !hasNickname;
-  $("btn-join").disabled = !hasNickname || $("in-code").value.trim().length !== 5;
+  // Both actions stay live; the nickname is only demanded at the moment
+  // someone actually tries to enter a session.
+  if ($("in-name").value.trim()) setHidden($("entry-warning"), true);
 }
 
 function savedCreds() {
@@ -1237,6 +1399,7 @@ function savedCreds() {
   if (urlCode) $("in-code").value = urlCode.toUpperCase();
   else if (saved && saved.code) $("in-code").value = saved.code;
   if (saved && saved.name) $("in-name").value = saved.name;
+  if (saved && saved.color) S.color = saved.color;
   $("in-name").placeholder = randomNickname();
   updateEntryActions();
   loadRemoteConfig();
@@ -1247,5 +1410,5 @@ function savedCreds() {
    Scoped to local hosts so the deployed app exposes no internals — jsdom runs
    at http://localhost/, so the UI suite still tests shipped code. */
 if (["localhost", "127.0.0.1", "[::1]", ""].includes(location.hostname)) {
-  window.__test = { S, render, showSession, showSetup, renderHistory, stepHistory, setHidden, addDraftItem };
+  window.__test = { S, render, showSession, showSetup, renderHistory, stepHistory, setHidden, addDraftItem, safeLink, parseDuration };
 }
