@@ -1,3 +1,4 @@
 .env
 .slopignore
 .soupignore
+node_modules/
