@@ -12,7 +12,7 @@ function setHidden(node, hidden) {
   else node.removeAttribute("hidden");
 }
 const SVGNS = "http://www.w3.org/2000/svg";
-const AXIS_COLORS = ["#6D57B8", "#2A6F8E", "#A87428", "#C03B2D", "#43775C", "#9A4E86", "#536B9B", "#875E3A"];
+const AXIS_COLORS = ["#A98CFF", "#4FC3FF", "#FFB14A", "#FF6464", "#65D69A", "#FF7AC6", "#739AFF", "#FF9D42"];
 /* Participants pick their own shape colour from this pool. The server owns the
    authoritative list and sends it on join — uniqueness is enforced there — so
    this copy is only the fallback for a boot that never reached a session. */
@@ -405,16 +405,23 @@ function showIntake(stage, record) {
   S.intakeStage = nextStage;
   S.reviewing = false;
   showView("intake", record);
+  $("view-intake").classList.toggle("intake-initial", nextStage === "first");
   if (S.drafts.length === 0) addDraftItem();
   renderIntake();
 }
 
 function renderIntake() {
+  renderIntakeCopy();
+  renderDraftRows();
+}
+
+function renderIntakeCopy() {
   const more = S.intakeStage === "more";
   $("intake-eyebrow").textContent = more ? "Every issue pointed" : "New session";
   $("intake-title").textContent = more
     ? "Point another issue, or wrap up."
-    : "Enter the first issue to point.";
+    : S.drafts.length > 1 ? "Enter each issue to point." : "Enter the first issue to point.";
+  setHidden($("intake-detail"), more);
   $("btn-launch").textContent = more ? "Add more issues" : "Launch pointing session";
   setHidden($("btn-intake-results"), !more);
   setHidden($("btn-intake-back"), !more || !(S.state && S.state.round));
@@ -422,7 +429,6 @@ function renderIntake() {
   const points = (S.history || []).reduce((sum, entry) => sum + ((entry.summary && entry.summary.storyPoints) || 0), 0);
   $("intake-tally").textContent = `${done} issue${done === 1 ? "" : "s"} pointed · ${points} story points so far`;
   setHidden($("intake-tally"), !more || done === 0);
-  renderDraftRows();
 }
 
 function showSettings(from, record) {
@@ -504,8 +510,8 @@ const DEMO_SUMMARY = {
 function demoParticipants(role, submitted) {
   return [
     { id: "ada", name: "Ada", organizer: true, submitted: false },
-    { id: "mina", name: role === "participant" ? "You" : "Mina", organizer: false, submitted: !!submitted, color: "#6D57B8" },
-    { id: "rowan", name: "Rowan", organizer: false, submitted: !!submitted, color: "#2A6F8E" },
+    { id: "mina", name: role === "participant" ? "You" : "Mina", organizer: false, submitted: !!submitted, color: "#A98CFF" },
+    { id: "rowan", name: "Rowan", organizer: false, submitted: !!submitted, color: "#4FC3FF" },
   ];
 }
 
@@ -1183,7 +1189,7 @@ function renderProspectivePlot() {
   const mins = aspects.map(() => 1);
   const maxes = aspects.map(() => max);
   const values = aspects.map(() => Math.min(max, START_VALUE));
-  drawStaticRadar($("setup-full-plot"), aspects, mins, maxes, [{ name: "Starting values", values, color: "#1E2B2F" }]);
+  drawStaticRadar($("setup-full-plot"), aspects, mins, maxes, [{ name: "Starting values", values, color: "#F4F1E8" }]);
 }
 
 function renderLiveInputs(shapes, scores = []) {
@@ -1893,6 +1899,7 @@ function addDraftItem(item = {}, focusIn = "intake") {
     fieldMode: item.fieldMode || "raw",
   });
   renderDraftRows();
+  if (S.view === "intake") renderIntakeCopy();
   if (S.view === "settings" || focusIn === "settings") renderSettingsItems();
   const host = focusIn === "settings" ? $("settings-items") : $("intake-items");
   const inputs = host.querySelectorAll(".intake-title-input");
@@ -1975,6 +1982,7 @@ function draftRow(draft, index, context) {
     remove.onclick = () => {
       S.drafts = S.drafts.filter((candidate) => candidate.id !== draft.id);
       renderDraftRows();
+      if (S.view === "intake") renderIntakeCopy();
       if (S.view === "settings") renderSettingsItems();
     };
     row.appendChild(remove);

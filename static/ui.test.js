@@ -143,8 +143,8 @@ const historyEntry = (n, title) => ({
   T.showSession();
   T.S.state = stateMsg({ participants: [
     { id: "o", name: "Ada", organizer: true, submitted: false },
-    { id: "g", name: "Lin", organizer: false, submitted: false, color: "#6D57B8" },
-    { id: "r", name: "Ravi", organizer: false, submitted: true, color: "#2A6F8E" },
+    { id: "g", name: "Lin", organizer: false, submitted: false, color: "#A98CFF" },
+    { id: "r", name: "Ravi", organizer: false, submitted: true, color: "#4FC3FF" },
   ], round: { number: 1, title: "PROJ-1", open: true, submittedCount: 1,
     axes: ["Uncertainty", "Complexity", "Toil"], axisMins: [1, 1, 1], axisMaxes: [8, 8, 8],
     liveShapes: [{ id: "g", name: "Lin", values: [5, 4, 3] }],
@@ -508,8 +508,8 @@ const historyEntry = (n, title) => ({
 
   const people = [
     { id: "o", name: "Ada", organizer: true, submitted: false },
-    { id: "g", name: "Lin", organizer: false, submitted: false, color: "#2A6F8E" },
-    { id: "r", name: "Ravi", organizer: false, submitted: false, color: "#6D57B8" },
+    { id: "g", name: "Lin", organizer: false, submitted: false, color: "#4FC3FF" },
+    { id: "r", name: "Ravi", organizer: false, submitted: false, color: "#A98CFF" },
   ];
   T.S.state = stateMsg({ participants: people });
   T.render();
@@ -517,10 +517,10 @@ const historyEntry = (n, title) => ({
   check("picker offered to participants", shown(win, "color-picker"));
   const options = Array.from(win.document.querySelectorAll(".color-option"));
   check("every palette colour is offered", options.length >= 8, options.length);
-  const taken = options.find((o) => o.getAttribute("aria-label").includes("#6D57B8"));
+  const taken = options.find((o) => o.getAttribute("aria-label").includes("#A98CFF"));
   check("a colour in use cannot be taken", taken.disabled);
   const mine = options.find((o) => o.classList.contains("is-mine"));
-  check("my own colour is marked", !!mine && mine.getAttribute("aria-label") === "#2A6F8E");
+  check("my own colour is marked", !!mine && mine.getAttribute("aria-label") === "#4FC3FF");
 
   // The stylesheet colours .my-shape, so the personal colour has to win on
   // inline style or it never reaches the screen.
@@ -597,6 +597,32 @@ const historyEntry = (n, title) => ({
     /auto-fill/.test(grid) && !/1fr\)\)/.test(grid), grid.slice(0, 110));
 }
 
+/* ── 16b. Theme: semantic dark surfaces stay distinct ───────────────── */
+{
+  const win = boot();
+  const css = read("style.css");
+  check("theme uses a non-black charcoal app background",
+    /--paper:\s+#161922/.test(css) && /background: radial-gradient/.test(css));
+  check("logo keeps a bright triangle on the single-colour wordmark",
+    /\.wordmark \{[^}]*color: var\(--ink\)/.test(css)
+    && /\.wordmark-angle \{[^}]*color: var\(--pencil\)/.test(css));
+  check("settings surfaces carry semantic concepts",
+    win.document.querySelector("#view-settings .issues-box")
+    && win.document.querySelector("#view-settings .aspects-box")
+    && win.document.querySelector("#view-settings .point-labels-box")
+    && win.document.querySelector("#setup-full-chart.chart-box"));
+  check("issues use honey fields and focus", /\.issues-box \{[^}]*--honey/.test(css)
+    && /\.issues-box input:focus-visible \{[^}]*--honey/.test(css));
+  check("aspects use orange fields and focus", /\.aspects-box \{[^}]*--orange/.test(css)
+    && /\.aspects-box input:focus-visible \{[^}]*--orange/.test(css));
+  check("point labels use blue fields and focus", /\.point-labels-box \{[^}]*--blue/.test(css)
+    && /\.point-labels-box input:focus-visible \{[^}]*--blue/.test(css));
+  check("radar screens use a violet chart treatment",
+    win.document.querySelector("#plot-wrap.chart-box")
+    && win.document.querySelector("#live-inputs.chart-box")
+    && /\.ring-outer \{[^}]*var\(--violet\)/.test(css));
+}
+
 
 /* ── 17. Intake: one mode-switching row, nothing else up front ───────── */
 {
@@ -620,17 +646,30 @@ const historyEntry = (n, title) => ({
   check("field mode has an icon control", !!win.document.querySelector(".field-mode-toggle svg"));
   check("the lone row carries the add affordance", !!win.document.querySelector(".intake-row .row-plus"));
   check("there is no separate add-issue button", !win.document.getElementById("btn-intake-add"));
+  check("initial intake copy names the first issue",
+    win.document.getElementById("intake-title").textContent === "Enter the first issue to point.");
+  check("initial intake explains that more issues can be added",
+    /add more issues to the session/.test(win.document.getElementById("intake-detail").textContent));
+  check("initial intake block is vertically centered", win.document.getElementById("view-intake").classList.contains("intake-initial"));
 
   // Adding rows happens at the right edge of the last row, not through a
   // competing action elsewhere on the page.
   win.document.querySelector(".intake-row .row-plus").click();
   check("the last-row plus adds another issue", win.document.querySelectorAll(".intake-row").length === 2);
+  check("multiple rows change the intake heading to each issue",
+    win.document.getElementById("intake-title").textContent === "Enter each issue to point.");
   check("extra rows use matching minus controls", win.document.querySelectorAll(".intake-row .row-minus").length === 2
     && !!win.document.querySelector(".intake-row .row-plus"));
+  win.document.querySelector(".intake-row .row-minus").click();
+  check("returning to one row restores the first-issue heading",
+    win.document.getElementById("intake-title").textContent === "Enter the first issue to point.");
   const css = read("style.css");
   check("plus and minus share one size rule", /\.row-plus, \.row-minus \{[^}]*flex: 0 0 44px/.test(css));
   check("settings precede the full-width launch action", win.document.getElementById("btn-open-settings").compareDocumentPosition(win.document.querySelector(".intake-actions"))
     & win.Node.DOCUMENT_POSITION_FOLLOWING && /#btn-launch \{ width: 100%/.test(css));
+  check("session code bubble inverts while pressed",
+    /\.code-chip:active \{[^}]*background: var\(--ink\)[^}]*color: var\(--paper\)/.test(css)
+    && /\.code-chip:active \.mono \{ color: var\(--paper\)/.test(css));
 }
 
 /* ── 18. Field modes preserve title, URL, and description ────────────── */
@@ -994,6 +1033,14 @@ const historyEntry = (n, title) => ({
   check("aspects use a plus control", win.document.querySelectorAll("#draft-aspects .draft-item").length === initialAspects + 1
     && !!aspectRows.at(-1).querySelector(".row-plus"));
   check("aspect rows use matching inline minus controls", win.document.querySelectorAll("#draft-aspects .row-minus").length === initialAspects + 1);
+  const css = read("style.css");
+  check("aspect rows use the neutral card surface", !/#draft-aspects \.draft-item:nth-child/.test(css));
+  check("aspect rows stay full width while inputs flex around controls",
+    /\.draft-item \{[^}]*width: 100%/.test(css)
+    && /\.draft-item input \{[^}]*flex: 1 1 auto[^}]*min-width: 0/.test(css));
+  check("point-label rows stay full width while inputs flex around controls",
+    /\.point-label-row \{[^}]*display: flex[^}]*width: 100%/.test(css)
+    && /\.point-label-row input \{[^}]*flex: 1 1 auto[^}]*min-width: 0/.test(css));
 
   win.document.getElementById("btn-close-settings").click();
   const warning = win.document.getElementById("settings-items-warning");

@@ -26,6 +26,7 @@
   "timerRemove": "Remove",
   "intakeEyebrow": "New session",
   "intakeTitle": "Enter the first issue to point.",
+  "intakeDetail": "You can add more issues to the session as they come up.",
   "intakeSettings": "Session settings",
   "intakeLaunchSession": "Launch pointing session",
   "intakeViewResults": "View session results",

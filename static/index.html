@@ -9,8 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Public+Sans:wght@400;600&family=Spline+Sans+Mono:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <!-- Inline so there is no extra request and no 404 for a missing icon file. -->
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23F3F5F1'/%3E%3Cpolygon points='16,6 27,25 5,25' fill='none' stroke='%23C03B2D' stroke-width='2.5' stroke-linejoin='round'/%3E%3C/svg%3E">
-<meta name="color-scheme" content="light">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23202534'/%3E%3Cpolygon points='16,6 27,25 5,25' fill='none' stroke='%23FF6464' stroke-width='2.5' stroke-linejoin='round'/%3E%3C/svg%3E">
+<meta name="color-scheme" content="dark">
 <meta name="description" content="" data-i18n-content="metaDescription">
 </head>
 <body>
@@ -85,9 +85,10 @@
      organizer might want lives behind Session settings, because a scrum lead
      picking the next issue off a board is not configuring anything. -->
 <main id="view-intake" hidden>
-  <section class="card intake-card">
+  <section class="card intake-card issues-box">
     <span id="intake-eyebrow" class="eyebrow" data-i18n="intakeEyebrow"></span>
     <h1 id="intake-title" class="intake-title" data-i18n="intakeTitle"></h1>
+    <p id="intake-detail" class="hint" data-i18n="intakeDetail"></p>
     <p id="intake-tally" class="hint intake-tally" hidden></p>
 
     <div id="intake-items" class="intake-items"></div>
@@ -118,7 +119,7 @@
     </div>
   </div>
 
-  <section class="card">
+  <section class="card issues-box">
     <span class="eyebrow" data-i18n="settingsIssueDetailsEyebrow"></span>
     <p class="hint" data-i18n="settingsIssueDetailsHint"></p>
     <div id="settings-items" class="draft-items"></div>
@@ -126,14 +127,14 @@
     <p id="settings-items-warning" class="setup-warning" hidden></p>
   </section>
 
-  <section class="card">
+  <section class="card aspects-box">
     <span class="eyebrow" data-i18n="settingsAspectsEyebrow"></span>
     <p class="hint" data-i18n="settingsAspectsHint"></p>
     <div id="draft-aspects" class="draft-items"></div>
     <p id="setup-aspect-warning" class="setup-warning" data-i18n="settingsAspectsWarning" hidden></p>
   </section>
 
-  <section class="card">
+  <section class="card point-labels-box">
     <div class="control-group">
       <input id="setup-max" type="hidden" value="8">
     </div>
@@ -144,7 +145,7 @@
     </div>
   </section>
 
-  <section id="setup-full-chart" class="card">
+  <section id="setup-full-chart" class="card chart-box">
     <span class="eyebrow" data-i18n="settingsChartEyebrow"></span>
     <svg id="setup-full-plot" viewBox="-70 -45 500 434" role="img" aria-label="Full prospective estimation chart"></svg>
     <p class="hint" data-i18n="settingsChartHint"></p>
@@ -175,7 +176,7 @@
       <button id="btn-mode-simple" class="btn" type="button" aria-pressed="false" data-i18n="roundModeSimple"></button>
     </div>
 
-    <div id="plot-wrap" class="plot-wrap">
+    <div id="plot-wrap" class="plot-wrap chart-box">
       <svg id="plot" viewBox="-70 -45 500 434" role="img"
            aria-label="Estimation chart"></svg>
       <div id="readouts" class="readouts"></div>
@@ -183,7 +184,7 @@
 
     <!-- Simple pointing: one number instead of a shape. Carries less
          information than the chart, and the server scores it accordingly. -->
-    <div id="simple-wrap" class="simple-wrap" hidden>
+    <div id="simple-wrap" class="simple-wrap chart-box" hidden>
       <output id="simple-value" class="simple-value mono" for="simple-slider">3</output>
       <span id="simple-label" class="simple-label"></span>
       <input id="simple-slider" class="simple-slider" type="range" min="1" max="8" step="1" value="3"
@@ -197,7 +198,7 @@
     </div>
   </section>
 
-  <section id="live-inputs" class="card live-inputs" hidden>
+  <section id="live-inputs" class="card live-inputs chart-box" hidden>
     <div class="live-head">
       <div><span class="eyebrow" data-i18n="liveInputEyebrow"></span><p class="hint" data-i18n="liveInputHint"></p></div>
       <div class="view-switch" role="group" aria-label="Live chart view">
@@ -235,7 +236,7 @@
     <div id="people" class="people"></div>
   </section>
 
-  <section id="history-card" class="card history-card" hidden>
+  <section id="history-card" class="card history-card chart-box" hidden>
     <div class="history-head">
       <span class="eyebrow" data-i18n="historyCompletedIssues"></span>
       <div class="history-nav">
