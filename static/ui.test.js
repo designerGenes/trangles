@@ -376,6 +376,11 @@ const historyEntry = (n, title) => ({
   check("capstone lists every issue", win.document.querySelectorAll("#final-issues .final-issue").length === 2);
   check("capstone includes session insights", shown(win, "session-insights")
     && /2 issues estimated/.test(win.document.getElementById("final-insights").textContent));
+  T.showSettings("session");
+  T.render();
+  check("a final summary replaces any open settings screen", shown(win, "view-session") && !shown(win, "view-settings"));
+  win.dispatchEvent(new win.PopStateEvent("popstate", { state: { view: "settings" } }));
+  check("browser navigation cannot reopen settings after completion", shown(win, "view-session") && !shown(win, "view-settings"));
 
   // The capstone must not read as another card in the same stack.
   const capstone = win.document.getElementById("final-summary-card");
@@ -389,6 +394,7 @@ const historyEntry = (n, title) => ({
   // The organizer keeps the one action that matters: restart.
   check("restart action still reachable", shown(win, "end-rail"));
   check("restart is the offered action", win.document.getElementById("btn-end").textContent === "Restart session");
+  check("final results hide session settings and other shelf controls", !shown(win, "organizer-shelf"));
 }
 
 /* ── 9. A concluded session cannot be re-queued or re-timed ────────── */
@@ -809,7 +815,7 @@ const historyEntry = (n, title) => ({
   check("no open round means no per-issue aspect", issueOption.disabled);
 }
 
-/* ── 23. Privacy mode blanks the organizer's screen only ──────────────── */
+/* ── 23. Privacy mode anonymizes the organizer's live screen ─────────── */
 {
   const win = boot();
   const T = win.__test;
@@ -821,21 +827,25 @@ const historyEntry = (n, title) => ({
   check("no privacy badge by default", !shown(win, "privacy-badge"));
   check("privacy toggle offered to the organizer", shown(win, "privacy-group"));
 
-  // The server does the masking; the client shows that it is on and drops the
-  // live overlay it is no longer being sent.
+  // The server masks names while retaining the group information the
+  // organizer needs to discuss the work on a shared screen.
   T.S.state = stateMsg({ privacy: true, participants: [
     { id: "o", name: "Ada", organizer: true, submitted: false },
     { id: "g", name: "Participant 1", organizer: false, submitted: true },
   ], round: { number: 1, title: "PROJ-1", open: true, submittedCount: 1,
-    axes: ["Uncertainty", "Complexity", "Toil"], axisMins: [1, 1, 1], axisMaxes: [8, 8, 8] } });
+    axes: ["Uncertainty", "Complexity", "Toil"], axisMins: [1, 1, 1], axisMaxes: [8, 8, 8],
+    liveShapes: [{ id: "g", name: "Participant 1", values: [4, 4, 4] }],
+    liveScores: [{ id: "g", name: "Participant 1", score: 5 }] } });
   T.render();
   check("privacy is visibly on", shown(win, "privacy-badge"));
   check("the toggle reflects the session", win.document.getElementById("in-privacy").checked);
+  check("privacy copy describes aliases, not hidden charts", /aliases/.test(win.document.querySelector("#privacy-group label span").textContent));
   check("no real names on the roster",
     !/Lin/.test(win.document.getElementById("people").textContent),
     win.document.getElementById("people").textContent);
-  check("no live shapes to read off the screen",
-    win.document.getElementById("live-overlay").querySelectorAll(".live-shape").length === 0);
+  check("live charts and scalar lines remain available under aliases",
+    win.document.getElementById("live-overlay").querySelectorAll(".live-shape").length === 1
+    && /Participant 1/.test(win.document.getElementById("live-scores").textContent));
 
   // A participant is never affected by the organizer's privacy setting.
   const guest = boot();
@@ -847,52 +857,11 @@ const historyEntry = (n, title) => ({
   check("participants keep their own chart", shown(guest, "plot-wrap"));
 }
 
-/* ── 24. Feedback is asked once, after the issue ──────────────────────── */
+/* ── 24. Process feedback is retained for internal use, not shown in UI ─ */
 {
   const win = boot();
-  const T = win.__test;
-  T.S.organizer = false; T.S.code = "ABCDE"; T.S.selfId = "g";
-  T.showSession();
-
-  T.S.state = stateMsg();
-  T.render();
-  check("no feedback prompt mid-round", !shown(win, "feedback-card"));
-
-  T.S.state = stateMsg({ round: { number: 1, title: "PROJ-1", open: false, submittedCount: 1,
-    axes: ["Uncertainty", "Complexity", "Toil"], axisMins: [1, 1, 1], axisMaxes: [8, 8, 8],
-    summary: historyEntry(1, "x").summary } });
-  T.render();
-  check("feedback is asked once the issue is pointed", shown(win, "feedback-card"));
-  check("both answers are offered",
-    !!win.document.getElementById("btn-feedback-up") && !!win.document.getElementById("btn-feedback-down"));
-  check("a comment is optional, not demanded",
-    !win.document.getElementById("feedback-comment").required);
-
-  win.document.getElementById("btn-feedback-up").click();
-  check("the answer is recorded locally", T.S.feedbackVote === "up");
-
-  T.S.state = stateMsg({ round: { number: 1, title: "PROJ-1", open: false, submittedCount: 1,
-    axes: ["Uncertainty", "Complexity", "Toil"], axisMins: [1, 1, 1], axisMaxes: [8, 8, 8],
-    selfFeedback: true, summary: historyEntry(1, "x").summary } });
-  T.render();
-  check("the prompt retires once answered", !shown(win, "feedback-card"));
-
-  // The organizer reads the tally, never a name.
-  const org = boot();
-  org.__test.S.organizer = true; org.__test.S.code = "ABCDE"; org.__test.S.selfId = "o";
-  org.__test.showSession();
-  org.__test.S.reviewing = true;
-  org.__test.S.state = stateMsg({ queuedItems: 1, round: { number: 1, title: "PROJ-1", open: false,
-    submittedCount: 1, summary: historyEntry(1, "x").summary,
-    feedback: { up: 2, down: 1, comments: ["too rushed"] } },
-    history: [historyEntry(1, "PROJ-1")] });
-  org.__test.render();
-  check("the organizer sees the tally", shown(org, "feedback-group"));
-  check("the tally counts both answers",
-    /2 worked well/.test(org.document.getElementById("feedback-tally").textContent),
-    org.document.getElementById("feedback-tally").textContent);
-  check("comments arrive without names",
-    /too rushed/.test(org.document.getElementById("feedback-comments").textContent));
+  check("participants are not prompted for process feedback", !win.document.getElementById("feedback-card"));
+  check("organizers have no process-feedback shelf section", !win.document.getElementById("feedback-group"));
 }
 
 /* ── 25. A round is drawn against its own aspects ─────────────────────── */

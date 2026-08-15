@@ -1324,20 +1324,23 @@ func (s *Session) broadcastStateLocked() {
 			view.History = s.history
 			if sv.Round != nil && s.round.Open {
 				round := *sv.Round
-				// A shared screen shows every shape as it is drawn, which is
-				// exactly the live-value overlay privacy mode exists to stop.
-				if !s.privacy {
-					round.LiveShapes = shapesOf(s.round.Previews)
-					round.LiveScores = scoresOf(s.round.Previews)
-				}
+				// Privacy changes attribution, not the group's live information.
+				// The organizer can keep discussing the values on a shared screen
+				// while aliases protect who contributed each one.
+				round.LiveShapes = shapesOf(s.round.Previews)
+				round.LiveScores = scoresOf(s.round.Previews)
 				view.Round = &round
 			}
 			if s.privacy {
 				view.Participants = anonymizeParticipants(sv.Participants, masked)
 				view.History = anonymizeHistory(s.history)
-				if view.Round != nil && view.Round.Summary != nil {
+				if view.Round != nil {
 					round := *view.Round
-					round.Summary = anonymizeSummary(round.Summary)
+					round.LiveShapes = anonymizeLiveShapes(round.LiveShapes, masked)
+					round.LiveScores = anonymizeLiveScores(round.LiveScores, masked)
+					if round.Summary != nil {
+						round.Summary = anonymizeSummary(round.Summary)
+					}
 					view.Round = &round
 				}
 			}
@@ -1391,6 +1394,26 @@ func anonymizeParticipants(people []ParticipantView, masked map[string]string) [
 	for i, person := range people {
 		out[i] = person
 		if alias, ok := masked[person.ID]; ok {
+			out[i].Name = alias
+		}
+	}
+	return out
+}
+
+func anonymizeLiveShapes(shapes []NamedShape, masked map[string]string) []NamedShape {
+	out := append([]NamedShape(nil), shapes...)
+	for i := range out {
+		if alias, ok := masked[out[i].ID]; ok {
+			out[i].Name = alias
+		}
+	}
+	return out
+}
+
+func anonymizeLiveScores(scores []NamedScore, masked map[string]string) []NamedScore {
+	out := append([]NamedScore(nil), scores...)
+	for i := range out {
+		if alias, ok := masked[out[i].ID]; ok {
 			out[i].Name = alias
 		}
 	}

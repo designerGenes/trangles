@@ -1105,8 +1105,11 @@ func TestOrganizerReceivesLiveSimpleScoresWithoutLeakingThem(t *testing.T) {
 	drain(guest)
 	session.handle(organizer, &inboundMsg{Type: "set_privacy", On: true})
 	privateView := lastState(t, organizer)
-	if privateView.Round == nil || len(privateView.Round.LiveScores) != 0 || len(privateView.Round.LiveShapes) != 0 {
-		t.Fatalf("privacy exposed live estimates: %#v", privateView.Round)
+	if privateView.Round == nil || len(privateView.Round.LiveScores) != 1 || len(privateView.Round.LiveShapes) != 0 {
+		t.Fatalf("privacy lost the live scalar estimate: %#v", privateView.Round)
+	}
+	if got := privateView.Round.LiveScores[0].Name; got != "Participant 1" {
+		t.Fatalf("privacy scalar alias = %q, want Participant 1", got)
 	}
 }
 
@@ -1217,8 +1220,11 @@ func TestPrivacyModeMasksTheOrganizerViewOnly(t *testing.T) {
 			t.Fatal("a participant name reached the shared screen")
 		}
 	}
-	if orgView.Round != nil && len(orgView.Round.LiveShapes) != 0 {
-		t.Fatal("live chart values were still overlaid under privacy mode")
+	if orgView.Round == nil || len(orgView.Round.LiveShapes) != 1 {
+		t.Fatalf("privacy lost live chart values: %#v", orgView.Round)
+	}
+	if got := orgView.Round.LiveShapes[0].Name; got != "Participant 1" {
+		t.Fatalf("privacy chart alias = %q, want Participant 1", got)
 	}
 
 	// The people estimating are unaffected — this is about one shared screen.

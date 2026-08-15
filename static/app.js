@@ -694,6 +694,9 @@ function render() {
     showIntake("more", true);
     return;
   }
+  // A completed session has a single destination: its results. Do not leave a
+  // settings screen visible behind the capstone when the last state arrives.
+  if (st.finalSummary && S.view === "settings") showSession();
   if (S.view !== "session" && S.view !== "settings") showSession();
   const concluded = !!st.finalSummary;
   // The final summary reports on the whole session, so the per-round stack —
@@ -736,7 +739,6 @@ function render() {
     stopCountdown();
     setHidden($("mode-switch"), true);
     setHidden($("simple-wrap"), true);
-    setHidden($("feedback-card"), true);
     $("plot-wrap").classList.add("plot-disabled");
     renderConsole(null);
     return;
@@ -777,7 +779,6 @@ function render() {
   submitBtn.disabled = !!S.demo || !r.open || mineIn;
   submitBtn.textContent = mineIn ? "Estimate submitted" : "Submit estimate";
   renderModeSwitch(r, mineIn);
-  renderFeedback(r);
   // Organizers never submit, so they must not inflate the denominator —
   // "2 of 3" could otherwise never complete.
   const estimators = st.participants.filter((person) => !person.organizer).length;
@@ -955,19 +956,6 @@ function setSimple(value) {
   schedulePreview();
 }
 
-/* Feedback is on the process, so it is asked once the issue is behind us and
-   retired the moment it is answered. */
-function renderFeedback(round) {
-  const ask = !S.demo && !S.organizer && !!round && !round.open && !round.selfFeedback;
-  setHidden($("feedback-card"), !ask);
-  setHidden($("feedback-thanks"), !(round && round.selfFeedback));
-  if (!ask) return;
-  $("btn-feedback-up").setAttribute("aria-pressed", String(S.feedbackVote === "up"));
-  $("btn-feedback-down").setAttribute("aria-pressed", String(S.feedbackVote === "down"));
-  $("btn-feedback-up").classList.toggle("btn-primary", S.feedbackVote === "up");
-  $("btn-feedback-down").classList.toggle("btn-primary", S.feedbackVote === "down");
-}
-
 function renderConsole(round) {
   if (!S.organizer) return;
   if (S.demo) {
@@ -978,6 +966,8 @@ function renderConsole(round) {
   const open = !!(round && round.open);
   const queued = S.state.queuedItems || 0;
   const final = !!S.state.finalSummary;
+  // Results are a readout, not a place to change the completed session.
+  setHidden($("organizer-shelf"), final);
   const finished = !!round && !open && queued === 0;
   const pending = (S.state.participants || []).filter((person) => !person.organizer && !person.submitted);
   const eligible = (S.state.participants || []).filter((person) => !person.organizer);
@@ -1004,14 +994,6 @@ function renderConsole(round) {
   $("aspect-scope").querySelector('option[value="issue"]').disabled = !open;
   if (!open && $("aspect-scope").value === "issue") $("aspect-scope").value = "remaining";
   $("in-privacy").checked = !!S.privacy;
-  // Feedback only exists once an issue has actually been pointed.
-  const feedback = (round && round.feedback) || null;
-  setHidden($("feedback-group"), !feedback);
-  if (feedback) {
-    $("feedback-tally").textContent = `${feedback.up || 0} worked well · ${feedback.down || 0} felt off`;
-    $("feedback-comments").innerHTML = (feedback.comments || [])
-      .map((comment) => `<li>${escapeHTML(comment)}</li>`).join("");
-  }
   // A group whose every control is hidden would otherwise leave a bare heading
   // floating in the shelf.
   setHidden($("round-group"), !canTime && !canRestart);
@@ -1159,8 +1141,8 @@ function renderLiveInputs(shapes, scores = []) {
   const empty = active.length === 0 && activeScores.length === 0;
   const estimators = ((S.state && S.state.participants) || []).filter((person) => !person.organizer);
   // A room with estimators but no previews still benefits from the normal
-  // chart surface. Only a genuinely empty room or privacy-hidden data uses the
-  // centered explanation in place of both visualizations.
+  // chart surface. Only a genuinely empty room, or a private screen before any
+  // anonymized estimates arrive, uses the centered explanation.
   const emptyStage = empty && (S.privacy || estimators.length === 0);
   $("btn-live-overlay").classList.toggle("btn-primary", S.liveView === "overlay");
   $("btn-live-grid").classList.toggle("btn-primary", S.liveView === "grid");
@@ -1176,9 +1158,9 @@ function renderLiveInputs(shapes, scores = []) {
   setHidden($("live-empty"), !emptyStage);
   $("live-stage").classList.toggle("has-empty", emptyStage);
   if (emptyStage) {
-    // Privacy already withholds previews; do not turn that into a roster leak.
+    // Avoid implying who has or has not supplied a private estimate.
     $("live-empty").textContent = S.privacy
-      ? "Live charts are hidden while privacy mode is on."
+      ? "No live estimates are available yet."
       : "No participants are here to estimate yet.";
   }
   $("live-toggles").innerHTML = "";
@@ -1633,14 +1615,6 @@ $("btn-apply-aspect").onclick = () => {
 $("btn-mode-shape").onclick = () => { S.mode = "radar"; S.touched = true; render(); schedulePreview(); };
 $("btn-mode-simple").onclick = () => { S.mode = "simple"; S.touched = true; render(); schedulePreview(); };
 $("simple-slider").oninput = () => setSimple(Number($("simple-slider").value));
-$("btn-feedback-up").onclick = () => sendFeedback("up");
-$("btn-feedback-down").onclick = () => sendFeedback("down");
-
-function sendFeedback(vote) {
-  S.feedbackVote = vote;
-  send({ type: "submit_feedback", vote, comment: $("feedback-comment").value.trim() });
-  $("feedback-comment").value = "";
-}
 $("btn-end").onclick = () => {
   advanceIssue();
 };
@@ -1753,6 +1727,11 @@ window.addEventListener("popstate", (event) => {
     return;
   }
   if (requested === "settings" && S.organizer) {
+    if (S.state && S.state.finalSummary) {
+      showSession(false);
+      if (S.state) render();
+      return;
+    }
     showSettings(S.settingsReturn, false);
     return;
   }

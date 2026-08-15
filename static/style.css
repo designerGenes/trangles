@@ -581,11 +581,6 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .simple-slider { margin-top: 10px; max-width: 30rem; width: 100%; }
 .simple-scale { color: var(--muted); display: flex; font-size: 0.75rem; justify-content: space-between; max-width: 30rem; width: 100%; }
 
-/* Process feedback ---------------------------------------------------- */
-.feedback-card { border-left: 4px solid var(--grid); }
-.feedback-row { display: flex; gap: 8px; margin: 12px 0 10px; }
-.feedback-card input { max-width: 30rem; }
-
 /* Scope selects ------------------------------------------------------- */
 /* Every optional control says what it applies to, so "for this issue" and
    "for all remaining issues" are never left to be inferred. */
@@ -654,7 +649,6 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .is-demo #submit-row,
 .is-demo #mode-switch,
 .is-demo #color-picker,
-.is-demo #feedback-card,
 .is-demo .view-switch,
 .is-demo .history-nav { display: none !important; }
 .is-demo #plot { cursor: default; }

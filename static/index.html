@@ -232,17 +232,6 @@
     <div id="minis" class="minis"></div>
   </section>
 
-  <section id="feedback-card" class="card feedback-card" hidden>
-    <span class="eyebrow">How did that go?</span>
-    <p class="hint">On the pointing process, not the issue. Never shown with your name.</p>
-    <div class="feedback-row">
-      <button id="btn-feedback-up" class="btn" type="button" aria-pressed="false">Worked well</button>
-      <button id="btn-feedback-down" class="btn" type="button" aria-pressed="false">Felt off</button>
-    </div>
-    <input id="feedback-comment" maxlength="280" autocomplete="off" placeholder="Anything worth changing? (optional)">
-    <p id="feedback-thanks" class="hint" hidden>Thanks — logged anonymously.</p>
-  </section>
-
   <section class="people-card">
     <span class="eyebrow">In the room</span>
     <div id="people" class="people"></div>
@@ -297,7 +286,7 @@
         <div class="console-row">
           <label class="aspect-toggle">
             <input id="in-privacy" type="checkbox">
-            <span>Privacy mode — hide names and live charts in my view</span>
+            <span>Privacy mode — show participant aliases in my view</span>
           </label>
         </div>
         <p class="hint">Only changes what you see. Everyone else keeps their own view.</p>
@@ -345,12 +334,6 @@
         <span class="eyebrow">Issue queue</span>
         <div id="queue-items" class="queue-items"></div>
         <button id="btn-add-queue-item" class="btn queue-add" type="button" aria-label="Add issue">+</button>
-      </div>
-
-      <div id="feedback-group" class="shelf-group" hidden>
-        <span class="eyebrow">Process feedback</span>
-        <p id="feedback-tally" class="hint"></p>
-        <ul id="feedback-comments" class="observations"></ul>
       </div>
 
       <div class="shelf-group">
