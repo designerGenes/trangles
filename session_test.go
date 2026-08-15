@@ -1041,3 +1041,269 @@ func TestTimerStopsAndResumesWhereItLeftOff(t *testing.T) {
 	session.handle(organizer, &inboundMsg{Type: "set_timer", Seconds: 0})
 	expectError(t, organizer)
 }
+
+func TestSimpleModeEstimatesAreAcceptedAndScored(t *testing.T) {
+	_, session, organizer, guest := newTestSession(t, nil)
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1")})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	drain(organizer)
+	drain(guest)
+
+	// A single score needs no per-axis values and must not be rejected for
+	// lacking them.
+	session.handle(guest, &inboundMsg{Type: "submit", Mode: ModeSimple, Score: 12})
+	submission := session.round.Submissions[guest.id]
+	if submission == nil {
+		t.Fatal("a single-score estimate was not recorded")
+	}
+	if submission.Mode != ModeSimple {
+		t.Fatalf("mode = %q", submission.Mode)
+	}
+	if submission.Score != AxisMax {
+		t.Fatalf("score was not clamped to the aspect scale: %v", submission.Score)
+	}
+	if len(shapesOf(session.round.Submissions)) != 0 {
+		t.Fatal("a single score was drawn as a shape")
+	}
+	if len(scoresOf(session.round.Submissions)) != 1 {
+		t.Fatal("a single score was not collected as one")
+	}
+
+	session.handle(organizer, &inboundMsg{Type: "end_round"})
+	if session.round.Summary == nil || session.round.Summary.StoryPoints == 0 {
+		t.Fatalf("single-score round produced no result: %#v", session.round.Summary)
+	}
+}
+
+func TestAspectScopeSeparatesThisIssueFromTheRest(t *testing.T) {
+	_, session, organizer, guest := newTestSession(t, nil)
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1", "PROJ-2")})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	session.handle(guest, &inboundMsg{Type: "submit", Values: []float64{3, 3, 3}})
+	drain(organizer)
+	drain(guest)
+
+	// "This issue" touches the round only, and resets estimates because the
+	// question people already answered has changed underneath them.
+	session.handle(organizer, &inboundMsg{Type: "add_aspect", Aspect: "Risk", Scope: ScopeIssue})
+	if got := len(session.round.Axes); got != 4 {
+		t.Fatalf("round aspects = %d, want 4", got)
+	}
+	if got := len(session.axes); got != 3 {
+		t.Fatalf("session default was changed by a per-issue aspect: %#v", session.axes)
+	}
+	if len(session.round.Submissions) != 0 {
+		t.Fatal("estimates for the old question were kept")
+	}
+
+	// "All remaining issues" changes the default the next round inherits, and
+	// leaves the issue on screen exactly as it was.
+	session.handle(organizer, &inboundMsg{Type: "add_aspect", Aspect: "Reach", Scope: ScopeRemaining})
+	if got := len(session.axes); got != 4 {
+		t.Fatalf("session aspects = %#v", session.axes)
+	}
+	if got := len(session.round.Axes); got != 4 || session.round.Axes[3] != "Risk" {
+		t.Fatalf("the open round was rewritten: %#v", session.round.Axes)
+	}
+	session.handle(organizer, &inboundMsg{Type: "end_round"})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	if got := session.round.Axes; len(got) != 4 || got[3] != "Reach" {
+		t.Fatalf("the next round did not inherit the new default: %#v", got)
+	}
+
+	// A past issue keeps the aspects it was actually estimated against.
+	if got := session.history[0].Axes; len(got) != 4 || got[3] != "Risk" {
+		t.Fatalf("history lost the issue's own aspects: %#v", got)
+	}
+
+	drain(organizer)
+	drain(guest)
+	session.handle(guest, &inboundMsg{Type: "add_aspect", Aspect: "Nope", Scope: ScopeRemaining})
+	expectError(t, guest)
+	session.handle(organizer, &inboundMsg{Type: "add_aspect", Aspect: "  ", Scope: ScopeRemaining})
+	expectError(t, organizer)
+	session.handle(organizer, &inboundMsg{Type: "add_aspect", Aspect: "reach", Scope: ScopeRemaining})
+	expectError(t, organizer)
+}
+
+func TestTimerScopeAppliesToRemainingIssuesAndCanBeRemoved(t *testing.T) {
+	_, session, organizer, _ := newTestSession(t, nil)
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1", "PROJ-2")})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+
+	session.handle(organizer, &inboundMsg{Type: "set_timer", Seconds: 90, Scope: ScopeRemaining})
+	if session.defaultSeconds != 90 {
+		t.Fatalf("standing round length = %d", session.defaultSeconds)
+	}
+	if session.round.Deadline == nil {
+		t.Fatal("the open round was not timed")
+	}
+
+	// A removed clock is not a paused one: the round carries on untimed.
+	session.handle(organizer, &inboundMsg{Type: "clear_timer", Scope: ScopeIssue})
+	if session.round.Deadline != nil || session.round.Paused != 0 {
+		t.Fatalf("timer survived removal: %v / %v", session.round.Deadline, session.round.Paused)
+	}
+	if !session.round.Open {
+		t.Fatal("removing the clock ended the round")
+	}
+	if session.defaultSeconds != 90 {
+		t.Fatal("removing this issue's clock cleared the standing one")
+	}
+
+	session.handle(organizer, &inboundMsg{Type: "end_round"})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	if session.round.Deadline == nil {
+		t.Fatal("the next issue did not inherit the standing round length")
+	}
+
+	session.handle(organizer, &inboundMsg{Type: "clear_timer", Scope: ScopeRemaining})
+	if session.defaultSeconds != 0 {
+		t.Fatalf("standing round length survived removal: %d", session.defaultSeconds)
+	}
+}
+
+func TestPrivacyModeMasksTheOrganizerViewOnly(t *testing.T) {
+	_, session, organizer, guest := newTestSession(t, nil)
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1")})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	session.handle(guest, &inboundMsg{Type: "preview", Values: []float64{4, 4, 4}})
+	drain(organizer)
+	drain(guest)
+
+	session.handle(organizer, &inboundMsg{Type: "set_privacy", On: true})
+
+	orgView := lastState(t, organizer)
+	if !orgView.Privacy {
+		t.Fatal("privacy was not reported to the organizer")
+	}
+	for _, person := range orgView.Participants {
+		if person.Name == "Lin" {
+			t.Fatal("a participant name reached the shared screen")
+		}
+	}
+	if orgView.Round != nil && len(orgView.Round.LiveShapes) != 0 {
+		t.Fatal("live chart values were still overlaid under privacy mode")
+	}
+
+	// The people estimating are unaffected — this is about one shared screen.
+	guestView := lastState(t, guest)
+	if guestView.Round == nil || guestView.Round.Title != "PROJ-1" {
+		t.Fatalf("the participant's session changed: %#v", guestView.Round)
+	}
+
+	drain(organizer)
+	session.handle(organizer, &inboundMsg{Type: "set_privacy", On: false})
+	restored := lastState(t, organizer)
+	if restored.Privacy {
+		t.Fatal("privacy did not switch back off")
+	}
+	found := false
+	for _, person := range restored.Participants {
+		if person.Name == "Lin" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("names did not come back when privacy was turned off")
+	}
+
+	drain(guest)
+	session.handle(guest, &inboundMsg{Type: "set_privacy", On: true})
+	expectError(t, guest)
+}
+
+func TestFeedbackIsCollectedAfterTheRoundAndNeverAttributed(t *testing.T) {
+	_, session, organizer, guest := newTestSession(t, nil)
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1")})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	drain(guest)
+
+	// Not while people are still estimating.
+	session.handle(guest, &inboundMsg{Type: "submit_feedback", Vote: "up"})
+	expectError(t, guest)
+
+	session.handle(organizer, &inboundMsg{Type: "end_round"})
+	drain(guest)
+	drain(organizer)
+
+	session.handle(guest, &inboundMsg{Type: "submit_feedback", Vote: "up", Comment: "  ran long  "})
+	entry := session.round.Feedback[guest.id]
+	if entry == nil || entry.Vote != "up" || entry.Comment != "ran long" {
+		t.Fatalf("feedback = %#v", entry)
+	}
+	view := feedbackViewOf(session.round.Feedback)
+	if view.Up != 1 || view.Down != 0 || len(view.Comments) != 1 {
+		t.Fatalf("tally = %#v", view)
+	}
+	// The comment travels, the author does not.
+	for _, comment := range view.Comments {
+		if strings.Contains(comment, "Lin") {
+			t.Fatal("feedback carried a name")
+		}
+	}
+	if session.history[0].Feedback == nil || session.history[0].Feedback.Up != 1 {
+		t.Fatalf("history did not pick up the feedback: %#v", session.history[0].Feedback)
+	}
+
+	drain(guest)
+	session.handle(guest, &inboundMsg{Type: "submit_feedback", Vote: "sideways"})
+	expectError(t, guest)
+	drain(organizer)
+	session.handle(organizer, &inboundMsg{Type: "submit_feedback", Vote: "up"})
+	expectError(t, organizer)
+}
+
+func TestResumeSessionReopensPointingWithoutLosingHistory(t *testing.T) {
+	_, session, organizer, _ := newTestSession(t, nil)
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1")})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	session.handle(organizer, &inboundMsg{Type: "end_round"})
+	session.handle(organizer, &inboundMsg{Type: "show_final_summary"})
+	if !session.finalSummaryShown {
+		t.Fatal("final summary was not shown")
+	}
+
+	session.handle(organizer, &inboundMsg{Type: "resume_session"})
+	if session.finalSummaryShown {
+		t.Fatal("the results view did not close")
+	}
+	if len(session.history) != 1 {
+		t.Fatalf("resuming discarded history: %#v", session.history)
+	}
+	// Resuming is not restarting: more issues can now be queued behind it.
+	session.handle(organizer, &inboundMsg{Type: "append_items", Items: testItems("PROJ-2")})
+	if len(session.items) != 2 {
+		t.Fatalf("items = %#v", itemTitles(session.items))
+	}
+}
+
+func TestFinalSummaryAggregatesNameSafeSessionInsights(t *testing.T) {
+	history := []HistoryEntry{
+		{Title: "PROJ-1", Summary: &Summary{
+			StoryPoints:  3,
+			Observations: []string{"Strong agreement across all aspects."},
+			Scores:       []NamedScore{{Name: "Lin", Score: 3}},
+		}},
+		{Title: "PROJ-2", Summary: &Summary{
+			StoryPoints:  5,
+			Observations: []string{"Wide split on Complexity (+/-2.5) - the group sees this differently."},
+		}},
+	}
+	final := finalSummaryOf(history)
+	if final.TotalPoints != 8 {
+		t.Fatalf("total points = %d, want 8", final.TotalPoints)
+	}
+	joined := strings.Join(final.SessionInsights, " ")
+	for _, want := range []string{"2 issues estimated", "Strong agreement on 1 issue", "1 issue had a wide split", "1 issue included single-score"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("session insights = %#v, missing %q", final.SessionInsights, want)
+		}
+	}
+	if strings.Contains(joined, "Lin") {
+		t.Fatalf("session insights exposed a participant name: %#v", final.SessionInsights)
+	}
+	if got := anonymizeFinalSummary(final).SessionInsights; !sameStrings(got, final.SessionInsights) {
+		t.Fatalf("anonymization changed name-safe insights: %#v", got)
+	}
+}

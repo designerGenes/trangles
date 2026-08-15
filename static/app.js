@@ -74,7 +74,28 @@ const S = {
   hiddenLive: new Set(),
   history: [],
   historyIndex: 0,      // which completed issue the organizer is viewing
+  mode: "radar",        // how I am estimating: "radar" | "simple"
+  simple: 3,            // my composite score in simple mode
+  drafts: [],           // issues typed on the intake screen, before they are sent
+  view: "landing",      // landing | intake | settings | session
+  intakeStage: "first", // first | more — which copy the intake screen wears
+  reviewing: false,     // organizer stepped back from intake to read a result
+  privacy: false,
+  feedbackVote: null,   // my vote on the round just concluded
+  settingsReturn: "intake",
+  settingsEdited: false, // distinguishes default settings from deliberate removal
 };
+
+/* The round on screen owns the aspect list; the session-level set is only the
+   default that the next round will inherit. */
+function roundAxes(state) {
+  const r = state && state.round;
+  if (r && Array.isArray(r.axes) && r.axes.length) {
+    return { axes: r.axes, mins: r.axisMins || r.axes.map(() => 1), maxes: r.axisMaxes || r.axes.map(() => 8) };
+  }
+  if (!state) return null;
+  return { axes: state.axes, mins: state.axisMins, maxes: state.axisMaxes };
+}
 
 /* ── plot geometry ─────────────────────────────────────────────────── */
 const CX = 180, CY = 180, R = 132;
@@ -316,7 +337,7 @@ function handleMessage(msg) {
       sessionStorage.setItem("tri", JSON.stringify({
         code: S.code, name: S.name, token: S.orgToken || "", color: S.color || "",
       }));
-      if (S.organizer) showSetup();
+      if (S.organizer) showIntake("first", true);
       else showSession();
       break;
     case "state":
@@ -342,27 +363,82 @@ function send(obj) {
 }
 
 /* ── rendering ─────────────────────────────────────────────────────── */
-function showSession() {
-  $("view-landing").hidden = true;
-  $("view-setup").hidden = true;
-  $("view-session").hidden = false;
-  $("code-chip").hidden = false;
-  $("code-text").textContent = S.code;
+/* One switch owns which screen is up, so no two views can be on at once. */
+function recordView(name) {
+  if (!window.history || !window.history.pushState) return;
+  const url = new URL(location.href);
+  url.hash = name === "landing" ? "" : name;
+  if (history.state && history.state.view === name) {
+    history.replaceState({ view: name }, "", url);
+  } else {
+    history.pushState({ view: name }, "", url);
+  }
+}
+
+function showView(name, record) {
+  S.view = name;
+  setHidden($("view-landing"), name !== "landing");
+  setHidden($("view-intake"), name !== "intake");
+  setHidden($("view-settings"), name !== "settings");
+  setHidden($("view-session"), name !== "session");
+  setHidden($("code-chip"), name === "landing" || !S.code);
+  if (S.code) $("code-text").textContent = S.code;
+  if (record) recordView(name);
+}
+
+function showSession(record) {
+  showView("session", record);
   $("organizer-shelf").hidden = !S.organizer;
   buildPlot();
 }
 
-function showSetup() {
-  $("view-landing").hidden = true;
-  $("view-session").hidden = true;
-  $("view-setup").hidden = false;
-  $("code-chip").hidden = true;
-  if ($("draft-items").children.length === 0) addDraftItem();
-  if ($("draft-aspects").children.length === 0) {
-    ["Uncertainty", "Complexity", "Toil"].forEach((aspect) => addDraftAspect(aspect));
+/* stage "first": nothing has been pointed yet. stage "more": the queue just
+   emptied, and the organizer chooses between more work and the results. */
+function showIntake(stage, record) {
+  const nextStage = stage || S.intakeStage;
+  // Initial drafts remain available in live settings. The post-session intake
+  // is a new queue, so it always starts with a clean row.
+  if (nextStage === "more" && S.intakeStage !== "more") S.drafts = [];
+  S.intakeStage = nextStage;
+  S.reviewing = false;
+  showView("intake", record);
+  if (S.drafts.length === 0) addDraftItem();
+  renderIntake();
+}
+
+function renderIntake() {
+  const more = S.intakeStage === "more";
+  $("intake-eyebrow").textContent = more ? "Every issue pointed" : "New session";
+  $("intake-title").textContent = more
+    ? "Point another issue, or wrap up."
+    : "Enter the first issue to point.";
+  $("btn-launch").textContent = more ? "Add more issues" : "Launch pointing session";
+  setHidden($("btn-intake-results"), !more);
+  setHidden($("btn-intake-back"), !more || !(S.state && S.state.round));
+  const done = (S.history || []).length;
+  const points = (S.history || []).reduce((sum, entry) => sum + ((entry.summary && entry.summary.storyPoints) || 0), 0);
+  $("intake-tally").textContent = `${done} issue${done === 1 ? "" : "s"} pointed · ${points} story points so far`;
+  setHidden($("intake-tally"), !more || done === 0);
+  renderDraftRows();
+}
+
+function showSettings(from, record) {
+  S.settingsReturn = from || S.view || "intake";
+  showView("settings", record);
+  $("btn-close-settings").textContent = S.settingsReturn === "session"
+    ? "Back to session"
+    : "Launch pointing session";
+  if (!S.settingsEdited && $("draft-aspects").children.length === 0) {
+    const seed = (S.state && S.state.axes) || ["Uncertainty", "Complexity", "Toil"];
+    seed.forEach((aspect) => addDraftAspect(aspect, false));
   }
+  renderSettingsItems();
   renderSetupRange();
-  observeFullSetupChart();
+}
+
+function closeSettings(record) {
+  if (S.settingsReturn === "session") showSession(record);
+  else launchDrafts();
 }
 
 function toLanding(message) {
@@ -379,30 +455,49 @@ function toLanding(message) {
   setHidden($("history-card"), true);
   setHidden($("end-rail"), true);
   clearTimeout(S.previewTimer);
-  $("draft-items").innerHTML = "";
+  S.drafts = [];
+  S.mode = "radar";
+  S.privacy = false;
+  S.reviewing = false;
+  S.feedbackVote = null;
+  S.settingsEdited = false;
+  $("intake-items").innerHTML = "";
   $("draft-aspects").innerHTML = "";
+  $("settings-items").innerHTML = "";
   $("setup-point-labels").innerHTML = "";
   $("setup-max").value = "8";
   stopCountdown();
-  $("view-session").hidden = true;
-  $("view-setup").hidden = true;
-  $("view-landing").hidden = false;
-  $("code-chip").hidden = true;
+  setHidden($("privacy-badge"), true);
+  showView("landing");
   if (message) toast(message);
 }
 
 function render() {
   const st = S.state;
   if (!st) return;
-  syncAxes(st.axes);
+  const resolved = roundAxes(st);
+  syncAxes(resolved.axes, resolved.mins, resolved.maxes);
+  S.privacy = !!st.privacy;
+  setHidden($("privacy-badge"), !(S.organizer && S.privacy));
   if (st.round && !S.live) {
     S.live = true;
-    showSession();
+    showSession(true);
   }
   if (S.organizer && !S.live) {
-    showSetup();
+    showIntake("first");
     return;
   }
+  // Once the queue is empty and the round is done, the organizer gets the same
+  // one-line intake screen they started on rather than being dropped straight
+  // into the final totals — pointing a few more issues is the common case.
+  if (S.organizer && !st.finalSummary && st.round && !st.round.open
+      && (st.queuedItems || 0) === 0 && !S.reviewing && S.view !== "settings") {
+    syncHistory(st.history);
+    renderConsole(st.round);
+    showIntake("more", true);
+    return;
+  }
+  if (S.view !== "session" && S.view !== "settings") showSession();
   const concluded = !!st.finalSummary;
   // The final summary reports on the whole session, so the per-round stack —
   // round header, live inputs, that round's summary, history — is left behind
@@ -424,7 +519,8 @@ function render() {
   const submitBtn = $("btn-submit");
   // The organizer observes; they never contribute an estimate, so they get
   // neither their own chart nor a submit control.
-  setHidden($("plot-wrap"), S.organizer);
+  setHidden($("plot-wrap"), S.organizer || S.mode === "simple");
+  setHidden($("simple-wrap"), S.organizer || S.mode !== "simple");
   setHidden($("submit-row"), S.organizer);
 
   if (!r) {
@@ -441,6 +537,9 @@ function render() {
     $("live-inputs").hidden = true;
     drawAverage(null);
     stopCountdown();
+    setHidden($("mode-switch"), true);
+    setHidden($("simple-wrap"), true);
+    setHidden($("feedback-card"), true);
     $("plot-wrap").classList.add("plot-disabled");
     renderConsole(null);
     return;
@@ -480,6 +579,8 @@ function render() {
   const mineIn = selfSubmitted(st);
   submitBtn.disabled = !r.open || mineIn;
   submitBtn.textContent = mineIn ? "Estimate submitted" : "Submit estimate";
+  renderModeSwitch(r, mineIn);
+  renderFeedback(r);
   // Organizers never submit, so they must not inflate the denominator —
   // "2 of 3" could otherwise never complete.
   const estimators = st.participants.filter((person) => !person.organizer).length;
@@ -517,9 +618,9 @@ function revealRoundSummary() {
   card.scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "start" });
 }
 
-function syncAxes(axes) {
-  const mins = S.state.axisMins || axes.map(() => 1);
-  const maxes = S.state.axisMaxes || axes.map(() => 8);
+function syncAxes(axes, minsIn, maxesIn) {
+  const mins = minsIn || S.state.axisMins || axes.map(() => 1);
+  const maxes = maxesIn || S.state.axisMaxes || axes.map(() => 8);
   const labels = S.state.pointLabels || defaultPointLabels(maxes[0]);
   if (!axes || (axes.length === S.axes.length && axes.every((axis, i) => axis === S.axes[i]) && mins.every((value, i) => value === S.axisMins[i]) && maxes.every((value, i) => value === S.axisMaxes[i]) && labels.every((value, i) => value === S.pointLabels[i]) && labels.length === S.pointLabels.length)) return;
   S.axes = axes.slice();
@@ -589,11 +690,17 @@ function defaultPointLabels(max) {
   return labels;
 }
 
+function estimatePayload(type) {
+  return S.mode === "simple"
+    ? { type, mode: "simple", score: S.simple, touched: S.touched }
+    : { type, mode: "radar", values: S.my, touched: S.touched };
+}
+
 function schedulePreview() {
   const r = S.state && S.state.round;
   if (!r || !r.open) return;
   clearTimeout(S.previewTimer);
-  S.previewTimer = setTimeout(() => send({ type: "preview", values: S.my, touched: S.touched }), 40);
+  S.previewTimer = setTimeout(() => send(estimatePayload("preview")), 40);
 }
 
 function selfSubmitted(state) {
@@ -610,6 +717,57 @@ function renderPeople(st) {
     </span>`).join("");
 }
 
+/* The switch belongs to participants alone: the organizer contributes no
+   estimate, so there is no mode for them to be in. */
+function renderModeSwitch(round, submitted) {
+  const offer = !S.organizer && !!round && round.open && !submitted;
+  setHidden($("mode-switch"), !offer);
+  $("btn-mode-shape").classList.toggle("btn-primary", S.mode === "radar");
+  $("btn-mode-simple").classList.toggle("btn-primary", S.mode === "simple");
+  $("btn-mode-shape").setAttribute("aria-pressed", String(S.mode === "radar"));
+  $("btn-mode-simple").setAttribute("aria-pressed", String(S.mode === "simple"));
+  if (S.mode !== "simple") return;
+  const slider = $("simple-slider");
+  const min = axisMin(0);
+  const max = axisMax(0);
+  slider.min = String(min);
+  slider.max = String(max);
+  slider.disabled = !offer;
+  if (S.simple < min || S.simple > max) S.simple = Math.min(max, Math.max(min, START_VALUE));
+  slider.value = String(S.simple);
+  $("simple-min").textContent = formatValue(min);
+  $("simple-max").textContent = formatValue(max);
+  drawSimple();
+}
+
+function drawSimple() {
+  $("simple-value").textContent = formatValue(S.simple);
+  const label = S.pointLabels[Math.round(S.simple)];
+  $("simple-label").textContent = label || "";
+}
+
+function setSimple(value) {
+  const next = Math.round(Math.min(axisMax(0), Math.max(axisMin(0), value)));
+  if (next === S.simple) return;
+  S.simple = next;
+  S.touched = true;
+  drawSimple();
+  schedulePreview();
+}
+
+/* Feedback is on the process, so it is asked once the issue is behind us and
+   retired the moment it is answered. */
+function renderFeedback(round) {
+  const ask = !S.organizer && !!round && !round.open && !round.selfFeedback;
+  setHidden($("feedback-card"), !ask);
+  setHidden($("feedback-thanks"), !(round && round.selfFeedback));
+  if (!ask) return;
+  $("btn-feedback-up").setAttribute("aria-pressed", String(S.feedbackVote === "up"));
+  $("btn-feedback-down").setAttribute("aria-pressed", String(S.feedbackVote === "down"));
+  $("btn-feedback-up").classList.toggle("btn-primary", S.feedbackVote === "up");
+  $("btn-feedback-down").classList.toggle("btn-primary", S.feedbackVote === "down");
+}
+
 function renderConsole(round) {
   if (!S.organizer) return;
   const open = !!(round && round.open);
@@ -624,10 +782,31 @@ function renderConsole(round) {
   const canRestart = !!round && !open && !final;
   $("btn-timer").hidden = !canTime;
   $("in-seconds").hidden = !canTime;
+  $("timer-scope").hidden = !canTime;
   // One button for the whole clock: it starts, stops, and picks back up.
   const running = canTime && !!round.deadlineMs;
   $("btn-timer").textContent = running ? "Stop timer" : "Start timer";
+  setHidden($("btn-timer-remove"), !canTime || !(round.deadlineMs || round.pausedMs));
   $("btn-restart-round").hidden = !canRestart;
+  // A standing length is easy to forget having set, so it says so.
+  const standing = S.state.defaultSeconds || 0;
+  $("timer-standing").textContent = standing
+    ? `Every remaining issue starts with ${clockText(standing * 1000)} on the clock.`
+    : "";
+  setHidden($("timer-standing"), !standing || final);
+  // Aspects can only be added while there is a session to add them to.
+  setHidden($("aspect-group"), final);
+  $("aspect-scope").querySelector('option[value="issue"]').disabled = !open;
+  if (!open && $("aspect-scope").value === "issue") $("aspect-scope").value = "remaining";
+  $("in-privacy").checked = !!S.privacy;
+  // Feedback only exists once an issue has actually been pointed.
+  const feedback = (round && round.feedback) || null;
+  setHidden($("feedback-group"), !feedback);
+  if (feedback) {
+    $("feedback-tally").textContent = `${feedback.up || 0} worked well · ${feedback.down || 0} felt off`;
+    $("feedback-comments").innerHTML = (feedback.comments || [])
+      .map((comment) => `<li>${escapeHTML(comment)}</li>`).join("");
+  }
   // A group whose every control is hidden would otherwise leave a bare heading
   // floating in the shelf.
   setHidden($("round-group"), !canTime && !canRestart);
@@ -648,7 +827,9 @@ function renderConsole(round) {
     $("end-hint").hidden = true;
   } else if (!open && queued === 0) {
     resetNextConfirm();
-    $("btn-end").textContent = "Final summary";
+    // Reached only while reviewing a result after the queue emptied; the
+    // intake screen is where "what next" actually gets decided.
+    $("btn-end").textContent = "What's next";
     $("end-hint").hidden = true;
   } else if (!open) {
     resetNextConfirm();
@@ -679,6 +860,9 @@ function renderFinalSummary(final) {
   $("final-meta").textContent = `${count} issue${count === 1 ? "" : "s"} estimated`;
   $("final-issues").innerHTML = (final.issues || []).map((issue) => `
     <div class="final-issue"><span class="title">${escapeHTML(issue.title)}</span><span class="mono">${issue.summary ? issue.summary.storyPoints : 0}</span></div>`).join("");
+  const insights = final.sessionInsights || [];
+  setHidden($("session-insights"), insights.length === 0);
+  $("final-insights").innerHTML = insights.map((insight) => `<li>${escapeHTML(insight)}</li>`).join("");
 }
 
 function resetNextConfirm() {
@@ -737,36 +921,23 @@ function setupPointLabels() {
   return labels;
 }
 
+/* The prospective chart lives on the settings screen only. It answers "what
+   will they be dragging", which is a setup question, not something to carry
+   through a live session. */
 function renderProspectivePlot() {
   const aspects = setupAspectNames();
   const max = setupMax();
   const validAspects = aspects.length >= 2 && aspects.length <= 12;
   $("setup-aspect-warning").hidden = validAspects;
-  $("btn-launch").disabled = !validAspects || !max;
-  $("setup-plot").hidden = !validAspects || !max;
-  $("setup-full-chart").hidden = !validAspects || !max;
-  $("setup-prospect").hidden = !validAspects || !max || fullSetupChartVisible;
+  setHidden($("setup-full-chart"), !validAspects || !max);
   if (!validAspects || !max) {
-    $("setup-plot").innerHTML = "";
     $("setup-full-plot").innerHTML = "";
     return;
   }
   const mins = aspects.map(() => 1);
   const maxes = aspects.map(() => max);
   const values = aspects.map(() => Math.min(max, START_VALUE));
-  drawStaticRadar($("setup-plot"), aspects, mins, maxes, [{ name: "Starting values", values, color: "#1E2B2F" }]);
   drawStaticRadar($("setup-full-plot"), aspects, mins, maxes, [{ name: "Starting values", values, color: "#1E2B2F" }]);
-}
-
-function observeFullSetupChart() {
-  if (setupChartObserver || !window.IntersectionObserver) return;
-  // Any part of the full chart being visible is enough — two copies of the
-  // same drawing on screen at once is the thing worth avoiding.
-  setupChartObserver = new IntersectionObserver(([entry]) => {
-    fullSetupChartVisible = entry.isIntersecting;
-    $("setup-prospect").hidden = entry.isIntersecting;
-  }, { threshold: 0 });
-  setupChartObserver.observe($("setup-full-chart"));
 }
 
 function renderLiveInputs(shapes) {
@@ -784,6 +955,18 @@ function renderLiveInputs(shapes) {
   setHidden($("live-toggles"), S.liveView !== "overlay");
   setHidden($("live-overlay"), S.liveView !== "overlay");
   setHidden($("live-grid"), S.liveView !== "grid");
+  const estimators = ((S.state && S.state.participants) || []).filter((person) => !person.organizer);
+  const empty = active.length === 0;
+  setHidden($("live-empty"), !empty);
+  $("live-stage").classList.toggle("has-empty", empty);
+  if (empty) {
+    // Privacy already withholds previews; do not turn that into a roster leak.
+    $("live-empty").textContent = S.privacy
+      ? "Live charts are hidden while privacy mode is on."
+      : estimators.length === 0
+        ? "No participants are here to estimate yet."
+        : "Waiting for participants to adjust a chart.";
+  }
   $("live-toggles").innerHTML = "";
   active.forEach((shape) => {
     const label = document.createElement("label");
@@ -801,8 +984,12 @@ function renderLiveInputs(shapes) {
     label.append(checkbox, swatch, document.createTextNode(shape.name));
     $("live-toggles").appendChild(label);
   });
-  drawStaticRadar($("live-overlay"), S.axes, S.axisMins, S.axisMaxes,
-    active.filter((shape) => !S.hiddenLive.has(shape.id)));
+  if (!empty) {
+    drawStaticRadar($("live-overlay"), S.axes, S.axisMins, S.axisMaxes,
+      active.filter((shape) => !S.hiddenLive.has(shape.id)));
+  } else {
+    $("live-overlay").innerHTML = "";
+  }
   $("live-grid").innerHTML = "";
   active.forEach((shape) => {
     const card = document.createElement("div");
@@ -953,6 +1140,11 @@ function renderHistory() {
 
   const entry = S.history[S.historyIndex];
   const summary = entry.summary || {};
+  // An issue keeps the aspects it was estimated against, which may not be the
+  // ones the session is using now.
+  const axes = (entry.axes && entry.axes.length) ? entry.axes : S.axes;
+  const mins = entry.axisMins || axes.map((_, i) => axisMin(i));
+  const maxes = entry.axisMaxes || axes.map((_, i) => axisMax(i));
   $("history-title").textContent = entry.title;
   $("history-position").textContent = `${S.historyIndex + 1} of ${S.history.length}`;
   $("btn-history-prev").disabled = S.historyIndex === 0;
@@ -960,15 +1152,18 @@ function renderHistory() {
   $("history-points").textContent = summary.storyPoints ?? "—";
 
   const averages = summary.averages || [];
-  $("history-stats").innerHTML = S.axes.map((axis, i) => `
+  $("history-stats").innerHTML = averages.length === 0
+    ? `<p class="hint">Answered with single scores only.</p>`
+    : axes.map((axis, i) => `
     <div class="axis-row">
       <span class="lbl" style="color:${axisColor(i)}">${escapeHTML(axis)}</span>
-      <span class="axis-bar"><i style="width:${averages[i] === undefined ? 0 : ((averages[i] - axisMin(i)) / (axisMax(i) - axisMin(i))) * 100}%;background:${axisColor(i)}"></i></span>
+      <span class="axis-bar"><i style="width:${averages[i] === undefined ? 0 : ((averages[i] - mins[i]) / (maxes[i] - mins[i])) * 100}%;background:${axisColor(i)}"></i></span>
       <span class="num mono">${averages[i] === undefined ? "—" : formatValue(averages[i])}</span>
     </div>`).join("");
 
   $("history-observations").innerHTML = (summary.observations || [])
     .map((observation) => `<li>${escapeHTML(observation)}</li>`).join("");
+  setHidden($("history-insights-title"), !(summary.observations || []).length);
 
   // Every individual shape plus the group consensus, so the organizer can
   // still see who diverged on an issue they have already moved past.
@@ -979,7 +1174,7 @@ function renderHistory() {
   if (averages.length) {
     shapes.push({ id: "history-avg", name: "Group", values: averages, color: "var(--pencil)" });
   }
-  drawStaticRadar($("history-chart"), S.axes, S.axisMins, S.axisMaxes, shapes);
+  drawStaticRadar($("history-chart"), axes, mins, maxes, shapes);
 }
 
 function stepHistory(delta) {
@@ -995,20 +1190,25 @@ function renderSummary(sum) {
   $("points-num").textContent = sum.storyPoints;
   $("points-why").textContent = sum.pointsWhy;
 
-  $("axis-stats").innerHTML = S.axes.map((a, i) => `
+  const averages = sum.averages || [];
+  const spread = sum.spread || [];
+  $("axis-stats").innerHTML = averages.length === 0
+    ? `<p class="hint">Everyone answered with a single score, so there is nothing to break down per aspect.</p>`
+    : S.axes.map((a, i) => `
     <div class="axis-row">
       <span class="lbl" style="color:${axisColor(i)}">${escapeHTML(a)}</span>
-      <span class="axis-bar"><i style="width:${((sum.averages[i] - axisMin(i)) / (axisMax(i) - axisMin(i))) * 100}%;background:${axisColor(i)}"></i></span>
-      <span class="num mono">${formatValue(sum.averages[i])} +/- ${formatValue(sum.spread[i])}</span>
+      <span class="axis-bar"><i style="width:${((averages[i] - axisMin(i)) / (axisMax(i) - axisMin(i))) * 100}%;background:${axisColor(i)}"></i></span>
+      <span class="num mono">${formatValue(averages[i])} +/- ${formatValue(spread[i])}</span>
     </div>`).join("");
 
   $("observations").innerHTML = (sum.observations || [])
     .map((o) => `<li>${escapeHTML(o)}</li>`).join("");
+  setHidden($("summary-insights-title"), !(sum.observations || []).length);
 
   const outlierNames = new Set((sum.outliers || []).map((o) => o.name));
   $("minis").innerHTML = (sum.shapes || []).map((sh) => miniSVG(sh, outlierNames.has(sh.name))).join("");
   // Redraw the big plot's red polygon as the final consensus.
-  drawAverage(sum.averages);
+  drawAverage(averages.length ? averages : null);
 }
 
 function miniSVG(shape, isOutlier) {
@@ -1036,17 +1236,17 @@ function clockText(ms) {
 function showPausedClock(remainingMs) {
   stopCountdown();
   const elT = $("round-timer");
-  elT.hidden = false;
   elT.classList.add("is-paused");
   elT.textContent = clockText(remainingMs);
+  showTimerFloat(true, false);
 }
 
 function startCountdown(deadlineMs) {
   stopCountdown();
   const elT = $("round-timer");
   elT.classList.remove("is-paused");
-  if (!deadlineMs) { elT.hidden = true; return; }
-  elT.hidden = false;
+  if (!deadlineMs) { showTimerFloat(false); return; }
+  showTimerFloat(true, true);
   const tick = () => { elT.textContent = clockText(deadlineMs - Date.now()); };
   tick();
   S.countdown = setInterval(tick, 250);
@@ -1054,13 +1254,19 @@ function startCountdown(deadlineMs) {
 function stopCountdown() {
   if (S.countdown) clearInterval(S.countdown);
   S.countdown = null;
-  $("round-timer").hidden = true;
+  showTimerFloat(false);
+}
+
+/* The clock is the one thing everyone in the room needs at a glance, so it
+   floats clear of the content rather than living inside the issue card. */
+function showTimerFloat(visible, running) {
+  setHidden($("timer-float"), !visible);
+  setHidden($("timer-controls"), !visible || !S.organizer);
+  if (visible) $("btn-timer-toggle").textContent = running ? "Pause" : "Resume";
 }
 
 /* ── misc ──────────────────────────────────────────────────────────── */
 let toastTimer = null;
-let setupChartObserver = null;
-let fullSetupChartVisible = false;
 function toast(text) {
   const t = $("toast");
   t.textContent = text;
@@ -1080,8 +1286,11 @@ $("btn-create").onclick = () => {
   S.name = requiredNickname();
   if (!S.name) return;
   S.live = false;
-  $("draft-items").innerHTML = "";
+  S.drafts = [];
+  S.settingsEdited = false;
+  $("intake-items").innerHTML = "";
   $("draft-aspects").innerHTML = "";
+  $("settings-items").innerHTML = "";
   $("setup-point-labels").innerHTML = "";
   $("setup-max").value = "8";
   connect({ type: "create", name: S.name });
@@ -1101,7 +1310,7 @@ $("btn-join").onclick = () => {
   });
 };
 $("btn-submit").onclick = () => {
-  send({ type: "submit", values: S.my });
+  send(estimatePayload("submit"));
   const r = S.state && S.state.round;
   if (r) S.submittedRound = r.number;
   render();
@@ -1128,8 +1337,36 @@ $("btn-timer").onclick = () => {
     toast("The round length has to be more than zero.");
     return;
   }
-  send({ type: "set_timer", seconds: secs });
+  send({ type: "set_timer", seconds: secs, scope: $("timer-scope").value });
 };
+$("btn-timer-remove").onclick = () => send({ type: "clear_timer", scope: $("timer-scope").value });
+$("btn-timer-clear").onclick = () => send({ type: "clear_timer", scope: "issue" });
+$("btn-timer-toggle").onclick = () => {
+  const round = S.state && S.state.round;
+  if (round && round.deadlineMs) send({ type: "pause_timer" });
+  else send({ type: "set_timer", seconds: 0, scope: "issue" });
+};
+$("in-privacy").onchange = () => send({ type: "set_privacy", on: $("in-privacy").checked });
+$("btn-apply-aspect").onclick = () => {
+  const aspect = $("in-aspect").value.trim();
+  if (!aspect) {
+    toast("Name the aspect first.");
+    return;
+  }
+  send({ type: "add_aspect", aspect, scope: $("aspect-scope").value });
+  $("in-aspect").value = "";
+};
+$("btn-mode-shape").onclick = () => { S.mode = "radar"; S.touched = true; render(); schedulePreview(); };
+$("btn-mode-simple").onclick = () => { S.mode = "simple"; S.touched = true; render(); schedulePreview(); };
+$("simple-slider").oninput = () => setSimple(Number($("simple-slider").value));
+$("btn-feedback-up").onclick = () => sendFeedback("up");
+$("btn-feedback-down").onclick = () => sendFeedback("down");
+
+function sendFeedback(vote) {
+  S.feedbackVote = vote;
+  send({ type: "submit_feedback", vote, comment: $("feedback-comment").value.trim() });
+  $("feedback-comment").value = "";
+}
 $("btn-end").onclick = () => {
   advanceIssue();
 };
@@ -1152,7 +1389,7 @@ function advanceIssue() {
   }
   if (!round || !round.open) {
     if (S.state && S.state.queuedItems === 0) {
-      send({ type: "show_final_summary" });
+      showIntake("more");
       return;
     }
     send({ type: "start_round", seconds: 0 });
@@ -1207,24 +1444,105 @@ $("code-chip").onclick = () => {
     .catch(() => toast(`Invite link: ${link}`));
 };
 
-$("btn-add-item").onclick = () => addDraftItem();
+function confirmSessionDeparture() {
+  return !S.code || confirm("Leave this session? You can rejoin with the saved session code while it remains active.");
+}
+
+$("home-link").onclick = (event) => {
+  if (!S.code) return;
+  if (!confirmSessionDeparture()) {
+    event.preventDefault();
+    return;
+  }
+  S.leftDeliberately = true;
+  if (S.ws) try { S.ws.close(); } catch (_) {}
+};
+
+window.addEventListener("popstate", (event) => {
+  const requested = event.state && event.state.view ? event.state.view : "landing";
+  if (requested === "landing") {
+    if (S.code && !confirmSessionDeparture()) {
+      recordView(S.view);
+      return;
+    }
+    if (S.code) toLanding("Left session. Rejoin with the saved session code while it remains active.");
+    else showView("landing");
+    return;
+  }
+  if (requested === "settings" && S.organizer) {
+    showSettings(S.settingsReturn, false);
+    return;
+  }
+  if (requested === "intake" && S.organizer) {
+    const round = S.state && S.state.round;
+    // The initial intake entry predates a live round. Reopening it would offer
+    // a launch that the server correctly rejects, so Back either leaves the
+    // session deliberately or returns to the current round.
+    if (round && round.open) {
+      if (!confirmSessionDeparture()) {
+        recordView(S.view);
+        return;
+      }
+      toLanding("Left session. Rejoin with the saved session code while it remains active.");
+      recordView("landing");
+      return;
+    }
+    showIntake(S.intakeStage, false);
+    return;
+  }
+  showSession(false);
+  if (S.state) render();
+});
+
+window.addEventListener("beforeunload", (event) => {
+  if (!S.code) return;
+  event.preventDefault();
+  event.returnValue = "";
+});
+
 $("btn-add-aspect").onclick = () => addDraftAspect();
-$("setup-prospect").onclick = () => $("setup-full-chart").scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "start" });
-$("btn-launch").onclick = () => {
+$("btn-open-settings").onclick = () => showSettings("intake", true);
+$("btn-session-settings").onclick = () => showSettings("session", true);
+$("btn-close-settings").onclick = () => closeSettings(true);
+$("btn-intake-results").onclick = () => send({ type: "show_final_summary" });
+$("btn-intake-back").onclick = () => {
+  // Stepping back to read the last result must not bounce straight back to
+  // intake on the next broadcast.
+  S.reviewing = true;
+  showSession(true);
+  render();
+};
+function launchDrafts() {
   const items = draftItemValues();
   if (items.length === 0) {
-    toast("Add at least one issue before launching.");
+    $("intake-warning").textContent = "Enter an issue before launching.";
+    setHidden($("intake-warning"), false);
     return;
   }
   const aspects = setupAspectNames();
   const max = setupMax();
-  if (aspects.length < 2 || aspects.length > 12 || !max) {
+  // Until someone edits the settings, omission means the server's standard
+  // aspects. Once they have edited it, an incomplete custom set is intentional
+  // enough to deserve a clear launch error rather than a silent reset.
+  if ((S.settingsEdited && (aspects.length < 2 || aspects.length > 12)) || !max) {
+    $("intake-warning").textContent = "Check the aspects in session settings — two to twelve are needed.";
+    setHidden($("intake-warning"), false);
+    showSettings("intake", true);
     renderProspectivePlot();
     return;
   }
-  send({ type: "load_items", items, aspects, max, pointLabels: setupPointLabels() });
+  setHidden($("intake-warning"), true);
+  if (S.intakeStage === "more") {
+    // The session is already configured; these issues join the queue behind it.
+    send({ type: "append_items", items });
+  } else {
+    send({ type: "load_items", items, aspects: S.settingsEdited ? aspects : [], max, pointLabels: setupPointLabels() });
+  }
+  if (S.intakeStage === "more") S.drafts = [];
+  S.reviewing = false;
   send({ type: "start_round" });
-};
+}
+$("btn-launch").onclick = launchDrafts;
 $("setup-max").oninput = renderSetupRange;
 $("btn-live-overlay").onclick = () => { S.liveView = "overlay"; renderLiveInputs((S.state.round && S.state.round.liveShapes) || []); };
 $("btn-live-grid").onclick = () => { S.liveView = "grid"; renderLiveInputs((S.state.round && S.state.round.liveShapes) || []); };
@@ -1239,29 +1557,116 @@ function caretSpan() {
   return caret;
 }
 
-function addDraftItem(item = {}) {
-  const entry = document.createElement("div");
-  entry.className = "draft-item-entry";
-  const row = document.createElement("div");
-  row.className = "draft-item";
-  const input = document.createElement("input");
-  input.type = "text";
-  input.maxLength = 200;
-  input.placeholder = "Issue key and summary";
-  input.value = item.title || "";
-  const remove = document.createElement("button");
-  remove.type = "button";
-  remove.className = "btn btn-quiet";
-  remove.textContent = "Remove";
-  remove.onclick = () => entry.remove();
-  row.append(input, remove);
-  entry.append(row, itemMeta(item));
-  $("draft-items").appendChild(entry);
-  input.focus();
+/* Issues typed on the intake screen live in one array, not in the DOM. Both
+   intake and settings draw the same expandable row against that source so a
+   title, description, and URL stay in step wherever they are edited. */
+function addDraftItem(item = {}, focusIn = "intake") {
+  S.drafts.push({
+    id: item.id || itemID(),
+    title: item.title || "",
+    link: item.link || "",
+    description: item.description || "",
+  });
+  renderDraftRows();
+  if (S.view === "settings" || focusIn === "settings") renderSettingsItems();
+  const host = focusIn === "settings" ? $("settings-items") : $("intake-items");
+  const inputs = host.querySelectorAll(".intake-title-input");
+  const last = inputs[inputs.length - 1];
+  if (last) last.focus();
 }
 
-/* The link and description belong to the issue above them, so they live inside
-   the same container and are spaced apart rather than stacked border-to-border. */
+function draftDetails(draft) {
+  const details = document.createElement("details");
+  details.className = "draft-details";
+  const summary = document.createElement("summary");
+  summary.append(document.createTextNode("Add description or link"), caretSpan());
+  const fields = document.createElement("div");
+  fields.className = "draft-meta-fields";
+  const description = document.createElement("textarea");
+  description.className = "item-description";
+  description.maxLength = 2000;
+  description.placeholder = "Optional issue description";
+  description.value = draft.description;
+  description.oninput = () => { draft.description = description.value; };
+  const link = document.createElement("input");
+  link.type = "url";
+  link.className = "item-link";
+  link.placeholder = "Optional issue URL";
+  link.value = draft.link;
+  link.oninput = () => { draft.link = link.value; };
+  fields.append(description, link);
+  details.append(summary, fields);
+  return details;
+}
+
+function draftRow(draft, index, context) {
+  const row = document.createElement("div");
+  row.className = context === "settings" ? "draft-item-entry intake-row" : "intake-row";
+  row.dataset.draftId = draft.id;
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "intake-title-input";
+  input.maxLength = 200;
+  input.placeholder = "Issue title";
+  input.value = draft.title;
+  input.oninput = () => { draft.title = input.value; };
+  row.append(input);
+  if (index === S.drafts.length - 1) {
+    const plus = document.createElement("button");
+    plus.type = "button";
+    plus.className = "btn row-plus";
+    plus.textContent = "+";
+    plus.setAttribute("aria-label", "Add issue");
+    plus.onclick = () => addDraftItem({}, context);
+    row.appendChild(plus);
+  }
+  // Keep one input available, but let every additional row be removed from
+  // either screen without its metadata becoming orphaned.
+  if (S.drafts.length > 1) {
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "btn btn-quiet";
+    remove.textContent = "Remove";
+    remove.onclick = () => {
+      S.drafts = S.drafts.filter((candidate) => candidate.id !== draft.id);
+      renderDraftRows();
+      if (S.view === "settings") renderSettingsItems();
+    };
+    row.appendChild(remove);
+  }
+  row.appendChild(draftDetails(draft));
+  return row;
+}
+
+function renderDraftRows() {
+  const host = $("intake-items");
+  if (!host) return;
+  host.innerHTML = "";
+  S.drafts.forEach((draft, index) => host.appendChild(draftRow(draft, index, "intake")));
+}
+
+function renderSettingsItems() {
+  const host = $("settings-items");
+  if (!host) return;
+  host.innerHTML = "";
+  setHidden($("settings-items-empty"), S.drafts.length > 0);
+  S.drafts.forEach((draft, index) => host.appendChild(draftRow(draft, index, "settings")));
+}
+
+function draftItemValues() {
+  return S.drafts
+    .map((draft) => ({
+      id: draft.id,
+      title: draft.title.trim(),
+      link: draft.link.trim(),
+      description: draft.description.trim(),
+    }))
+    .filter((item) => item.title);
+}
+
+/* The shelf's queue rows keep their own collapsed link/description fields:
+   mid-session an organizer is adding one issue in place, not visiting a
+   settings screen to finish it. */
 function itemMeta(item) {
   const meta = document.createElement("details");
   meta.className = "draft-item-meta";
@@ -1293,7 +1698,7 @@ function addQueueItem(item = {}) {
   const title = document.createElement("input");
   title.type = "text";
   title.maxLength = 200;
-  title.placeholder = "Issue key and summary";
+  title.placeholder = "Issue title";
   title.value = item.title || "";
   const confirmButton = document.createElement("button");
   confirmButton.type = "button";
@@ -1345,7 +1750,8 @@ function itemID() {
   return `item-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function addDraftAspect(value = "") {
+function addDraftAspect(value = "", edited = true) {
+  if (edited) S.settingsEdited = true;
   const row = document.createElement("div");
   row.className = "draft-item";
   const input = document.createElement("input");
@@ -1353,26 +1759,16 @@ function addDraftAspect(value = "") {
   input.maxLength = 24;
   input.placeholder = "Aspect name";
   input.value = value;
-  input.oninput = renderProspectivePlot;
+  input.oninput = () => { S.settingsEdited = true; renderProspectivePlot(); };
   const remove = document.createElement("button");
   remove.type = "button";
   remove.className = "btn btn-quiet";
   remove.textContent = "Remove";
-  remove.onclick = () => { row.remove(); renderProspectivePlot(); };
+  remove.onclick = () => { S.settingsEdited = true; row.remove(); renderProspectivePlot(); };
   row.append(input, remove);
   $("draft-aspects").appendChild(row);
   input.focus();
   renderProspectivePlot();
-}
-
-function draftItemValues() {
-  return Array.from($("draft-items").querySelectorAll(".draft-item-entry"))
-    .map((entry) => ({
-      title: entry.querySelector(".draft-item input").value.trim(),
-      link: entry.querySelector(".item-link").value.trim(),
-      description: entry.querySelector(".item-description").value.trim(),
-    }))
-    .filter((item) => item.title);
 }
 
 function requiredNickname() {
@@ -1402,6 +1798,7 @@ function savedCreds() {
   if (saved && saved.color) S.color = saved.color;
   $("in-name").placeholder = randomNickname();
   updateEntryActions();
+  if (history.replaceState) history.replaceState({ view: "landing" }, "", location.pathname + location.search);
   loadRemoteConfig();
 })();
 
@@ -1410,5 +1807,8 @@ function savedCreds() {
    Scoped to local hosts so the deployed app exposes no internals — jsdom runs
    at http://localhost/, so the UI suite still tests shipped code. */
 if (["localhost", "127.0.0.1", "[::1]", ""].includes(location.hostname)) {
-  window.__test = { S, render, showSession, showSetup, renderHistory, stepHistory, setHidden, addDraftItem, safeLink, parseDuration };
+  window.__test = {
+    S, render, showSession, showIntake, showSettings, closeSettings, renderHistory, stepHistory,
+    setHidden, addDraftItem, renderSettingsItems, safeLink, parseDuration, setSimple, roundAxes,
+  };
 }

@@ -32,6 +32,8 @@ type SessionSnapshot struct {
 	PointLabels       []string       `json:"pointLabels"`
 	History           []HistoryEntry `json:"history,omitempty"`
 	FinalSummaryShown bool           `json:"finalSummaryShown"`
+	Privacy           bool           `json:"privacy,omitempty"`
+	DefaultSeconds    int            `json:"defaultSeconds,omitempty"`
 	Round             *RoundSnapshot `json:"round,omitempty"`
 }
 
@@ -46,6 +48,10 @@ type RoundSnapshot struct {
 	Submissions map[string]*Submission `json:"submissions"`
 	Previews    map[string]*Submission `json:"previews"`
 	Summary     *Summary               `json:"summary,omitempty"`
+	Axes        []string               `json:"axes,omitempty"`
+	AxisMins    []float64              `json:"axisMins,omitempty"`
+	AxisMaxes   []float64              `json:"axisMaxes,omitempty"`
+	Feedback    map[string]*Feedback   `json:"feedback,omitempty"`
 }
 
 type RedisSessionStore struct {
@@ -93,6 +99,8 @@ func (s *Session) snapshotLocked() SessionSnapshot {
 		PointLabels:       append([]string(nil), s.pointLabels...),
 		History:           append([]HistoryEntry(nil), s.history...),
 		FinalSummaryShown: s.finalSummaryShown,
+		Privacy:           s.privacy,
+		DefaultSeconds:    s.defaultSeconds,
 	}
 	if s.round != nil {
 		snapshot.Round = &RoundSnapshot{
@@ -106,6 +114,10 @@ func (s *Session) snapshotLocked() SessionSnapshot {
 			Submissions: s.round.Submissions,
 			Previews:    s.round.Previews,
 			Summary:     s.round.Summary,
+			Axes:        append([]string(nil), s.round.Axes...),
+			AxisMins:    append([]float64(nil), s.round.AxisMins...),
+			AxisMaxes:   append([]float64(nil), s.round.AxisMaxes...),
+			Feedback:    s.round.Feedback,
 		}
 	}
 	return snapshot

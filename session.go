@@ -8,6 +8,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -18,11 +19,30 @@ import (
 // DefaultAxes are used unless an organizer sets a custom issue-set schema.
 var DefaultAxes = []string{"Uncertainty", "Complexity", "Toil"}
 
+// How an estimate was given. Radar is the full shape, one value per aspect;
+// simple is a single composite number on the same scale. Both are valid input
+// to a round — see SimpleWeight for what each is worth.
+const (
+	ModeRadar  = "radar"
+	ModeSimple = "simple"
+)
+
+// Where a mid-session change lands. "This issue" touches only the round on
+// screen; "all remaining issues" changes the session default that every
+// subsequent round inherits.
+const (
+	ScopeIssue     = "issue"
+	ScopeRemaining = "remaining"
+)
+
 const (
 	AxisMax        = 8.0
 	AxisMin        = 1.0
 	maxNameLen     = 24
 	maxTitleLen    = 200
+	maxCommentLen  = 280
+	minAspects     = 2
+	maxAspects     = 12
 	maxRoundSecs   = 3600
 	writeWait      = 10 * time.Second
 	pongWait       = 70 * time.Second
@@ -286,6 +306,13 @@ type Session struct {
 	pointLabels       []string
 	finalSummaryShown bool
 	closed            bool
+	// privacy blanks names and live shapes in the organizer's own view only.
+	// They are the one likely to be sharing a screen; everyone else keeps the
+	// session they already had.
+	privacy bool
+	// defaultSeconds is the round length the organizer set "for all remaining
+	// issues". Zero means each round starts untimed.
+	defaultSeconds int
 }
 
 type Round struct {
@@ -302,12 +329,40 @@ type Round struct {
 	Submissions map[string]*Submission // keyed by client id; survives disconnects
 	Previews    map[string]*Submission // keyed by client id; current unsent chart
 	Summary     *Summary
+	// A round carries the aspects it was actually estimated against. The
+	// organizer can add one mid-session for this issue alone, so the session
+	// default is not enough to draw or score a past round correctly.
+	Axes      []string
+	AxisMins  []float64
+	AxisMaxes []float64
+	// Feedback on the pointing process itself, keyed by client id so one
+	// person cannot stuff the ballot. Never attributed back to a name.
+	Feedback map[string]*Feedback
 }
 
 type Submission struct {
 	Name    string
 	Values  []float64
 	Touched bool
+	// Mode is ModeRadar (Values carry one entry per aspect) or ModeSimple
+	// (Score carries one composite number and Values is empty).
+	Mode  string
+	Score float64
+}
+
+// Feedback is one person's read on how the pointing went, not on the issue.
+type Feedback struct {
+	Vote    string `json:"vote"` // "up" | "down"
+	Comment string `json:"comment,omitempty"`
+}
+
+// FeedbackView is the aggregate the organizer sees. Comments travel without
+// names attached — process feedback that can be traced back to a person stops
+// being honest feedback.
+type FeedbackView struct {
+	Up       int      `json:"up"`
+	Down     int      `json:"down"`
+	Comments []string `json:"comments,omitempty"`
 }
 
 type Item struct {
@@ -327,6 +382,12 @@ type HistoryEntry struct {
 	Link        string   `json:"link,omitempty"`
 	Description string   `json:"description,omitempty"`
 	Summary     *Summary `json:"summary,omitempty"`
+	// The aspects this issue was actually estimated against, which may differ
+	// from the session's current set if one was added for a single issue.
+	Axes      []string      `json:"axes,omitempty"`
+	AxisMins  []float64     `json:"axisMins,omitempty"`
+	AxisMaxes []float64     `json:"axisMaxes,omitempty"`
+	Feedback  *FeedbackView `json:"feedback,omitempty"`
 }
 
 type inboundMsg struct {
@@ -342,6 +403,13 @@ type inboundMsg struct {
 	ItemID      string    `json:"itemId"`
 	Color       string    `json:"color"`
 	Restore     bool      `json:"restore"`
+	Mode        string    `json:"mode"`
+	Score       float64   `json:"score"`
+	Aspect      string    `json:"aspect"`
+	Scope       string    `json:"scope"`
+	On          bool      `json:"on"`
+	Vote        string    `json:"vote"`
+	Comment     string    `json:"comment"`
 }
 
 func (s *Session) handle(c *Client, msg *inboundMsg) {
@@ -476,24 +544,14 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 		if s.round != nil {
 			num = s.round.Number + 1
 		}
-		r := &Round{
-			Number:      num,
-			Title:       item.Title,
-			Link:        item.Link,
-			Description: item.Description,
-			Open:        true,
-			Submissions: make(map[string]*Submission),
-			Previews:    make(map[string]*Submission),
+		r := s.newRoundLocked(num, item)
+		// An explicit length beats the standing one; otherwise a round length
+		// set "for all remaining issues" applies without being retyped.
+		secs := msg.Seconds
+		if secs <= 0 {
+			secs = s.defaultSeconds
 		}
-		if msg.Seconds > 0 {
-			secs := msg.Seconds
-			if secs > maxRoundSecs {
-				secs = maxRoundSecs
-			}
-			dl := time.Now().Add(time.Duration(secs) * time.Second)
-			r.Deadline = &dl
-			r.timer = time.AfterFunc(time.Until(dl), func() { s.timerFired(r) })
-		}
+		s.armRoundTimerLocked(r, secs)
 		s.round = r
 		s.persistLocked()
 		s.broadcastStateLocked()
@@ -506,34 +564,73 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 			}
 			return
 		}
-		if len(msg.Values) != len(s.axes) {
-			if msg.Type == "submit" {
-				c.trySend(errMsg("Estimate must cover every axis."))
-			}
-			return
-		}
 		if _, submitted := r.Submissions[c.id]; submitted {
 			if msg.Type == "submit" {
 				c.trySend(errMsg("Your estimate has already been submitted for this issue."))
 			}
 			return
 		}
-		vals := make([]float64, len(msg.Values))
-		for i, v := range msg.Values {
-			v = math.Round(v)
-			if v < s.axisMins[i] {
-				v = s.axisMins[i]
+		axes, mins, maxes := s.roundAxesLocked()
+		var preview *Submission
+		if msg.Mode == ModeSimple {
+			// One number on the same scale the aspects use, so it can be
+			// averaged with them rather than sitting in a separate world.
+			preview = &Submission{
+				Name: c.name, Mode: ModeSimple, Touched: msg.Touched,
+				Score: clampValue(msg.Score, mins[0], maxes[0]),
 			}
-			if v > s.axisMaxes[i] {
-				v = s.axisMaxes[i]
+		} else {
+			if len(msg.Values) != len(axes) {
+				if msg.Type == "submit" {
+					c.trySend(errMsg("Estimate must cover every axis."))
+				}
+				return
 			}
-			vals[i] = v
+			vals := make([]float64, len(msg.Values))
+			for i, v := range msg.Values {
+				vals[i] = clampValue(v, mins[i], maxes[i])
+			}
+			preview = &Submission{Name: c.name, Values: vals, Mode: ModeRadar, Touched: msg.Touched}
 		}
-		preview := &Submission{Name: c.name, Values: vals, Touched: msg.Touched}
 		r.Previews[c.id] = preview
 		if msg.Type == "submit" {
 			preview.Touched = true
 			r.Submissions[c.id] = preview
+		}
+		s.persistLocked()
+		s.broadcastStateLocked()
+
+	case "submit_feedback":
+		// Feedback is on the process, not the issue, so it is collected once a
+		// round has concluded and never while people are still estimating.
+		r := s.round
+		if r == nil || r.Open {
+			c.trySend(errMsg("Feedback opens once the issue has been pointed."))
+			return
+		}
+		if c.organizer {
+			c.trySend(errMsg("Feedback comes from the people doing the estimating."))
+			return
+		}
+		vote := strings.TrimSpace(strings.ToLower(msg.Vote))
+		if vote != "up" && vote != "down" {
+			c.trySend(errMsg("Feedback is a thumbs up or a thumbs down."))
+			return
+		}
+		comment := strings.TrimSpace(msg.Comment)
+		if len(comment) > maxCommentLen {
+			comment = comment[:maxCommentLen]
+		}
+		if r.Feedback == nil {
+			r.Feedback = make(map[string]*Feedback)
+		}
+		r.Feedback[c.id] = &Feedback{Vote: vote, Comment: comment}
+		// The concluded round is already in history; keep the entry in step so
+		// the organizer sees feedback arrive against the issue it belongs to.
+		for i := range s.history {
+			if s.history[i].Number == r.Number {
+				s.history[i].Feedback = feedbackViewOf(r.Feedback)
+			}
 		}
 		s.persistLocked()
 		s.broadcastStateLocked()
@@ -591,8 +688,25 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 			c.trySend(errMsg(concludedMsg))
 			return
 		}
+		// "For all remaining issues" is a standing choice, so it is recorded
+		// even when there is no open round to apply it to yet.
+		if msg.Scope == ScopeRemaining {
+			seconds := msg.Seconds
+			if seconds > maxRoundSecs {
+				seconds = maxRoundSecs
+			}
+			if seconds < 0 {
+				seconds = 0
+			}
+			s.defaultSeconds = seconds
+		}
 		r := s.round
 		if r == nil || !r.Open {
+			if msg.Scope == ScopeRemaining {
+				s.persistLocked()
+				s.broadcastStateLocked()
+				return
+			}
 			c.trySend(errMsg("There is no open issue to time."))
 			return
 		}
@@ -615,6 +729,104 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 		dl := time.Now().Add(left)
 		r.Deadline = &dl
 		r.timer = time.AfterFunc(time.Until(dl), func() { s.timerFired(r) })
+		s.persistLocked()
+		s.broadcastStateLocked()
+
+	case "clear_timer":
+		if !c.organizer {
+			c.trySend(errMsg("Only the organizer can remove the timer."))
+			return
+		}
+		// Removing the clock is not the same as pausing it: the round carries
+		// on untimed, and nobody is left watching a frozen number.
+		if msg.Scope == ScopeRemaining {
+			s.defaultSeconds = 0
+		}
+		r := s.round
+		if r != nil {
+			if r.timer != nil {
+				r.timer.Stop()
+				r.timer = nil
+			}
+			r.Deadline = nil
+			r.Paused = 0
+		}
+		s.persistLocked()
+		s.broadcastStateLocked()
+
+	case "set_privacy":
+		if !c.organizer {
+			c.trySend(errMsg("Only the organizer can change privacy mode."))
+			return
+		}
+		if s.privacy == msg.On {
+			return
+		}
+		s.privacy = msg.On
+		s.broadcastStateLocked()
+
+	case "add_aspect":
+		if !c.organizer {
+			c.trySend(errMsg("Only the organizer can add an aspect."))
+			return
+		}
+		if s.finalSummaryShown {
+			c.trySend(errMsg(concludedMsg))
+			return
+		}
+		aspect := strings.TrimSpace(msg.Aspect)
+		if aspect == "" {
+			c.trySend(errMsg("Give the aspect a name."))
+			return
+		}
+		if len(aspect) > maxNameLen {
+			aspect = aspect[:maxNameLen]
+		}
+		if msg.Scope == ScopeIssue {
+			r := s.round
+			if r == nil || !r.Open {
+				c.trySend(errMsg("There is no open issue to add an aspect to."))
+				return
+			}
+			if err := s.addRoundAspectLocked(r, aspect); err != nil {
+				c.trySend(errMsg(err.Error()))
+				return
+			}
+			// The question changed after people had already answered it, so
+			// the estimates so far no longer cover it. Clearing them is the
+			// honest option; the alternative is inventing a value nobody gave.
+			r.Submissions = make(map[string]*Submission)
+			r.Previews = make(map[string]*Submission)
+			s.notifyLocked("The organizer added an aspect to this issue. Estimates have been reset.")
+		} else {
+			if len(s.axes) >= maxAspects {
+				c.trySend(errMsg("A session can carry at most 12 aspects."))
+				return
+			}
+			for _, existing := range s.axes {
+				if strings.EqualFold(existing, aspect) {
+					c.trySend(errMsg("That aspect is already in the session."))
+					return
+				}
+			}
+			s.axes = append(s.axes, aspect)
+			s.axisMins = append(s.axisMins, AxisMin)
+			s.axisMaxes = append(s.axisMaxes, s.sessionMaxLocked())
+		}
+		s.persistLocked()
+		s.broadcastStateLocked()
+
+	case "resume_session":
+		if !c.organizer {
+			c.trySend(errMsg("Only the organizer can reopen the session."))
+			return
+		}
+		if !s.finalSummaryShown {
+			return
+		}
+		// Leaving the results view is not the same as restarting: history and
+		// the totals stay exactly as they are, and more issues can follow.
+		s.finalSummaryShown = false
 		s.persistLocked()
 		s.broadcastStateLocked()
 
@@ -714,6 +926,121 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 	}
 }
 
+// roundAxesLocked reports the aspects the round on screen is being estimated
+// against. A round keeps the set it started with, so adding an aspect for one
+// issue does not silently rewrite the issue before it.
+func (s *Session) roundAxesLocked() ([]string, []float64, []float64) {
+	if r := s.round; r != nil && len(r.Axes) > 0 {
+		return r.Axes, r.AxisMins, r.AxisMaxes
+	}
+	return s.axes, s.axisMins, s.axisMaxes
+}
+
+// sessionMaxLocked reports the shared upper bound every aspect uses. New
+// aspects join on the same scale as the ones already there.
+func (s *Session) sessionMaxLocked() float64 {
+	if len(s.axisMaxes) > 0 {
+		return s.axisMaxes[0]
+	}
+	return AxisMax
+}
+
+func (s *Session) addRoundAspectLocked(r *Round, aspect string) error {
+	if len(r.Axes) == 0 {
+		r.Axes = append([]string(nil), s.axes...)
+		r.AxisMins = append([]float64(nil), s.axisMins...)
+		r.AxisMaxes = append([]float64(nil), s.axisMaxes...)
+	}
+	if len(r.Axes) >= maxAspects {
+		return fmt.Errorf("An issue can carry at most %d aspects", maxAspects)
+	}
+	for _, existing := range r.Axes {
+		if strings.EqualFold(existing, aspect) {
+			return fmt.Errorf("That aspect is already on this issue")
+		}
+	}
+	max := AxisMax
+	if len(r.AxisMaxes) > 0 {
+		max = r.AxisMaxes[0]
+	}
+	r.Axes = append(r.Axes, aspect)
+	r.AxisMins = append(r.AxisMins, AxisMin)
+	r.AxisMaxes = append(r.AxisMaxes, max)
+	return nil
+}
+
+// notifyLocked tells the room something changed underneath them. It reuses the
+// reminder channel the client already surfaces as a toast.
+func (s *Session) notifyLocked(message string) {
+	note := mustJSON(map[string]string{"type": "reminder", "message": message})
+	for participant := range s.clients {
+		participant.trySend(note)
+	}
+}
+
+func feedbackViewOf(feedback map[string]*Feedback) *FeedbackView {
+	if len(feedback) == 0 {
+		return nil
+	}
+	view := &FeedbackView{}
+	// Map order is random and comments are anonymous, so sort them to keep a
+	// re-broadcast from reshuffling the list under the organizer's eyes.
+	for _, entry := range feedback {
+		if entry.Vote == "up" {
+			view.Up++
+		} else {
+			view.Down++
+		}
+		if entry.Comment != "" {
+			view.Comments = append(view.Comments, entry.Comment)
+		}
+	}
+	sort.Strings(view.Comments)
+	return view
+}
+
+func clampValue(v, min, max float64) float64 {
+	v = math.Round(v)
+	if v < min {
+		return min
+	}
+	if v > max {
+		return max
+	}
+	return v
+}
+
+// newRoundLocked builds a round against the session's current aspects. A round
+// keeps the set it started with, so an aspect added later for one issue cannot
+// reach back and change what an earlier issue was estimated against.
+func (s *Session) newRoundLocked(number int, item Item) *Round {
+	return &Round{
+		Number:      number,
+		Title:       item.Title,
+		Link:        item.Link,
+		Description: item.Description,
+		Open:        true,
+		Submissions: make(map[string]*Submission),
+		Previews:    make(map[string]*Submission),
+		Axes:        append([]string(nil), s.axes...),
+		AxisMins:    append([]float64(nil), s.axisMins...),
+		AxisMaxes:   append([]float64(nil), s.axisMaxes...),
+		Feedback:    make(map[string]*Feedback),
+	}
+}
+
+func (s *Session) armRoundTimerLocked(r *Round, seconds int) {
+	if seconds <= 0 {
+		return
+	}
+	if seconds > maxRoundSecs {
+		seconds = maxRoundSecs
+	}
+	dl := time.Now().Add(time.Duration(seconds) * time.Second)
+	r.Deadline = &dl
+	r.timer = time.AfterFunc(time.Until(dl), func() { s.timerFired(r) })
+}
+
 func (s *Session) startNextRoundLocked(seconds int) {
 	if s.nextItem >= len(s.items) {
 		return
@@ -724,23 +1051,11 @@ func (s *Session) startNextRoundLocked(seconds int) {
 	if s.round != nil {
 		number = s.round.Number + 1
 	}
-	r := &Round{
-		Number:      number,
-		Title:       item.Title,
-		Link:        item.Link,
-		Description: item.Description,
-		Open:        true,
-		Submissions: make(map[string]*Submission),
-		Previews:    make(map[string]*Submission),
+	r := s.newRoundLocked(number, item)
+	if seconds <= 0 {
+		seconds = s.defaultSeconds
 	}
-	if seconds > 0 {
-		if seconds > maxRoundSecs {
-			seconds = maxRoundSecs
-		}
-		dl := time.Now().Add(time.Duration(seconds) * time.Second)
-		r.Deadline = &dl
-		r.timer = time.AfterFunc(time.Until(dl), func() { s.timerFired(r) })
-	}
+	s.armRoundTimerLocked(r, seconds)
 	s.round = r
 }
 
@@ -754,6 +1069,7 @@ func (s *Session) timerFired(r *Round) {
 }
 
 func (s *Session) submitCurrentChartsLocked(r *Round) {
+	axes, mins, maxes := s.roundAxesLocked()
 	for c := range s.clients {
 		if c.organizer {
 			continue
@@ -761,16 +1077,21 @@ func (s *Session) submitCurrentChartsLocked(r *Round) {
 		if _, submitted := r.Submissions[c.id]; submitted {
 			continue
 		}
+		// Whatever is in front of someone is their answer, in whichever mode
+		// they were working — a slider left at 5 is as much an estimate as a
+		// polygon left where they dragged it.
 		if preview := r.Previews[c.id]; preview != nil {
-			values := append([]float64(nil), preview.Values...)
-			r.Submissions[c.id] = &Submission{Name: c.name, Values: values, Touched: preview.Touched}
+			taken := *preview
+			taken.Name = c.name
+			taken.Values = append([]float64(nil), preview.Values...)
+			r.Submissions[c.id] = &taken
 			continue
 		}
-		values := make([]float64, len(s.axes))
+		values := make([]float64, len(axes))
 		for i := range values {
-			values[i] = math.Min(s.axisMaxes[i], math.Max(s.axisMins[i], 3))
+			values[i] = math.Min(maxes[i], math.Max(mins[i], 3))
 		}
-		r.Submissions[c.id] = &Submission{Name: c.name, Values: values}
+		r.Submissions[c.id] = &Submission{Name: c.name, Values: values, Mode: ModeRadar}
 	}
 }
 
@@ -790,10 +1111,15 @@ func (s *Session) endRoundLocked() {
 	}
 	r.Deadline = nil
 	r.Paused = 0
-	r.Summary = computeSummary(shapesOf(r.Submissions), s.axes)
+	axes, mins, maxes := s.roundAxesLocked()
+	r.Summary = computeSummary(shapesOf(r.Submissions), scoresOf(r.Submissions), axes)
 	// A round concludes once, so this is the one place history grows.
 	s.history = append(s.history, HistoryEntry{
 		Number: r.Number, Title: r.Title, Link: r.Link, Description: r.Description, Summary: r.Summary,
+		Axes:      append([]string(nil), axes...),
+		AxisMins:  append([]float64(nil), mins...),
+		AxisMaxes: append([]float64(nil), maxes...),
+		Feedback:  feedbackViewOf(r.Feedback),
 	})
 	s.persistLocked()
 	s.broadcastStateLocked()
@@ -881,8 +1207,9 @@ type ParticipantView struct {
 }
 
 type FinalSummary struct {
-	Issues      []HistoryEntry `json:"issues"`
-	TotalPoints int            `json:"totalPoints"`
+	Issues          []HistoryEntry `json:"issues"`
+	TotalPoints     int            `json:"totalPoints"`
+	SessionInsights []string       `json:"sessionInsights,omitempty"`
 }
 
 type RoundView struct {
@@ -897,6 +1224,16 @@ type RoundView struct {
 	Average        []float64    `json:"average,omitempty"`
 	LiveShapes     []NamedShape `json:"liveShapes,omitempty"`
 	Summary        *Summary     `json:"summary,omitempty"`
+	// The aspects this issue is being estimated against. Usually the session
+	// set, but the organizer can add one for a single issue.
+	Axes      []string  `json:"axes,omitempty"`
+	AxisMins  []float64 `json:"axisMins,omitempty"`
+	AxisMaxes []float64 `json:"axisMaxes,omitempty"`
+	// Feedback on the round just concluded, organizer-only and never named.
+	Feedback *FeedbackView `json:"feedback,omitempty"`
+	// SelfFeedback tells one participant whether they have already answered,
+	// so the prompt can retire itself instead of asking twice.
+	SelfFeedback bool `json:"selfFeedback,omitempty"`
 }
 
 type StateView struct {
@@ -911,17 +1248,25 @@ type StateView struct {
 	QueuedItems  int               `json:"queuedItems"`
 	Round        *RoundView        `json:"round,omitempty"`
 	FinalSummary *FinalSummary     `json:"finalSummary,omitempty"`
+	// Privacy is reported to everyone so the organizer's own view can show it
+	// is on. It only changes what the organizer receives.
+	Privacy bool `json:"privacy,omitempty"`
+	// DefaultSeconds is the round length standing for all remaining issues.
+	DefaultSeconds int `json:"defaultSeconds,omitempty"`
 	// History is sent to the organizer only — participants estimate the
 	// issue in front of them and shouldn't be anchored by past results.
 	History []HistoryEntry `json:"history,omitempty"`
 }
 
 func (s *Session) broadcastStateLocked() {
+	axes, mins, maxes := s.roundAxesLocked()
 	sv := StateView{
 		Type: "state", Code: s.Code, Axes: s.axes, AxisMax: AxisMax,
 		AxisMins: s.axisMins, AxisMaxes: s.axisMaxes,
-		PointLabels: s.pointLabels,
-		QueuedItems: len(s.items) - s.nextItem,
+		PointLabels:    s.pointLabels,
+		QueuedItems:    len(s.items) - s.nextItem,
+		Privacy:        s.privacy,
+		DefaultSeconds: s.defaultSeconds,
 	}
 	for c := range s.clients {
 		submitted := false
@@ -937,6 +1282,9 @@ func (s *Session) broadcastStateLocked() {
 			Organizer: c.organizer, Submitted: submitted, Responded: responded,
 		})
 	}
+	// Map iteration is random, so without this the roster reshuffles on every
+	// broadcast — and privacy mode's pseudonyms would follow it around.
+	sort.Slice(sv.Participants, func(i, j int) bool { return sv.Participants[i].ID < sv.Participants[j].ID })
 	if r := s.round; r != nil {
 		rv := &RoundView{
 			Number:         r.Number,
@@ -946,6 +1294,9 @@ func (s *Session) broadcastStateLocked() {
 			Open:           r.Open,
 			SubmittedCount: len(r.Submissions),
 			Summary:        r.Summary,
+			Axes:           axes,
+			AxisMins:       mins,
+			AxisMaxes:      maxes,
 		}
 		if r.Deadline != nil {
 			rv.DeadlineMs = r.Deadline.UnixMilli()
@@ -955,20 +1306,39 @@ func (s *Session) broadcastStateLocked() {
 		}
 		// Live group average while the round is open (revealed as it forms).
 		if r.Open && len(r.Submissions) > 0 {
-			rv.Average = axisAverages(shapesOf(r.Submissions), len(s.axes))
+			rv.Average = axisAverages(shapesOf(r.Submissions), len(axes))
 		}
 		sv.Round = rv
 	}
 	if s.finalSummaryShown {
 		sv.FinalSummary = finalSummaryOf(s.history)
 	}
+	masked := maskedNames(sv.Participants)
 	for c := range s.clients {
 		view := sv
 		if c.organizer {
 			view.History = s.history
 			if sv.Round != nil && s.round.Open {
 				round := *sv.Round
-				round.LiveShapes = shapesOf(s.round.Previews)
+				// A shared screen shows every shape as it is drawn, which is
+				// exactly the live-value overlay privacy mode exists to stop.
+				if !s.privacy {
+					round.LiveShapes = shapesOf(s.round.Previews)
+				}
+				view.Round = &round
+			}
+			if s.privacy {
+				view.Participants = anonymizeParticipants(sv.Participants, masked)
+				view.History = anonymizeHistory(s.history)
+				if view.Round != nil && view.Round.Summary != nil {
+					round := *view.Round
+					round.Summary = anonymizeSummary(round.Summary)
+					view.Round = &round
+				}
+			}
+			if view.Round != nil && s.round != nil && !s.round.Open {
+				round := *view.Round
+				round.Feedback = feedbackViewOf(s.round.Feedback)
 				view.Round = &round
 			}
 		} else if sv.Round != nil && !sv.Round.Open && sv.Round.Summary != nil {
@@ -976,22 +1346,109 @@ func (s *Session) broadcastStateLocked() {
 			round.Summary = anonymizeSummary(sv.Round.Summary)
 			view.Round = &round
 		}
+		if !c.organizer && sv.Round != nil && !sv.Round.Open && s.round != nil {
+			round := *view.Round
+			_, answered := s.round.Feedback[c.id]
+			round.SelfFeedback = answered
+			view.Round = &round
+		}
 		if !c.organizer && sv.FinalSummary != nil {
 			view.FinalSummary = anonymizeFinalSummary(sv.FinalSummary)
+		}
+		if c.organizer && s.privacy && view.FinalSummary != nil {
+			view.FinalSummary = anonymizeFinalSummary(view.FinalSummary)
 		}
 		c.trySend(mustJSON(view))
 	}
 }
 
+// maskedNames assigns each estimator a stable pseudonym for privacy mode. The
+// roster is already sorted by id, so the same person keeps the same label for
+// the life of the session rather than being renumbered on every broadcast.
+func maskedNames(people []ParticipantView) map[string]string {
+	names := make(map[string]string, len(people))
+	seat := 0
+	for _, person := range people {
+		if person.Organizer {
+			continue
+		}
+		seat++
+		names[person.ID] = fmt.Sprintf("Participant %d", seat)
+	}
+	return names
+}
+
+// anonymizeParticipants blanks the roster for a shared screen. The organizer's
+// own name stays: they are the one presenting, and the room already knows who
+// is driving.
+func anonymizeParticipants(people []ParticipantView, masked map[string]string) []ParticipantView {
+	out := make([]ParticipantView, len(people))
+	for i, person := range people {
+		out[i] = person
+		if alias, ok := masked[person.ID]; ok {
+			out[i].Name = alias
+		}
+	}
+	return out
+}
+
+func anonymizeHistory(history []HistoryEntry) []HistoryEntry {
+	out := make([]HistoryEntry, len(history))
+	for i, entry := range history {
+		out[i] = entry
+		if entry.Summary != nil {
+			out[i].Summary = anonymizeSummary(entry.Summary)
+		}
+	}
+	return out
+}
+
 func finalSummaryOf(history []HistoryEntry) *FinalSummary {
 	issues := append([]HistoryEntry(nil), history...)
-	final := &FinalSummary{Issues: issues}
+	final := &FinalSummary{Issues: issues, SessionInsights: sessionInsightsOf(issues)}
 	for _, issue := range issues {
 		if issue.Summary != nil {
 			final.TotalPoints += issue.Summary.StoryPoints
 		}
 	}
 	return final
+}
+
+// sessionInsightsOf deliberately aggregates only group-level facts. Final
+// summaries are shown to every participant, and a session-level observation
+// should never reveal who held an outlying view.
+func sessionInsightsOf(history []HistoryEntry) []string {
+	if len(history) == 0 {
+		return nil
+	}
+	agreements, splits, singleScores := 0, 0, 0
+	for _, issue := range history {
+		if issue.Summary == nil {
+			continue
+		}
+		if len(issue.Summary.Scores) > 0 {
+			singleScores++
+		}
+		for _, observation := range issue.Summary.Observations {
+			switch {
+			case strings.HasPrefix(observation, "Strong agreement"):
+				agreements++
+			case strings.HasPrefix(observation, "Wide split"):
+				splits++
+			}
+		}
+	}
+	insights := []string{fmt.Sprintf("%d issue%s estimated across this session.", len(history), plural(len(history)))}
+	if agreements > 0 {
+		insights = append(insights, fmt.Sprintf("Strong agreement on %d issue%s.", agreements, plural(agreements)))
+	}
+	if splits > 0 {
+		insights = append(insights, fmt.Sprintf("%d issue%s had a wide split worth discussing.", splits, plural(splits)))
+	}
+	if singleScores > 0 {
+		insights = append(insights, fmt.Sprintf("%d issue%s included single-score estimates alongside the session's chart input.", singleScores, plural(singleScores)))
+	}
+	return insights
 }
 
 func anonymizeFinalSummary(final *FinalSummary) *FinalSummary {
@@ -1014,6 +1471,14 @@ func anonymizeSummary(summary *Summary) *Summary {
 		copy.Shapes[i].ID = ""
 		copy.Shapes[i].Name = fmt.Sprintf("Anonymous response %d", i+1)
 	}
+	// Single-score estimates carry names too; leaving them attributed would
+	// make simple mode the one place a name still leaks.
+	copy.Scores = make([]NamedScore, len(summary.Scores))
+	for i, score := range summary.Scores {
+		copy.Scores[i] = score
+		copy.Scores[i].ID = ""
+		copy.Scores[i].Name = fmt.Sprintf("Anonymous score %d", i+1)
+	}
 	copy.Outliers = append([]Outlier(nil), summary.Outliers...)
 	for i := range copy.Outliers {
 		copy.Outliers[i].Name = "A teammate"
@@ -1022,6 +1487,11 @@ func anonymizeSummary(summary *Summary) *Summary {
 	for _, shape := range summary.Shapes {
 		for j := range copy.Observations {
 			copy.Observations[j] = strings.ReplaceAll(copy.Observations[j], shape.Name, "a teammate")
+		}
+	}
+	for _, score := range summary.Scores {
+		for j := range copy.Observations {
+			copy.Observations[j] = strings.ReplaceAll(copy.Observations[j], score.Name, "a teammate")
 		}
 	}
 	return &copy

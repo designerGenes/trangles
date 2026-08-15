@@ -16,10 +16,13 @@
 <body>
 
 <header class="masthead">
-  <div class="wordmark">Tri<span class="wordmark-angle">▲</span>ngulate</div>
-  <button id="code-chip" class="code-chip" hidden title="Copy invite link">
-    session <span id="code-text" class="mono"></span>
-  </button>
+  <a id="home-link" class="wordmark" href="/">Tri<span class="wordmark-angle">▲</span>ngulate</a>
+  <div class="masthead-actions">
+    <span id="privacy-badge" class="privacy-badge" hidden>Privacy on</span>
+    <button id="code-chip" class="code-chip" hidden title="Copy invite link">
+      session <span id="code-text" class="mono"></span>
+    </button>
+  </div>
 </header>
 
 <!-- ───────────────────────────── landing ───────────────────────────── -->
@@ -51,56 +54,83 @@
   </div>
 </main>
 
-<!-- ─────────────────────────── new session ─────────────────────────── -->
-<main id="view-setup" hidden>
-  <div class="setup-layout">
-    <aside class="setup-rail">
-      <button id="btn-launch" class="btn btn-primary setup-launch" type="button">Launch first issue</button>
-      <button id="setup-prospect" class="setup-prospect" type="button" aria-label="Show the full prospective chart">
-        <span class="eyebrow">Prospective chart</span>
-        <svg id="setup-plot" viewBox="-70 -45 500 434" role="img" aria-label="Compact prospective estimation chart"></svg>
-        <span class="hint">View full chart</span>
-      </button>
-    </aside>
+<!-- Floats above everything for the whole room. The organizer gets the two
+     controls that matter on the clock itself, not three scrolls away. -->
+<div id="timer-float" class="timer-float" hidden>
+  <span id="round-timer" class="mono timer"></span>
+  <div id="timer-controls" class="timer-controls" hidden>
+    <button id="btn-timer-toggle" class="timer-mini" type="button" aria-label="Pause or resume the timer">Pause</button>
+    <button id="btn-timer-clear" class="timer-mini" type="button" aria-label="Remove the timer">Remove</button>
+  </div>
+</div>
 
-    <section class="card setup-card">
-      <span class="eyebrow">New session</span>
-      <h1 class="setup-title">Build the issues you want the team to shape.</h1>
+<!-- ──────────────────────────── issue intake ───────────────────────── -->
+<!-- The whole of "start pointing": one issue and a button. Everything else an
+     organizer might want lives behind Session settings, because a scrum lead
+     picking the next issue off a board is not configuring anything. -->
+<main id="view-intake" hidden>
+  <section class="card intake-card">
+    <span id="intake-eyebrow" class="eyebrow">New session</span>
+    <h1 id="intake-title" class="intake-title">Enter the first issue to point.</h1>
+    <p id="intake-tally" class="hint intake-tally" hidden></p>
 
-      <span class="eyebrow">Issues</span>
-      <div id="draft-items" class="draft-items"></div>
-      <button id="btn-add-item" class="btn" type="button">Add issue</button>
+    <div id="intake-items" class="intake-items"></div>
 
-      <details id="setup-aspects-stack" class="setup-aspects" open>
-        <summary><span>Aspects</span><span class="caret" aria-hidden="true"></span></summary>
-        <div class="stack-body">
-          <div id="draft-aspects" class="draft-items"></div>
-          <button id="btn-add-aspect" class="btn" type="button">Add aspect</button>
-          <p id="setup-aspect-warning" class="setup-warning" hidden>Choose between 2 and 12 aspects to launch a session.</p>
-        </div>
-      </details>
+    <div class="intake-actions">
+      <button id="btn-launch" class="btn btn-primary" type="button">Launch pointing session</button>
+      <button id="btn-intake-results" class="btn" type="button" hidden>View session results</button>
+      <button id="btn-intake-back" class="btn btn-quiet" type="button" hidden>Back to the last result</button>
+    </div>
+    <p id="intake-warning" class="setup-warning" hidden></p>
 
-      <details class="setup-drawer">
-        <summary><span>Session controls</span><span class="caret" aria-hidden="true"></span></summary>
-        <div class="drawer-body">
-          <div class="control-group">
-            <label class="field range-field">
-              <span>Points per aspect</span>
-              <input id="setup-max" class="mono" type="number" min="2" max="100" step="1" value="8">
-            </label>
-            <p class="hint">Every aspect uses the same whole-number range: 1 to this value.</p>
-          </div>
-          <div class="control-group">
-            <span class="eyebrow">Point hover labels</span>
-            <p class="hint">Optional. Shown when a handle rests on that value.</p>
-            <div id="setup-point-labels"></div>
-          </div>
-        </div>
-      </details>
-    </section>
+    <button id="btn-open-settings" class="btn btn-quiet intake-settings" type="button">Session settings</button>
+  </section>
+</main>
+
+<!-- ─────────────────────────── session settings ────────────────────── -->
+<!-- Everything the organizer can change but rarely needs to: aspects, the
+     point range, per-issue links and descriptions, and the chart preview. -->
+<main id="view-settings" hidden>
+  <div class="settings-head">
+    <div>
+      <span class="eyebrow">Session settings</span>
+      <h1 class="setup-title">Set up how this team estimates.</h1>
+    </div>
+    <button id="btn-close-settings" class="btn" type="button">Launch pointing session</button>
   </div>
 
-  <section id="setup-full-chart" class="card setup-full-chart">
+  <section class="card">
+    <span class="eyebrow">Aspects</span>
+    <p class="hint">Each aspect becomes one axis of the chart. Two to twelve.</p>
+    <div id="draft-aspects" class="draft-items"></div>
+    <button id="btn-add-aspect" class="btn" type="button">Add aspect</button>
+    <p id="setup-aspect-warning" class="setup-warning" hidden>Choose between 2 and 12 aspects to launch a session.</p>
+  </section>
+
+  <section class="card">
+    <span class="eyebrow">Issue details</span>
+    <p class="hint">Add a title, description, or link for each issue.</p>
+    <div id="settings-items" class="draft-items"></div>
+    <p id="settings-items-empty" class="hint">Issues you enter on the previous screen appear here.</p>
+  </section>
+
+  <section class="card">
+    <span class="eyebrow">Point range</span>
+    <div class="control-group">
+      <label class="field range-field">
+        <span>Points per aspect</span>
+        <input id="setup-max" class="mono" type="number" min="2" max="100" step="1" value="8">
+      </label>
+      <p class="hint">Every aspect uses the same whole-number range: 1 to this value.</p>
+    </div>
+    <div class="control-group">
+      <span class="eyebrow">Point hover labels</span>
+      <p class="hint">Optional. Shown when a handle rests on that value.</p>
+      <div id="setup-point-labels"></div>
+    </div>
+  </section>
+
+  <section id="setup-full-chart" class="card">
     <span class="eyebrow">Prospective chart</span>
     <svg id="setup-full-plot" viewBox="-70 -45 500 434" role="img" aria-label="Full prospective estimation chart"></svg>
     <p class="hint">This is the chart participants will use. Each aspect starts at 2, clamped to the shared point range.</p>
@@ -115,7 +145,6 @@
     <div class="round-head">
       <span id="round-eyebrow" class="eyebrow">Waiting</span>
       <div class="round-head-actions">
-        <span id="round-timer" class="mono timer" hidden></span>
         <div id="color-picker" class="color-picker" hidden>
           <button id="btn-color" class="color-swatch" type="button"
                   aria-haspopup="true" aria-expanded="false"
@@ -127,10 +156,25 @@
     <h2 class="round-title"><a id="round-title">Waiting for the organizer to post an issue.</a></h2>
     <p id="round-description" class="round-description" hidden></p>
 
+    <div id="mode-switch" class="mode-switch" role="group" aria-label="How to estimate" hidden>
+      <button id="btn-mode-shape" class="btn" type="button" aria-pressed="true">Shape</button>
+      <button id="btn-mode-simple" class="btn" type="button" aria-pressed="false">Single score</button>
+    </div>
+
     <div id="plot-wrap" class="plot-wrap">
       <svg id="plot" viewBox="-70 -45 500 434" role="img"
            aria-label="Estimation chart"></svg>
       <div id="readouts" class="readouts"></div>
+    </div>
+
+    <!-- Simple pointing: one number instead of a shape. Carries less
+         information than the chart, and the server scores it accordingly. -->
+    <div id="simple-wrap" class="simple-wrap" hidden>
+      <output id="simple-value" class="simple-value mono" for="simple-slider">3</output>
+      <span id="simple-label" class="simple-label"></span>
+      <input id="simple-slider" class="simple-slider" type="range" min="1" max="8" step="1" value="3"
+             aria-label="Composite point score for this issue">
+      <div class="simple-scale mono"><span id="simple-min">1</span><span id="simple-max">8</span></div>
     </div>
 
     <div id="submit-row" class="submit-row">
@@ -150,9 +194,10 @@
     <div id="live-toggles" class="live-toggles"></div>
     <!-- Both views share one box: Individual fills the space Sum already
          occupied instead of reflowing the card around it. -->
-    <div class="live-stage">
-      <svg id="live-overlay" class="live-overlay" viewBox="-70 -45 500 434" role="img" aria-label="Summed participant chart"></svg>
-      <div id="live-grid" class="live-grid" hidden></div>
+    <div id="live-stage" class="live-stage">
+       <svg id="live-overlay" class="live-overlay" viewBox="-70 -45 500 434" role="img" aria-label="Summed participant chart"></svg>
+       <div id="live-grid" class="live-grid" hidden></div>
+       <p id="live-empty" class="hint live-empty" hidden></p>
     </div>
   </section>
 
@@ -165,8 +210,20 @@
       <p id="points-why" class="points-why"></p>
     </div>
     <div id="axis-stats" class="axis-stats"></div>
+    <h3 id="summary-insights-title" class="insights-title">Pointing insights</h3>
     <ul id="observations" class="observations"></ul>
     <div id="minis" class="minis"></div>
+  </section>
+
+  <section id="feedback-card" class="card feedback-card" hidden>
+    <span class="eyebrow">How did that go?</span>
+    <p class="hint">On the pointing process, not the issue. Never shown with your name.</p>
+    <div class="feedback-row">
+      <button id="btn-feedback-up" class="btn" type="button" aria-pressed="false">Worked well</button>
+      <button id="btn-feedback-down" class="btn" type="button" aria-pressed="false">Felt off</button>
+    </div>
+    <input id="feedback-comment" maxlength="280" autocomplete="off" placeholder="Anything worth changing? (optional)">
+    <p id="feedback-thanks" class="hint" hidden>Thanks — logged anonymously.</p>
   </section>
 
   <section class="people-card">
@@ -195,6 +252,7 @@
           <span class="points-label">story points</span>
         </div>
         <div id="history-stats" class="axis-stats"></div>
+        <h3 id="history-insights-title" class="insights-title">Pointing insights</h3>
         <ul id="history-observations" class="observations"></ul>
       </div>
     </div>
@@ -217,15 +275,45 @@
       <span class="caret" aria-hidden="true"></span>
     </summary>
     <div class="shelf-body">
+      <div id="privacy-group" class="shelf-group">
+        <span class="eyebrow">Sharing your screen</span>
+        <div class="console-row">
+          <label class="aspect-toggle">
+            <input id="in-privacy" type="checkbox">
+            <span>Privacy mode — hide names and live charts in my view</span>
+          </label>
+        </div>
+        <p class="hint">Only changes what you see. Everyone else keeps their own view.</p>
+      </div>
+
       <div id="round-group" class="shelf-group">
-        <span class="eyebrow">Round</span>
+        <span class="eyebrow">Timer</span>
         <div class="console-row">
           <input id="in-seconds" class="mono" type="text" maxlength="8"
                   placeholder="90s" aria-label="Round timer, e.g. 90s or 5m"
                   title="Optional round length — 90s, 5m, 1m30s or a plain number of seconds">
+          <select id="timer-scope" class="scope-select" aria-label="What this timer applies to">
+            <option value="issue">for this issue</option>
+            <option value="remaining">for all remaining issues</option>
+          </select>
           <button id="btn-timer" class="btn" type="button" hidden>Start timer</button>
+          <button id="btn-timer-remove" class="btn btn-quiet" type="button" hidden>Remove timer</button>
           <button id="btn-restart-round" class="btn" type="button" hidden>Restart round</button>
         </div>
+        <p id="timer-standing" class="hint" hidden></p>
+      </div>
+
+      <div id="aspect-group" class="shelf-group">
+        <span class="eyebrow">Add an aspect</span>
+        <div class="console-row">
+          <input id="in-aspect" maxlength="24" autocomplete="off" placeholder="Risk" aria-label="New aspect name">
+          <select id="aspect-scope" class="scope-select" aria-label="What this aspect applies to">
+            <option value="remaining">for all remaining issues</option>
+            <option value="issue">for this issue</option>
+          </select>
+          <button id="btn-apply-aspect" class="btn" type="button">Add</button>
+        </div>
+        <p class="hint">Adding one to this issue resets estimates for it — the question changed.</p>
       </div>
 
       <div id="pending-panel" class="shelf-group" hidden>
@@ -239,10 +327,17 @@
       <div id="queue-editor" class="shelf-group">
         <span class="eyebrow">Issue queue</span>
         <div id="queue-items" class="queue-items"></div>
-        <button id="btn-add-queue-item" class="btn shelf-action" type="button">Add issue</button>
+        <button id="btn-add-queue-item" class="btn queue-add" type="button" aria-label="Add issue">+</button>
+      </div>
+
+      <div id="feedback-group" class="shelf-group" hidden>
+        <span class="eyebrow">Process feedback</span>
+        <p id="feedback-tally" class="hint"></p>
+        <ul id="feedback-comments" class="observations"></ul>
       </div>
 
       <div class="shelf-group">
+        <button id="btn-session-settings" class="btn shelf-action" type="button">Session settings</button>
         <button id="btn-close" class="btn btn-quiet shelf-action">Close session for everyone</button>
       </div>
     </div>
@@ -260,9 +355,13 @@
      <span id="final-points" class="capstone-points mono"></span>
      <span class="capstone-points-label">total story points</span>
      <span id="final-meta" class="capstone-meta mono"></span>
-   </div>
-   <div id="final-issues" class="final-issues"></div>
-   <p class="capstone-foot hint">Restart the session to run these issues again or queue new work.</p>
+    </div>
+    <div id="final-issues" class="final-issues"></div>
+    <section id="session-insights" class="session-insights" hidden>
+      <span class="capstone-kicker">Session insights</span>
+      <ul id="final-insights" class="capstone-insights"></ul>
+    </section>
+    <p class="capstone-foot hint">Restart the session to run these issues again or queue new work.</p>
  </section>
 
 </main>

@@ -54,6 +54,8 @@ body {
   justify-content: space-between;
 }
 .wordmark {
+  color: var(--ink);
+  text-decoration: none;
   font-family: "Bricolage Grotesque", sans-serif;
   font-weight: 800;
   font-size: 1.35rem;
@@ -69,6 +71,17 @@ body {
   font-size: 0.85rem;
   color: var(--muted);
   cursor: pointer;
+}
+.masthead-actions { align-items: center; display: flex; gap: 10px; }
+.privacy-badge {
+  background: var(--ink);
+  border-radius: 999px;
+  color: var(--paper);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 4px 12px;
+  text-transform: uppercase;
 }
 .code-chip .mono { color: var(--ink); font-weight: 700; letter-spacing: 0.12em; }
 .code-chip:hover { border-color: var(--ink); }
@@ -104,61 +117,64 @@ main { max-width: var(--column); margin: 0 auto; padding: 8px 16px 48px; }
 .entry-warning { color: var(--pencil); font-size: 0.8rem; margin: 10px 0 0; text-align: left; }
 .hint { font-size: 0.8rem; color: var(--muted); margin: 0; }
 
-/* New session -------------------------------------------------------- */
-#view-setup { max-width: 940px; --setup-rail: 172px; --setup-gap: 22px; }
-.setup-layout { align-items: start; display: grid; gap: var(--setup-gap); grid-template-columns: var(--setup-rail) minmax(0, 1fr); margin-top: 20px; }
-.setup-rail { display: flex; flex-direction: column; gap: 18px; position: sticky; top: 18px; }
-.setup-launch { background: #5DCB74; border-color: #2C7B45; color: #102819; min-height: 64px; }
-.setup-launch:hover:not(:disabled) { background: #79DB8C; }
-.setup-prospect { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); color: var(--ink); cursor: pointer; padding: 10px; text-align: left; }
-.setup-prospect:hover { border-color: var(--ink); }
-.setup-prospect svg { display: block; margin: 4px auto; overflow: visible; width: 100%; }
-.setup-prospect .hint { display: block; text-align: center; }
-.setup-card { margin: 0; }
+/* Issue intake -------------------------------------------------------- */
+/* The screen that replaces the old launch console. One column, one question:
+   which issue are we pointing? Everything configurable is a click away. */
+.intake-card { margin: 40px auto 0; max-width: 34rem; padding: 26px 24px 20px; }
+.intake-title {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 1.6rem;
+  line-height: 1.14;
+  letter-spacing: -0.02em;
+  margin: 6px 0 4px;
+}
+.intake-tally { margin-bottom: 4px; }
+.intake-items { display: flex; flex-direction: column; gap: 8px; margin: 16px 0 8px; }
+.intake-row { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; }
+.intake-row > input { flex: 1 1 14rem; }
+.intake-row .btn-quiet { margin-top: 0; }
+.draft-details { flex: 1 0 100%; }
+.draft-details summary { color: var(--muted); cursor: pointer; font-size: 0.78rem; }
+.draft-details .draft-meta-fields { padding-top: 8px; }
+.row-plus { flex: 0 0 auto; font-size: 1.2rem; line-height: 1; padding: 7px 11px; }
+.intake-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.intake-settings { border-top: 1px solid var(--grid); display: block; margin: 20px 0 0; padding: 12px 0 0; width: 100%; text-align: left; }
+
+/* Session settings ---------------------------------------------------- */
+#view-settings { max-width: 720px; }
+.settings-head { align-items: flex-start; display: flex; gap: 16px; justify-content: space-between; margin: 20px 0 14px; }
 .setup-title {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 1.7rem;
-  line-height: 1.12;
+  font-size: 1.5rem;
+  line-height: 1.14;
   letter-spacing: -0.02em;
-  margin: 6px 0;
+  margin: 4px 0 0;
 }
-.draft-items { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
-/* An issue is one object. Its title row, its disclosure and its optional fields
-   sit in a single container instead of three boxes stacked edge to edge. */
+.draft-items { display: flex; flex-direction: column; gap: 10px; margin: 10px 0 12px; }
 .draft-item-entry, .queue-item { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
 .draft-item { align-items: center; display: flex; gap: 8px; }
 .draft-item input { flex: 1; }
 .draft-item .btn-quiet { margin: 0; }
+.settings-item-title { font-weight: 600; margin-bottom: 8px; overflow-wrap: anywhere; }
 .draft-item-meta { margin-top: 10px; }
 .draft-item-meta summary { color: var(--muted); cursor: pointer; font-size: 0.78rem; }
-.draft-meta-fields { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; }
-.draft-item-meta textarea { background: #fff; border: 1px solid var(--border); border-radius: 6px; color: var(--ink); font: inherit; min-height: 66px; padding: 8px 10px; resize: vertical; width: 100%; }
-/* Aspect rows have no sub-fields, so each row is its own container. */
+.draft-item-meta .draft-meta-fields { padding-top: 10px; }
+.draft-meta-fields { display: flex; flex-direction: column; gap: 8px; }
+.draft-item-entry textarea { background: #fff; border: 1px solid var(--border); border-radius: 6px; color: var(--ink); font: inherit; min-height: 66px; padding: 8px 10px; resize: vertical; width: 100%; }
 #draft-aspects .draft-item { background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 7px; }
-.setup-aspects { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 12px; }
-.setup-aspects summary, .setup-drawer summary { align-items: center; color: var(--ink); cursor: pointer; display: flex; font-size: 0.82rem; font-weight: 700; justify-content: space-between; letter-spacing: 0.09em; text-transform: uppercase; }
-.caret { border-bottom: 2px solid var(--muted); border-right: 2px solid var(--muted); height: 7px; margin: 0 4px; transform: rotate(45deg); transition: transform 120ms; width: 7px; }
-details[open] > summary .caret { transform: rotate(225deg); }
-.stack-body { padding-top: 12px; }
 #draft-aspects .draft-item:nth-child(odd) { background: #E1F3DE; border-color: #A9CCA8; }
 #draft-aspects .draft-item:nth-child(even) { background: #F0FAEE; border-color: #C4DEC1; }
+.caret { border-bottom: 2px solid var(--muted); border-right: 2px solid var(--muted); height: 7px; margin: 0 4px; transform: rotate(45deg); transition: transform 120ms; width: 7px; }
+details[open] > summary .caret { transform: rotate(225deg); }
 .setup-warning { color: var(--pencil); font-size: 0.85rem; font-weight: 600; margin: 10px 0 0; }
-.setup-drawer { background: #F6F8F4; border: 1px solid var(--border); border-radius: var(--radius); margin-top: 18px; padding: 12px; }
-.drawer-body { padding-top: 12px; }
 .range-field { max-width: 8rem; }
 .range-field input { margin-top: 4px; }
-.drawer-body .hint { margin-top: 6px; }
-/* Everything in Session controls is one flat list of groups — no drawer inside
-   the drawer, and every heading on the same left edge. */
 .control-group { display: flex; flex-direction: column; gap: 6px; }
 .control-group + .control-group { border-top: 1px solid var(--grid); margin-top: 16px; padding-top: 14px; }
 #setup-point-labels { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; max-height: 320px; overflow-y: auto; }
 .point-label-row { align-items: center; display: grid; gap: 8px; grid-template-columns: 2rem 1fr; }
 .point-label-row span { color: var(--muted); font-family: "Spline Sans Mono", monospace; text-align: right; }
-/* Same left edge and same width as the card above it — the rail is a sidebar,
-   not part of the content column. */
-.setup-full-chart { margin: 22px 0 0 calc(var(--setup-rail) + var(--setup-gap)); text-align: left; }
-.setup-full-chart svg { display: block; margin: 4px auto; max-width: 700px; overflow: visible; width: 100%; }
+#setup-full-plot { display: block; margin: 4px auto; max-width: 620px; overflow: visible; width: 100%; }
 
 .field { display: block; }
 .field span {
@@ -367,6 +383,9 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 }
 .final-issue .title { font-weight: 600; overflow-wrap: anywhere; }
 .final-issue .mono { color: #E7A79E; font-size: 1.05rem; font-weight: 700; }
+.session-insights { border-top: 1px solid rgba(243, 245, 241, 0.18); margin-top: 16px; padding-top: 16px; }
+.capstone-insights { color: rgba(243, 245, 241, 0.78); margin: 10px 0 0; padding-left: 1.2rem; }
+.capstone-insights li + li { margin-top: 4px; }
 .capstone-foot { color: rgba(243, 245, 241, 0.5); margin: 18px 0 0; }
 .summary-head { display: flex; gap: 18px; align-items: center; margin-bottom: 12px; }
 .points-block { text-align: center; min-width: 92px; }
@@ -389,6 +408,7 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 
 .observations { margin: 0 0 14px; padding-left: 1.2rem; }
 .observations li { margin-bottom: 4px; }
+.insights-title { color: var(--muted); font-size: 0.72rem; letter-spacing: 0.1em; margin: 0 0 6px; text-transform: uppercase; }
 
 .minis { display: flex; flex-wrap: wrap; gap: 12px; }
 .mini { text-align: center; width: 84px; }
@@ -429,6 +449,8 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
    drawn height (viewBox 500x434, capped at 660 wide) so Individual lands in
    the same box; a grid too tall for it still grows past it. */
 .live-stage { min-height: min(573px, 87vw); }
+.live-stage.has-empty { align-items: center; display: flex; justify-content: center; min-height: 5rem; }
+.live-empty { max-width: 26rem; padding: 12px 0; text-align: center; }
 .live-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(170px, 200px)); justify-content: center; margin-top: 12px; }
 .live-mini { text-align: center; }
 .live-mini svg { display: block; width: 100%; }
@@ -443,6 +465,7 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .shelf-group { display: flex; flex-direction: column; gap: 8px; }
 .shelf-group + .shelf-group { border-top: 1px solid var(--grid); margin-top: 16px; padding-top: 16px; }
 .shelf-action { align-self: flex-start; margin-top: 0; }
+.queue-add { align-self: flex-end; font-size: 1.2rem; line-height: 1; padding: 7px 11px; }
 .queue-items { display: flex; flex-direction: column; gap: 10px; }
 .queue-items:empty { display: none; }
 .queue-item.confirmed { background: #F0FAEE; border-color: #C4DEC1; }
@@ -483,6 +506,66 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .history-facts .points-block { text-align: left; }
 .history-facts .points-num { color: var(--ink); font-size: 2.2rem; }
 
+/* Floating countdown --------------------------------------------------- */
+/* The clock belongs to the room, not to one card, so it sits clear of the
+   content where everyone can find it without scrolling. */
+.timer-float {
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 2px 12px rgba(30, 43, 47, 0.14);
+  display: flex;
+  gap: 10px;
+  padding: 6px 14px;
+  position: fixed;
+  right: 18px;
+  top: 16px;
+  z-index: 50;
+}
+.timer-float .timer { font-size: 1.05rem; }
+.timer-controls { display: flex; gap: 4px; }
+.timer-mini {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.7rem;
+  padding: 2px 9px;
+}
+.timer-mini:hover { border-color: var(--ink); color: var(--ink); }
+
+/* Estimate mode ------------------------------------------------------- */
+.mode-switch { display: flex; gap: 6px; margin: 4px 0 12px; }
+.mode-switch .btn { font-size: 0.8rem; padding: 6px 12px; }
+/* Simple pointing: one number, given the same room the chart would have had
+   so switching modes does not make the card jump. */
+.simple-wrap { align-items: center; display: flex; flex-direction: column; gap: 4px; padding: 22px 0 18px; }
+.simple-value { color: var(--pencil); font-size: 3.4rem; font-weight: 700; line-height: 1; }
+.simple-label { color: var(--muted); font-size: 0.8rem; letter-spacing: 0.1em; min-height: 1.2em; text-transform: uppercase; }
+.simple-slider { margin-top: 10px; max-width: 30rem; width: 100%; }
+.simple-scale { color: var(--muted); display: flex; font-size: 0.75rem; justify-content: space-between; max-width: 30rem; width: 100%; }
+
+/* Process feedback ---------------------------------------------------- */
+.feedback-card { border-left: 4px solid var(--grid); }
+.feedback-row { display: flex; gap: 8px; margin: 12px 0 10px; }
+.feedback-card input { max-width: 30rem; }
+
+/* Scope selects ------------------------------------------------------- */
+/* Every optional control says what it applies to, so "for this issue" and
+   "for all remaining issues" are never left to be inferred. */
+.scope-select {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 8px 10px;
+}
+
 /* Toast -------------------------------------------------------------- */
 .toast {
   position: fixed;
@@ -509,16 +592,16 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 }
 
 @media (max-width: 560px) {
-  .setup-layout { display: flex; flex-direction: column; }
-  .setup-rail { position: static; width: 100%; }
-  .setup-full-chart { margin-left: 0; }
   .landing-split { grid-template-columns: 1fr; }
   .landing-rule { display: none; }
-  .setup-prospect { display: none; }
-  .setup-launch { width: 100%; }
+  .intake-card { margin-top: 20px; }
+  .intake-actions .btn { flex: 1 1 100%; }
+  .settings-head { flex-direction: column; }
   .summary-head { flex-direction: column; text-align: center; }
   .axis-row { grid-template-columns: 6rem 1fr 5rem; }
   .live-head { align-items: stretch; flex-direction: column; }
+  /* The masthead already occupies the top-right on a narrow screen. */
+  .timer-float { right: 50%; top: auto; bottom: 16px; transform: translateX(50%); }
 }
 
 @media (prefers-reduced-motion: no-preference) {
