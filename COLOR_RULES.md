@@ -97,7 +97,7 @@ Generated from `static/style.css`. If this table and the stylesheet disagree, th
 | --- | --- | --- |
 | `--ink` | `#F4F1E8` | Primary text (on dark). |
 | `--muted` | `#AEB7C8` | Secondary text (on dark). |
-| `--on-primary` | `#FFFFFF` | White text on blue, violet, and coral call-to-action buttons. |
+| `--on-primary` | `#FFFFFF` | White text on coral primary actions outside bright panels. |
 | `--on-pencil` | `#22161B` | Text on coral controls. |
 | `--on-pending` | `#241A22` | Text on pending control. |
 
@@ -172,14 +172,14 @@ Generated from `static/style.css`. If this table and the stylesheet disagree, th
 
 | Token | Value | Role |
 | --- | --- | --- |
-| `--primary-action` | `#1769AA` | Blue preparation CTA: launch, view results, and pre-session setup actions. |
-| `--primary-edge` | `#2E85C8` | Blue preparation CTA edge / hover. |
-| `--primary-edge-hot` | `#4DA3DF` | Blue preparation CTA hover edge. |
-| `--primary-glow` | `rgba(23, 105, 170, 0.30)` | Blue preparation CTA glow. |
-| `--panel-accent` | `#6250B4` | Violet accent action within a bright preparation panel, used by Session settings. |
-| `--panel-accent-edge` | `#7E6DD4` | Violet panel-accent edge. |
-| `--panel-accent-hot` | `#8E7FE5` | Violet panel-accent hover. |
-| `--panel-accent-glow` | `rgba(98, 80, 180, 0.28)` | Violet panel-accent glow. |
+| `--primary-action` | `#C7464D` | Coral action outside bright panels: settings launch, mode selection, and other general calls to action. |
+| `--primary-edge` | `#D7545B` | Coral primary-action edge / hover. |
+| `--primary-edge-hot` | `#E66A70` | Coral primary-action hover edge. |
+| `--primary-glow` | `rgba(199, 70, 77, 0.30)` | Coral primary-action glow. |
+| `--panel-action` | `#FFF4D2` | Pale cream action surface inside the bright honey issue panel. |
+| `--panel-action-edge` | `#E3AD39` | Pale issue-panel action edge. |
+| `--panel-action-hover` | `#FFFFFF` | Pale issue-panel action hover surface. |
+| `--panel-action-ink` | `#2B210F` | Dark readable text on pale issue-panel actions. |
 | `--pencil` | `#C7464D` | Coral active-session commitment color and logo triangle. |
 | `--pencil-hot` | `#D7545B` | Coral commitment hover. |
 | `--pencil-fill` | `rgba(199, 70, 77, 0.13)` | Average shape fill. |

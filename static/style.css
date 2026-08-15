@@ -87,14 +87,14 @@
   --ring: #3B345D;                             /* @label Radar grid ring */
 
   /* @group Actions and status */
-  --primary-action: #1769AA;                    /* @label Preparation CTA */
-  --primary-edge: #2E85C8;                      /* @label Preparation CTA edge / hover */
-  --primary-edge-hot: #4DA3DF;                  /* @label Preparation CTA hover edge */
-  --primary-glow: rgba(23, 105, 170, 0.30);     /* @label Preparation CTA glow */
-  --panel-accent: #6250B4;                      /* @label Preparation panel accent */
-  --panel-accent-edge: #7E6DD4;                 /* @label Preparation panel accent edge */
-  --panel-accent-hot: #8E7FE5;                  /* @label Preparation panel accent hover */
-  --panel-accent-glow: rgba(98, 80, 180, 0.28); /* @label Preparation panel accent glow */
+  --primary-action: #C7464D;                    /* @label Primary action */
+  --primary-edge: #D7545B;                      /* @label Primary action edge / hover */
+  --primary-edge-hot: #E66A70;                  /* @label Primary action hover edge */
+  --primary-glow: rgba(199, 70, 77, 0.30);      /* @label Primary action glow */
+  --panel-action: #FFF4D2;                      /* @label Bright-panel action surface */
+  --panel-action-edge: #E3AD39;                 /* @label Bright-panel action edge */
+  --panel-action-hover: #FFFFFF;                /* @label Bright-panel action hover */
+  --panel-action-ink: #2B210F;                  /* @label Bright-panel action text */
   --pencil: #C7464D;                           /* @label Consensus coral */
   --pencil-hot: #D7545B;                       /* @label Consensus coral hover */
   --pencil-fill: rgba(199, 70, 77, 0.13);      /* @label Average shape fill */
@@ -447,8 +447,8 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .btn:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--violet); }
 .btn-primary { background: var(--primary-action); border-color: var(--primary-edge); color: var(--on-primary); box-shadow: 0 8px 18px var(--primary-glow); }
 .btn-primary:hover:not(:disabled) { background: var(--primary-edge); border-color: var(--primary-edge-hot); }
-.btn-panel-accent { background: var(--panel-accent); border-color: var(--panel-accent-edge); color: var(--on-primary); box-shadow: 0 8px 18px var(--panel-accent-glow); }
-.btn-panel-accent:hover:not(:disabled) { background: var(--panel-accent-hot); border-color: var(--panel-accent-hot); }
+.btn-panel-action { background: var(--panel-action); border-color: var(--panel-action-edge); color: var(--panel-action-ink); box-shadow: 0 6px 14px var(--panel-cast-tight); }
+.btn-panel-action:hover:not(:disabled) { background: var(--panel-action-hover); border-color: var(--panel-action-edge); }
 .btn-session-commit { background: var(--pencil); border-color: var(--pencil-hot); color: var(--on-primary); box-shadow: 0 8px 18px var(--pencil-cast); }
 .btn-session-commit:hover:not(:disabled) { background: var(--pencil-hot); border-color: var(--pencil-hot); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -461,7 +461,7 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
   font-size: 0.85rem;
 }
 .btn-quiet:hover { color: var(--pencil); background: none; }
-.intake-settings.btn-panel-accent { margin-top: 18px; min-height: 46px; padding: 10px 12px; text-align: center; }
+.intake-settings.btn-panel-action { margin-top: 18px; min-height: 46px; padding: 10px 12px; text-align: center; }
 
 /* Round card --------------------------------------------------------- */
 .eyebrow {
