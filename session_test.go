@@ -1075,6 +1075,41 @@ func TestSimpleModeEstimatesAreAcceptedAndScored(t *testing.T) {
 	}
 }
 
+func TestOrganizerReceivesLiveSimpleScoresWithoutLeakingThem(t *testing.T) {
+	_, session, organizer, guest := newTestSession(t, nil)
+	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1")})
+	session.handle(organizer, &inboundMsg{Type: "start_round"})
+	drain(organizer)
+	drain(guest)
+
+	// A submitted single score remains a preview for the organizer's live view,
+	// but it must not be invented as a per-aspect polygon.
+	session.handle(guest, &inboundMsg{Type: "submit", Mode: ModeSimple, Score: 6, Touched: true})
+	organizerState := readState(t, organizer)
+	guestState := readState(t, guest)
+	if organizerState.Round == nil || len(organizerState.Round.LiveScores) != 1 {
+		t.Fatalf("organizer live scores = %#v", organizerState.Round)
+	}
+	score := organizerState.Round.LiveScores[0]
+	if score.ID != guest.id || score.Name != guest.name || score.Score != 6 {
+		t.Fatalf("organizer live score = %#v", score)
+	}
+	if len(organizerState.Round.LiveShapes) != 0 {
+		t.Fatalf("single score became a radar shape: %#v", organizerState.Round.LiveShapes)
+	}
+	if guestState.Round == nil || len(guestState.Round.LiveScores) != 0 {
+		t.Fatalf("participant received organizer live scores: %#v", guestState.Round)
+	}
+
+	drain(organizer)
+	drain(guest)
+	session.handle(organizer, &inboundMsg{Type: "set_privacy", On: true})
+	privateView := lastState(t, organizer)
+	if privateView.Round == nil || len(privateView.Round.LiveScores) != 0 || len(privateView.Round.LiveShapes) != 0 {
+		t.Fatalf("privacy exposed live estimates: %#v", privateView.Round)
+	}
+}
+
 func TestAspectScopeSeparatesThisIssueFromTheRest(t *testing.T) {
 	_, session, organizer, guest := newTestSession(t, nil)
 	session.handle(organizer, &inboundMsg{Type: "load_items", Items: testItems("PROJ-1", "PROJ-2")})

@@ -210,11 +210,12 @@
     <div id="live-toggles" class="live-toggles"></div>
     <!-- Both views share one box: Individual fills the space Sum already
          occupied instead of reflowing the card around it. -->
-    <div id="live-stage" class="live-stage">
-       <svg id="live-overlay" class="live-overlay" viewBox="-70 -45 500 434" role="img" aria-label="Summed participant chart"></svg>
-       <div id="live-grid" class="live-grid" hidden></div>
-       <p id="live-empty" class="hint live-empty" hidden></p>
-    </div>
+     <div id="live-stage" class="live-stage">
+        <svg id="live-overlay" class="live-overlay" viewBox="-70 -45 500 434" role="img" aria-label="Summed participant chart"></svg>
+        <div id="live-grid" class="live-grid" hidden></div>
+        <div id="live-scores" class="live-scores" hidden></div>
+        <p id="live-empty" class="hint live-empty" hidden></p>
+     </div>
   </section>
 
   <section id="summary-card" class="card summary-card" hidden>
@@ -395,7 +396,10 @@
   <p id="demo-copy" class="demo-copy"></p>
   <section id="demo-peer-preview" class="demo-peer-preview" hidden></section>
   <div class="demo-guide-actions">
-    <button id="btn-demo-replay" class="btn" type="button">Replay this walkthrough</button>
+    <div class="demo-step-actions">
+      <button id="btn-demo-prev" class="btn" type="button">Previous</button>
+      <button id="btn-demo-next" class="btn" type="button">Next</button>
+    </div>
     <span id="demo-progress" class="hint"></span>
   </div>
 </aside>

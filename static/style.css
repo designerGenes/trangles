@@ -478,6 +478,16 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .live-mini { text-align: center; }
 .live-mini svg { display: block; width: 100%; }
 .live-mini span { font-size: 0.78rem; font-weight: 600; }
+.live-scores { border-top: 1px solid var(--grid); display: flex; flex-direction: column; gap: 9px; margin: 14px auto 0; max-width: 660px; padding-top: 12px; width: 100%; }
+.live-scores-head { align-items: baseline; color: var(--muted); display: flex; font-size: 0.78rem; justify-content: space-between; letter-spacing: 0.06em; text-transform: uppercase; }
+.live-scores-head strong { color: var(--ink); font-size: 0.78rem; letter-spacing: 0; text-transform: none; }
+.live-score-row { align-items: center; display: grid; gap: 10px; grid-template-columns: minmax(5rem, 9rem) 1fr 2rem; text-align: left; }
+.live-score-name { font-size: 0.82rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-score-track { background: var(--paper); border-radius: 999px; height: 8px; overflow: hidden; position: relative; }
+.live-score-track i { border-radius: inherit; display: block; height: 100%; }
+.live-score-row strong { color: var(--ink); font-size: 0.85rem; text-align: right; }
+.live-score-card { align-items: stretch; background: var(--paper); border-radius: 7px; display: flex; padding: 12px; width: 100%; }
+.live-score-card .live-score-row { flex: 1; }
 
 /* Organizer shelf ---------------------------------------------------- */
 .organizer-shelf { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 8px; }
@@ -633,8 +643,22 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .demo-peer-bars { display: flex; gap: 5px; margin-top: 9px; }
 .demo-peer-bars i { background: #E7A79E; border-radius: 999px; display: block; height: 5px; }
 .demo-guide-actions { align-items: center; display: flex; gap: 10px; justify-content: space-between; margin-top: 14px; }
+.demo-step-actions { display: flex; gap: 6px; }
 .demo-guide-actions .btn { border-color: rgba(243, 245, 241, 0.65); background: transparent; color: var(--paper); font-size: 0.8rem; padding: 6px 10px; }
+.demo-guide-actions .btn:disabled { opacity: 0.35; }
 .demo-guide-actions .hint { color: rgba(243, 245, 241, 0.58); text-align: right; }
+.is-demo #code-chip,
+.is-demo #timer-float,
+.is-demo #organizer-shelf,
+.is-demo #end-rail,
+.is-demo #submit-row,
+.is-demo #mode-switch,
+.is-demo #color-picker,
+.is-demo #feedback-card,
+.is-demo .view-switch,
+.is-demo .history-nav { display: none !important; }
+.is-demo #plot { cursor: default; }
+.is-demo .handle { cursor: default; pointer-events: none; }
 .demo-target { box-shadow: 0 0 0 3px #E7A79E, 0 0 0 7px rgba(231, 167, 158, 0.25); position: relative; z-index: 5; }
 /* A short, target-anchored tooltip names the current control. The adjacent
    guide carries the longer explanation and, for organizers, the peer view. */

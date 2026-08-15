@@ -128,6 +128,31 @@ const historyEntry = (n, title) => ({
   check("participant: submit row visible", shown(guest, "submit-row"));
 }
 
+/* ── 2b. Live scalar estimates render as tracks, not missing shapes ─── */
+{
+  const win = boot();
+  const T = win.__test;
+  T.S.organizer = true; T.S.code = "ABCDE"; T.S.selfId = "o";
+  T.showSession();
+  T.S.state = stateMsg({ participants: [
+    { id: "o", name: "Ada", organizer: true, submitted: false },
+    { id: "g", name: "Lin", organizer: false, submitted: false, color: "#6D57B8" },
+    { id: "r", name: "Ravi", organizer: false, submitted: true, color: "#2A6F8E" },
+  ], round: { number: 1, title: "PROJ-1", open: true, submittedCount: 1,
+    axes: ["Uncertainty", "Complexity", "Toil"], axisMins: [1, 1, 1], axisMaxes: [8, 8, 8],
+    liveShapes: [{ id: "g", name: "Lin", values: [5, 4, 3] }],
+    liveScores: [{ id: "r", name: "Ravi", score: 6 }] } });
+  T.render();
+  check("Sum keeps the radar beside scalar input", shown(win, "live-overlay") && shown(win, "live-scores"));
+  check("Sum reports scalar names and values", /Ravi/.test(win.document.getElementById("live-scores").textContent)
+    && /6/.test(win.document.getElementById("live-scores").textContent));
+
+  win.document.getElementById("btn-live-grid").click();
+  check("Individual renders a scalar as a line card", shown(win, "live-grid")
+    && win.document.querySelectorAll(".live-score-card").length === 1
+    && !shown(win, "live-scores"));
+}
+
 /* ── 3. History appears only after an issue is completed ───────────── */
 {
   const win = boot();
@@ -986,9 +1011,12 @@ const historyEntry = (n, title) => ({
   T.showSession();
   T.S.state = stateMsg({ participants: [{ id: "o", name: "Ada", organizer: true, submitted: false }] });
   T.render();
+  check("empty Sum view shows only its centered explanation", shown(win, "live-empty")
+    && !visible(win, "live-overlay") && !visible(win, "live-grid"));
   win.document.getElementById("btn-live-grid").click();
   check("empty individual view names the missing participants", /No participants/.test(win.document.getElementById("live-empty").textContent));
-  check("empty individual view collapses the chart stage", win.document.getElementById("live-stage").classList.contains("has-empty"));
+  check("empty individual view keeps the centered stage clear", win.document.getElementById("live-stage").classList.contains("has-empty")
+    && !visible(win, "live-overlay") && !visible(win, "live-grid"));
 }
 
 /* ── 30. Browser history and the wordmark leave deliberately ─────────── */
@@ -1024,13 +1052,22 @@ const historyEntry = (n, title) => ({
   check("organizer demo opens the real session view", shown(win, "view-session") && T.S.organizer);
   check("organizer demo explains the participant perspective", shown(win, "demo-peer-preview")
     && /Participant view/.test(win.document.getElementById("demo-peer-preview").textContent));
-  check("organizer demo starts with organizer controls", shown(win, "organizer-shelf"));
+  check("demo hides production organizer controls", !shown(win, "organizer-shelf")
+    && !shown(win, "end-rail") && !shown(win, "code-chip"));
   check("demo guide is anchored to its highlighted control", win.document.querySelector(".demo-target").hasAttribute("data-demo-tooltip")
     && win.document.querySelector(".demo-target").getAttribute("aria-describedby") === "demo-guide");
+  check("demo begins on a manual first frame", T.S.demo.step === 0
+    && win.document.getElementById("btn-demo-prev").disabled
+    && !win.document.getElementById("btn-demo-next").disabled
+    && /Use Next/.test(win.document.getElementById("demo-progress").textContent));
 
-  T.runDemoStep("organizer", 1);
+  win.document.getElementById("btn-demo-next").click();
   check("organizer demo simulates live participant charts", T.S.state.round.liveShapes.length === 2
     && shown(win, "live-inputs"));
+  check("demo hides live-view switches", !visible(win, "btn-live-overlay") && !visible(win, "btn-live-grid"));
+  win.document.getElementById("btn-demo-prev").click();
+  check("demo can manually return to a prior frame", T.S.demo.step === 0);
+  T.runDemoStep("organizer", 1);
   T.runDemoStep("organizer", 2);
   check("organizer demo simulates a concluded issue", shown(win, "history-card")
     && /Finish the round/.test(win.document.getElementById("demo-title").textContent));
@@ -1050,8 +1087,8 @@ const historyEntry = (n, title) => ({
   check("participant demo shows the private chart after organizer launch", shown(win, "plot-wrap")
     && /Make a private estimate/.test(win.document.getElementById("demo-title").textContent));
   T.runDemoStep("participant", 2);
-  check("participant demo automatically submits the estimate", win.document.getElementById("btn-submit").disabled
-    && /Submit your shape/.test(win.document.getElementById("demo-title").textContent));
+  check("participant demo displays a read-only submitted estimate", !shown(win, "submit-row")
+    && /Submission recorded/.test(win.document.getElementById("demo-title").textContent));
   T.runDemoStep("participant", 3);
   check("participant demo receives an anonymized result", shown(win, "summary-card")
     && /Anonymous response/.test(win.document.getElementById("minis").textContent));

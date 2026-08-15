@@ -294,7 +294,7 @@ function drawAverage(target) {
 
 function inputEnabled() {
   const r = S.state && S.state.round;
-  return !!(r && r.open && !S.organizer && !selfSubmitted(S.state));
+  return !!(r && r.open && !S.demo && !S.organizer && !selfSubmitted(S.state));
 }
 
 /* ── websocket ─────────────────────────────────────────────────────── */
@@ -383,14 +383,14 @@ function showView(name, record) {
   setHidden($("view-intake"), name !== "intake");
   setHidden($("view-settings"), name !== "settings");
   setHidden($("view-session"), name !== "session");
-  setHidden($("code-chip"), name === "landing" || !S.code);
+  setHidden($("code-chip"), name === "landing" || !S.code || !!S.demo);
   if (S.code) $("code-text").textContent = S.code;
   if (record) recordView(name);
 }
 
 function showSession(record) {
   showView("session", record);
-  $("organizer-shelf").hidden = !S.organizer;
+  $("organizer-shelf").hidden = !S.organizer || !!S.demo;
   buildPlot();
 }
 
@@ -560,7 +560,9 @@ function setDemoGuide(step, title, copy, target, peer) {
   $("demo-step").textContent = `${S.demo.role === "organizer" ? "Organizer" : "Participant"} demo · ${step + 1} of 4`;
   $("demo-title").textContent = title;
   $("demo-copy").textContent = copy;
-  $("demo-progress").textContent = step < 3 ? "Next moment appears automatically." : "Walkthrough complete.";
+  $("demo-progress").textContent = step < 3 ? "Use Next to continue." : "Walkthrough complete.";
+  $("btn-demo-prev").disabled = step === 0;
+  $("btn-demo-next").disabled = step === 3;
   setHidden($("demo-peer-preview"), !peer);
   $("demo-peer-preview").innerHTML = peer || "";
   setHidden($("demo-guide"), false);
@@ -568,6 +570,7 @@ function setDemoGuide(step, title, copy, target, peer) {
 
 function runDemoStep(role, step) {
   if (!S.demo || S.demo.role !== role) return;
+  step = Math.max(0, Math.min(3, step));
   S.demo.step = step;
   const history = [{ number: 1, title: "Invite teammates to a project workspace", summary: DEMO_SUMMARY,
     axes: DEMO_AXES, axisMins: [1, 1, 1], axisMaxes: [8, 8, 8] }];
@@ -578,7 +581,7 @@ function runDemoStep(role, step) {
       setDemoGuide(step, "Start with one issue", "Ada launches a lightweight session. Participants can join from the session code, while the organizer watches the room instead of voting.", ".round-card", demoPeerPreview(step));
     } else if (step === 1) {
       S.state = demoState(role, demoRound(true, false, null, liveShapes), false);
-      setDemoGuide(step, "Watch shapes arrive", "Mina and Rowan adjust their charts. The organizer sees the live overlay and can switch to individual cards without exposing a final score.", "#live-inputs", demoPeerPreview(step));
+      setDemoGuide(step, "Watch shapes arrive", "This frame shows Mina and Rowan adjusting their charts. The organizer sees the live overlay without exposing a final score.", "#live-inputs", demoPeerPreview(step));
     } else if (step === 2) {
       S.state = demoState(role, demoRound(false, true, DEMO_SUMMARY), true, history);
       setDemoGuide(step, "Finish the round", "When everyone has submitted, Ada ends the issue. The completed-issue view keeps the score, aspect averages, and discussion prompts together.", "#history-card", demoPeerPreview(step));
@@ -602,7 +605,7 @@ function runDemoStep(role, step) {
     S.my = [5, 4, 3];
     S.touched = true;
     S.state = demoState(role, demoRound(true, true), true);
-    setDemoGuide(step, "Submit your shape", "Mina's estimate is submitted automatically for the demo. Her chart locks, while the organizer waits for the room or finishes the round.", "#submit-row");
+    setDemoGuide(step, "Submission recorded", "This frame shows Mina's submitted estimate. Her chart is now read-only while the organizer waits for the room or finishes the round.", "#plot-wrap");
   } else {
     const anonymous = { ...DEMO_SUMMARY, shapes: DEMO_SUMMARY.shapes.map((shape, index) => ({ ...shape, id: "", name: `Anonymous response ${index + 1}` })) };
     S.state = demoState(role, demoRound(false, true, anonymous), true);
@@ -611,18 +614,14 @@ function runDemoStep(role, step) {
   render();
 }
 
-function queueDemo(role) {
-  const demo = S.demo;
-  [2200, 4600, 7000].forEach((delay, index) => {
-    demo.timers.push(setTimeout(() => {
-      if (S.demo === demo) runDemoStep(role, index + 1);
-    }, delay));
-  });
+function stepDemo(delta) {
+  if (!S.demo) return;
+  runDemoStep(S.demo.role, S.demo.step + delta);
 }
 
 function clearDemo() {
-  if (S.demo) S.demo.timers.forEach((timer) => clearTimeout(timer));
   S.demo = null;
+  document.body.classList.remove("is-demo");
   document.querySelectorAll(".demo-target").forEach((node) => {
     node.classList.remove("demo-target");
     node.removeAttribute("data-demo-tooltip");
@@ -645,7 +644,8 @@ function startDemo(role) {
   }
   clearDemo();
   setHidden($("demo-launcher"), true);
-  S.demo = { role, step: 0, timers: [] };
+  S.demo = { role, step: 0 };
+  document.body.classList.add("is-demo");
   S.code = "DEMO1";
   S.name = role === "organizer" ? "Ada" : "Mina";
   S.selfId = role === "organizer" ? "ada" : "mina";
@@ -662,7 +662,6 @@ function startDemo(role) {
   S.my = [2, 2, 2];
   showSession();
   runDemoStep(role, 0);
-  queueDemo(role);
 }
 
 function stopDemo() {
@@ -719,7 +718,7 @@ function render() {
   // neither their own chart nor a submit control.
   setHidden($("plot-wrap"), S.organizer || S.mode === "simple");
   setHidden($("simple-wrap"), S.organizer || S.mode !== "simple");
-  setHidden($("submit-row"), S.organizer);
+  setHidden($("submit-row"), S.organizer || !!S.demo);
 
   if (!r) {
     eyebrow.textContent = "Waiting";
@@ -775,7 +774,7 @@ function render() {
   $("plot-wrap").classList.toggle("plot-disabled", !r.open);
 
   const mineIn = selfSubmitted(st);
-  submitBtn.disabled = !r.open || mineIn;
+  submitBtn.disabled = !!S.demo || !r.open || mineIn;
   submitBtn.textContent = mineIn ? "Estimate submitted" : "Submit estimate";
   renderModeSwitch(r, mineIn);
   renderFeedback(r);
@@ -789,7 +788,7 @@ function render() {
     if (r.pausedMs) showPausedClock(r.pausedMs);
     else startCountdown(r.deadlineMs);
     $("summary-card").hidden = true;
-    if (!S.organizer && S.previewRound !== r.number) {
+    if (!S.demo && !S.organizer && S.previewRound !== r.number) {
       S.previewRound = r.number;
       schedulePreview();
     }
@@ -803,7 +802,10 @@ function render() {
   renderConsole(r);
   if (S.organizer) {
     $("live-inputs").hidden = !r.open;
-    if (r.open) renderLiveInputs(r.liveShapes || []);
+    if (r.open) {
+      renderLiveInputs(r.liveShapes || [], r.liveScores || []);
+      setHidden($("live-inputs").querySelector(".view-switch"), !!S.demo);
+    }
   }
   if (justConcluded) revealRoundSummary();
 }
@@ -918,7 +920,7 @@ function renderPeople(st) {
 /* The switch belongs to participants alone: the organizer contributes no
    estimate, so there is no mode for them to be in. */
 function renderModeSwitch(round, submitted) {
-  const offer = !S.organizer && !!round && round.open && !submitted;
+  const offer = !S.demo && !S.organizer && !!round && round.open && !submitted;
   setHidden($("mode-switch"), !offer);
   $("btn-mode-shape").classList.toggle("btn-primary", S.mode === "radar");
   $("btn-mode-simple").classList.toggle("btn-primary", S.mode === "simple");
@@ -956,7 +958,7 @@ function setSimple(value) {
 /* Feedback is on the process, so it is asked once the issue is behind us and
    retired the moment it is answered. */
 function renderFeedback(round) {
-  const ask = !S.organizer && !!round && !round.open && !round.selfFeedback;
+  const ask = !S.demo && !S.organizer && !!round && !round.open && !round.selfFeedback;
   setHidden($("feedback-card"), !ask);
   setHidden($("feedback-thanks"), !(round && round.selfFeedback));
   if (!ask) return;
@@ -968,6 +970,11 @@ function renderFeedback(round) {
 
 function renderConsole(round) {
   if (!S.organizer) return;
+  if (S.demo) {
+    setHidden($("organizer-shelf"), true);
+    setHidden($("end-rail"), true);
+    return;
+  }
   const open = !!(round && round.open);
   const queued = S.state.queuedItems || 0;
   const final = !!S.state.finalSummary;
@@ -1138,32 +1145,41 @@ function renderProspectivePlot() {
   drawStaticRadar($("setup-full-plot"), aspects, mins, maxes, [{ name: "Starting values", values, color: "#1E2B2F" }]);
 }
 
-function renderLiveInputs(shapes) {
+function renderLiveInputs(shapes, scores = []) {
   const section = $("live-inputs");
   section.hidden = false;
   const active = shapes.map((shape) => ({
     ...shape,
     color: participantColor(shape.id),
   }));
+  const activeScores = scores.map((score) => ({
+    ...score,
+    color: participantColor(score.id),
+  }));
+  const empty = active.length === 0 && activeScores.length === 0;
+  const estimators = ((S.state && S.state.participants) || []).filter((person) => !person.organizer);
+  // A room with estimators but no previews still benefits from the normal
+  // chart surface. Only a genuinely empty room or privacy-hidden data uses the
+  // centered explanation in place of both visualizations.
+  const emptyStage = empty && (S.privacy || estimators.length === 0);
   $("btn-live-overlay").classList.toggle("btn-primary", S.liveView === "overlay");
   $("btn-live-grid").classList.toggle("btn-primary", S.liveView === "grid");
   // The active view is conveyed by colour alone otherwise.
   $("btn-live-overlay").setAttribute("aria-pressed", String(S.liveView === "overlay"));
   $("btn-live-grid").setAttribute("aria-pressed", String(S.liveView === "grid"));
-  setHidden($("live-toggles"), S.liveView !== "overlay");
-  setHidden($("live-overlay"), S.liveView !== "overlay");
-  setHidden($("live-grid"), S.liveView !== "grid");
-  const estimators = ((S.state && S.state.participants) || []).filter((person) => !person.organizer);
-  const empty = active.length === 0;
-  setHidden($("live-empty"), !empty);
-  $("live-stage").classList.toggle("has-empty", empty);
-  if (empty) {
+  setHidden($("live-toggles"), emptyStage || S.liveView !== "overlay");
+  // An empty SVG is still a flex item. Hide both views for the empty state so
+  // the explanatory message owns the entire stage in Sum and Individual.
+  setHidden($("live-overlay"), emptyStage || S.liveView !== "overlay");
+  setHidden($("live-grid"), emptyStage || S.liveView !== "grid");
+  setHidden($("live-scores"), emptyStage || S.liveView !== "overlay" || activeScores.length === 0);
+  setHidden($("live-empty"), !emptyStage);
+  $("live-stage").classList.toggle("has-empty", emptyStage);
+  if (emptyStage) {
     // Privacy already withholds previews; do not turn that into a roster leak.
     $("live-empty").textContent = S.privacy
       ? "Live charts are hidden while privacy mode is on."
-      : estimators.length === 0
-        ? "No participants are here to estimate yet."
-        : "Waiting for participants to adjust a chart.";
+      : "No participants are here to estimate yet.";
   }
   $("live-toggles").innerHTML = "";
   active.forEach((shape) => {
@@ -1175,7 +1191,7 @@ function renderLiveInputs(shapes) {
     checkbox.onchange = () => {
       if (checkbox.checked) S.hiddenLive.delete(shape.id);
       else S.hiddenLive.add(shape.id);
-      renderLiveInputs(shapes);
+      renderLiveInputs(shapes, scores);
     };
     const swatch = document.createElement("i");
     swatch.style.background = shape.color;
@@ -1188,6 +1204,7 @@ function renderLiveInputs(shapes) {
   } else {
     $("live-overlay").innerHTML = "";
   }
+  renderLiveScores(activeScores);
   $("live-grid").innerHTML = "";
   active.forEach((shape) => {
     const card = document.createElement("div");
@@ -1201,6 +1218,56 @@ function renderLiveInputs(shapes) {
     card.append(svg, name);
     $("live-grid").appendChild(card);
   });
+  activeScores.forEach((score) => $("live-grid").appendChild(liveScoreCard(score)));
+}
+
+function scorePercent(score) {
+  const min = axisMin(0), max = axisMax(0);
+  return Math.max(0, Math.min(100, ((score - min) / (max - min)) * 100));
+}
+
+function scoreLine(score, label) {
+  const row = document.createElement("div");
+  row.className = "live-score-row";
+  const name = document.createElement("span");
+  name.className = "live-score-name";
+  name.textContent = label || score.name;
+  name.style.color = score.color;
+  const track = document.createElement("span");
+  track.className = "live-score-track";
+  const fill = document.createElement("i");
+  fill.style.width = `${scorePercent(score.score)}%`;
+  fill.style.background = score.color;
+  track.appendChild(fill);
+  const value = document.createElement("strong");
+  value.className = "mono";
+  value.textContent = formatValue(score.score);
+  row.append(name, track, value);
+  return row;
+}
+
+function renderLiveScores(scores) {
+  const host = $("live-scores");
+  host.innerHTML = "";
+  if (scores.length === 0) return;
+  const heading = document.createElement("div");
+  heading.className = "live-scores-head";
+  const label = document.createElement("span");
+  label.textContent = "Single-score inputs";
+  const average = scores.reduce((total, score) => total + score.score, 0) / scores.length;
+  const total = document.createElement("strong");
+  total.className = "mono";
+  total.textContent = `average ${formatValue(average)}`;
+  heading.append(label, total);
+  host.appendChild(heading);
+  scores.forEach((score) => host.appendChild(scoreLine(score)));
+}
+
+function liveScoreCard(score) {
+  const card = document.createElement("div");
+  card.className = "live-mini live-score-card";
+  card.appendChild(scoreLine(score));
+  return card;
 }
 
 function participantColor(id) {
@@ -1228,8 +1295,8 @@ function knownColor(id) {
 
 function renderColorPicker(st) {
   // The organizer never submits a shape, so they have no colour to pick.
-  setHidden($("color-picker"), S.organizer);
-  if (S.organizer) return;
+  setHidden($("color-picker"), S.organizer || !!S.demo);
+  if (S.organizer || S.demo) return;
   const mine = selfColor();
   if (mine) S.color = mine;
   $("btn-color").style.background = mine || "var(--ink)";
@@ -1498,7 +1565,8 @@ $("btn-demo").onclick = () => setHidden($("demo-launcher"), false);
 $("btn-demo-close").onclick = () => setHidden($("demo-launcher"), true);
 $("btn-demo-organizer").onclick = () => startDemo("organizer");
 $("btn-demo-participant").onclick = () => startDemo("participant");
-$("btn-demo-replay").onclick = () => { if (S.demo) startDemo(S.demo.role); };
+$("btn-demo-prev").onclick = () => stepDemo(-1);
+$("btn-demo-next").onclick = () => stepDemo(1);
 $("btn-demo-exit").onclick = stopDemo;
 $("in-name").oninput = updateEntryActions;
 $("in-code").oninput = updateEntryActions;
@@ -1759,8 +1827,16 @@ function launchDrafts() {
 }
 $("btn-launch").onclick = launchDrafts;
 $("setup-max").oninput = renderSetupRange;
-$("btn-live-overlay").onclick = () => { S.liveView = "overlay"; renderLiveInputs((S.state.round && S.state.round.liveShapes) || []); };
-$("btn-live-grid").onclick = () => { S.liveView = "grid"; renderLiveInputs((S.state.round && S.state.round.liveShapes) || []); };
+$("btn-live-overlay").onclick = () => {
+  S.liveView = "overlay";
+  const round = S.state && S.state.round;
+  renderLiveInputs((round && round.liveShapes) || [], (round && round.liveScores) || []);
+};
+$("btn-live-grid").onclick = () => {
+  S.liveView = "grid";
+  const round = S.state && S.state.round;
+  renderLiveInputs((round && round.liveShapes) || [], (round && round.liveScores) || []);
+};
 
 /* Every <details> in the app signals itself with this caret rather than the
    native triangle, which style.css suppresses globally. Built here so the
@@ -2042,6 +2118,6 @@ if (["localhost", "127.0.0.1", "[::1]", ""].includes(location.hostname)) {
   window.__test = {
     S, render, showSession, showIntake, showSettings, closeSettings, renderHistory, stepHistory,
     setHidden, addDraftItem, renderSettingsItems, safeLink, parseDuration, setSimple, roundAxes,
-    startDemo, stopDemo, runDemoStep,
+    startDemo, stopDemo, runDemoStep, stepDemo,
   };
 }

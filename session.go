@@ -1223,7 +1223,11 @@ type RoundView struct {
 	SubmittedCount int          `json:"submittedCount"`
 	Average        []float64    `json:"average,omitempty"`
 	LiveShapes     []NamedShape `json:"liveShapes,omitempty"`
-	Summary        *Summary     `json:"summary,omitempty"`
+	// LiveScores are one-number previews from simple pointing mode. They are
+	// separate from shapes because inventing per-aspect values would misstate
+	// what the participant actually answered.
+	LiveScores []NamedScore `json:"liveScores,omitempty"`
+	Summary    *Summary     `json:"summary,omitempty"`
 	// The aspects this issue is being estimated against. Usually the session
 	// set, but the organizer can add one for a single issue.
 	Axes      []string  `json:"axes,omitempty"`
@@ -1324,6 +1328,7 @@ func (s *Session) broadcastStateLocked() {
 				// exactly the live-value overlay privacy mode exists to stop.
 				if !s.privacy {
 					round.LiveShapes = shapesOf(s.round.Previews)
+					round.LiveScores = scoresOf(s.round.Previews)
 				}
 				view.Round = &round
 			}
