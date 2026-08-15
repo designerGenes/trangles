@@ -97,7 +97,7 @@ Generated from `static/style.css`. If this table and the stylesheet disagree, th
 | --- | --- | --- |
 | `--ink` | `#F4F1E8` | Primary text (on dark). |
 | `--muted` | `#AEB7C8` | Secondary text (on dark). |
-| `--on-primary` | `#FFFFFF` | Text on primary action. |
+| `--on-primary` | `#FFFFFF` | White text on blue, violet, and coral call-to-action buttons. |
 | `--on-pencil` | `#22161B` | Text on coral controls. |
 | `--on-pending` | `#241A22` | Text on pending control. |
 
@@ -172,16 +172,20 @@ Generated from `static/style.css`. If this table and the stylesheet disagree, th
 
 | Token | Value | Role |
 | --- | --- | --- |
-| `--primary-action` | `#FF6464` | Primary action. Matches the logo triangle and all launch, next, results, and close-session actions. |
-| `--primary-edge` | `#FF8585` | Primary action edge / hover. |
-| `--primary-edge-hot` | `#FFB0B0` | Primary action hover edge. |
-| `--primary-glow` | `rgba(255, 100, 100, 0.30)` | Primary action glow. |
-| `--pencil` | `#FF6464` | Consensus coral. |
-| `--pencil-hot` | `#FF8585` | Consensus coral hover. |
-| `--pencil-fill` | `rgba(255, 100, 100, 0.13)` | Average shape fill. |
-| `--pencil-cast` | `rgba(255, 100, 100, 0.26)` | Coral action shadow. |
-| `--pencil-glow` | `rgba(255, 100, 100, 0.36)` | Timer glow. |
-| `--pencil-glow-max` | `rgba(255, 100, 100, 0.55)` | Wordmark glow. |
+| `--primary-action` | `#1769AA` | Blue preparation CTA: launch, view results, and pre-session setup actions. |
+| `--primary-edge` | `#2E85C8` | Blue preparation CTA edge / hover. |
+| `--primary-edge-hot` | `#4DA3DF` | Blue preparation CTA hover edge. |
+| `--primary-glow` | `rgba(23, 105, 170, 0.30)` | Blue preparation CTA glow. |
+| `--panel-accent` | `#6250B4` | Violet accent action within a bright preparation panel, used by Session settings. |
+| `--panel-accent-edge` | `#7E6DD4` | Violet panel-accent edge. |
+| `--panel-accent-hot` | `#8E7FE5` | Violet panel-accent hover. |
+| `--panel-accent-glow` | `rgba(98, 80, 180, 0.28)` | Violet panel-accent glow. |
+| `--pencil` | `#C7464D` | Coral active-session commitment color and logo triangle. |
+| `--pencil-hot` | `#D7545B` | Coral commitment hover. |
+| `--pencil-fill` | `rgba(199, 70, 77, 0.13)` | Average shape fill. |
+| `--pencil-cast` | `rgba(199, 70, 77, 0.26)` | Coral action shadow. |
+| `--pencil-glow` | `rgba(199, 70, 77, 0.36)` | Timer glow. |
+| `--pencil-glow-max` | `rgba(199, 70, 77, 0.55)` | Wordmark glow. |
 | `--pending` | `#C97586` | Pending end-round action. |
 | `--score-low` | `#F4F1E8` | Single-score estimate at the minimum value. |
 | `--score-mid` | `#FFD166` | Single-score estimate at the midpoint. |

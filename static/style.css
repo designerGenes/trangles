@@ -26,7 +26,7 @@
   /* @group Text */
   --ink: #F4F1E8;                              /* @label Primary text (on dark) */
   --muted: #AEB7C8;                            /* @label Secondary text (on dark) */
-  --on-primary: #22161B;                        /* @label Text on primary action */
+  --on-primary: #FFFFFF;                        /* @label Text on primary action */
   --on-pencil: #22161B;                        /* @label Text on coral controls */
   --on-pending: #241A22;                       /* @label Text on pending control */
 
@@ -87,16 +87,20 @@
   --ring: #3B345D;                             /* @label Radar grid ring */
 
   /* @group Actions and status */
-  --primary-action: #FF6464;                    /* @label Primary action */
-  --primary-edge: #FF8585;                      /* @label Primary action edge / hover */
-  --primary-edge-hot: #FFB0B0;                  /* @label Primary action hover edge */
-  --primary-glow: rgba(255, 100, 100, 0.30);    /* @label Primary action glow */
-  --pencil: #FF6464;                           /* @label Consensus coral */
-  --pencil-hot: #FF8585;                       /* @label Consensus coral hover */
-  --pencil-fill: rgba(255, 100, 100, 0.13);    /* @label Average shape fill */
-  --pencil-cast: rgba(255, 100, 100, 0.26);    /* @label Coral action shadow */
-  --pencil-glow: rgba(255, 100, 100, 0.36);    /* @label Timer glow */
-  --pencil-glow-max: rgba(255, 100, 100, 0.55); /* @label Wordmark glow */
+  --primary-action: #1769AA;                    /* @label Preparation CTA */
+  --primary-edge: #2E85C8;                      /* @label Preparation CTA edge / hover */
+  --primary-edge-hot: #4DA3DF;                  /* @label Preparation CTA hover edge */
+  --primary-glow: rgba(23, 105, 170, 0.30);     /* @label Preparation CTA glow */
+  --panel-accent: #6250B4;                      /* @label Preparation panel accent */
+  --panel-accent-edge: #7E6DD4;                 /* @label Preparation panel accent edge */
+  --panel-accent-hot: #8E7FE5;                  /* @label Preparation panel accent hover */
+  --panel-accent-glow: rgba(98, 80, 180, 0.28); /* @label Preparation panel accent glow */
+  --pencil: #C7464D;                           /* @label Consensus coral */
+  --pencil-hot: #D7545B;                       /* @label Consensus coral hover */
+  --pencil-fill: rgba(199, 70, 77, 0.13);      /* @label Average shape fill */
+  --pencil-cast: rgba(199, 70, 77, 0.26);      /* @label Coral action shadow */
+  --pencil-glow: rgba(199, 70, 77, 0.36);      /* @label Timer glow */
+  --pencil-glow-max: rgba(199, 70, 77, 0.55);  /* @label Wordmark glow */
   --pending: #C97586;                           /* @label Pending end-round action */
 
   /* @group Single-score estimate */
@@ -443,6 +447,10 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .btn:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--violet); }
 .btn-primary { background: var(--primary-action); border-color: var(--primary-edge); color: var(--on-primary); box-shadow: 0 8px 18px var(--primary-glow); }
 .btn-primary:hover:not(:disabled) { background: var(--primary-edge); border-color: var(--primary-edge-hot); }
+.btn-panel-accent { background: var(--panel-accent); border-color: var(--panel-accent-edge); color: var(--on-primary); box-shadow: 0 8px 18px var(--panel-accent-glow); }
+.btn-panel-accent:hover:not(:disabled) { background: var(--panel-accent-hot); border-color: var(--panel-accent-hot); }
+.btn-session-commit { background: var(--pencil); border-color: var(--pencil-hot); color: var(--on-primary); box-shadow: 0 8px 18px var(--pencil-cast); }
+.btn-session-commit:hover:not(:disabled) { background: var(--pencil-hot); border-color: var(--pencil-hot); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-quiet {
   border-color: transparent;
@@ -453,8 +461,7 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
   font-size: 0.85rem;
 }
 .btn-quiet:hover { color: var(--pencil); background: none; }
-.intake-settings.btn-quiet { background: var(--panel-slot); border: 1px solid var(--panel-slot-edge); border-radius: 10px; color: var(--ink); margin-top: 18px; min-height: 46px; padding: 10px 12px; }
-.intake-settings.btn-quiet:hover { background: var(--panel-slot); border-color: var(--ink); color: var(--ink); }
+.intake-settings.btn-panel-accent { margin-top: 18px; min-height: 46px; padding: 10px 12px; text-align: center; }
 
 /* Round card --------------------------------------------------------- */
 .eyebrow {

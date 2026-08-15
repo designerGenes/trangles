@@ -631,14 +631,20 @@ const historyEntry = (n, title) => ({
   check("active chart surfaces stay reserved while results are violet",
     /\.round-card \.chart-box, \.live-inputs\.chart-box \{[^}]*background: var\(--card\)/.test(css)
     && /\.chart-box, \.summary-card, \.history-card, \.final-summary-card \{[^}]*var\(--violet-lit\), var\(--violet-deep\)/.test(css));
-  check("launch and other primary actions use logo-triangle coral",
+  check("preparation launch actions use the blue CTA family",
     /\.btn-primary \{[^}]*background: var\(--primary-action\)/.test(css)
-    && /--primary-action:\s+#FF6464/.test(css));
+    && /--primary-action:\s+#1769AA/.test(css));
+  check("session settings uses a distinct violet panel accent",
+    /\.btn-panel-accent \{[^}]*background: var\(--panel-accent\)/.test(css)
+    && win.document.getElementById("btn-open-settings").classList.contains("btn-panel-accent"));
+  check("active participant submission keeps the coral commitment treatment",
+    /\.btn-session-commit \{[^}]*background: var\(--pencil\)/.test(css)
+    && win.document.getElementById("btn-submit").classList.contains("btn-session-commit"));
   check("radar axis labels use the light chart foreground",
     /\.axis-label \{[^}]*fill: var\(--ink\)/.test(css)
     && /\.tick-label \{[^}]*fill: var\(--ink\)/.test(css));
   check("session settings is a taller light-text panel control",
-    /\.intake-settings\.btn-quiet \{[^}]*color: var\(--ink\)[^}]*min-height: 46px/.test(css));
+    /\.intake-settings\.btn-panel-accent \{[^}]*min-height: 46px[^}]*text-align: center/.test(css));
 }
 
 /* ── 16c. Control panels are raised plastic, and stay readable ──────── */
