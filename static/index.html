@@ -165,7 +165,7 @@
 <main id="view-session" hidden>
 
  <div id="round-stage" class="round-stage">
-  <section class="card round-card">
+   <section class="card round-card demo-focusable">
     <div class="round-head">
       <span id="round-eyebrow" class="eyebrow" data-i18n="roundWaitingEyebrow"></span>
       <div class="round-head-actions">
@@ -185,7 +185,7 @@
       <button id="btn-mode-simple" class="btn" type="button" aria-pressed="false" data-i18n="roundModeSimple"></button>
     </div>
 
-    <div id="plot-wrap" class="plot-wrap chart-box">
+    <div id="plot-wrap" class="plot-wrap chart-box demo-focusable">
       <p id="plot-loading" class="chart-loading">Loading chart...</p>
       <svg id="plot" viewBox="-70 -45 500 434" role="img"
            aria-label="Estimation chart"></svg>
@@ -208,7 +208,7 @@
     </div>
   </section>
 
-  <section id="live-inputs" class="card live-inputs chart-box" hidden>
+  <section id="live-inputs" class="card live-inputs chart-box demo-focusable" hidden>
     <div class="live-head">
       <div><span class="eyebrow" data-i18n="liveInputEyebrow"></span><p class="hint" data-i18n="liveInputHint"></p></div>
       <div class="view-switch" role="group" aria-label="Live chart view">
@@ -247,7 +247,7 @@
     <div id="people" class="people"></div>
   </section>
 
-  <section id="history-card" class="card history-card chart-box" hidden>
+  <section id="history-card" class="card history-card chart-box demo-focusable" hidden>
     <div class="history-head">
       <span class="eyebrow" data-i18n="historyCompletedIssues"></span>
       <div class="history-nav">
@@ -259,7 +259,7 @@
       </div>
     </div>
     <h3 id="history-title" class="history-title"></h3>
-    <div class="history-body">
+    <div id="history-body" class="history-body">
       <p id="history-chart-loading" class="chart-loading" hidden>Loading chart...</p>
       <svg id="history-chart" viewBox="-70 -45 500 434" role="img"
            aria-label="Chart for the selected completed issue"></svg>
@@ -336,7 +336,7 @@
 
  <!-- Capstone. Deliberately not a .card: the session is over, and this screen
       should not read as one more step in the same stack. -->
- <section id="final-summary-card" class="final-summary-card" hidden>
+ <section id="final-summary-card" class="final-summary-card demo-focusable" hidden>
    <header class="capstone-head">
      <span class="capstone-kicker" data-i18n="capstoneKicker"></span>
      <h2 class="capstone-title" data-i18n="capstoneTitle"></h2>
@@ -364,10 +364,14 @@
 <aside id="demo-guide" class="demo-guide" aria-live="polite" hidden>
   <div class="demo-guide-head">
     <span id="demo-step" class="eyebrow"></span>
-    <button id="btn-demo-exit" class="btn btn-quiet" type="button" data-i18n="demoExit"></button>
+      <button id="btn-demo-exit" class="btn btn-session-commit" type="button" data-i18n="demoExit"></button>
   </div>
   <h2 id="demo-title" class="demo-title"></h2>
   <p id="demo-copy" class="demo-copy"></p>
+  <div class="demo-role-switch" role="group" aria-label="Demo view">
+    <button id="btn-demo-organizer-view" class="btn" type="button" aria-pressed="true">Organizer view</button>
+    <button id="btn-demo-participant-view" class="btn" type="button" aria-pressed="false">Participant view</button>
+  </div>
   <section id="demo-peer-preview" class="demo-peer-preview" hidden></section>
   <div class="demo-guide-actions">
     <div class="demo-step-actions">

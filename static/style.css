@@ -365,6 +365,7 @@ main { max-width: var(--column); margin: 0 auto; padding: 8px 16px 48px; }
 .chart-loading { animation: chart-pulse 1.1s ease-in-out infinite; color: var(--muted); font-size: 0.85rem; letter-spacing: 0.08em; margin: 24px auto; text-align: center; text-transform: uppercase; }
 .chart-box > .chart-loading { color: var(--ink-mid); }
 @keyframes chart-pulse { 0%, 100% { opacity: 0.38; } 50% { opacity: 1; } }
+.demo-focusable { margin-bottom: 24px; margin-top: 12px; }
 
 /* Session settings ---------------------------------------------------- */
 #view-settings { max-width: 720px; }
@@ -546,6 +547,7 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .round-description { color: var(--muted); margin: -2px 0 10px; white-space: pre-wrap; }
 
 .plot-wrap { display: flex; flex-direction: column; align-items: center; }
+.plot-wrap.is-loading { justify-content: center; min-height: 320px; }
 /* A live round is neutral on purpose: several participant colours share the
    surface, and a tinted floor would bias how they read against each other. */
 .round-card .chart-box, .live-inputs.chart-box { background: var(--card); background-image: none; border-color: var(--border); box-shadow: none; }
@@ -709,6 +711,7 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
    drawn height (viewBox 500x434, capped at 660 wide) so Individual lands in
    the same box; a grid too tall for it still grows past it. */
 .live-stage { min-height: min(573px, 87vw); }
+.live-stage.is-loading { align-items: center; display: flex; justify-content: center; }
 .live-stage.has-empty { align-items: center; display: flex; justify-content: center; min-height: 5rem; }
 .live-empty { max-width: 26rem; padding: 12px 0; text-align: center; }
 .live-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(170px, 200px)); justify-content: center; margin-top: 12px; }
@@ -764,6 +767,7 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .history-arrow { font-size: 1rem; line-height: 1; padding: 4px 12px; }
 .history-title { font-family: "Bricolage Grotesque", sans-serif; font-size: 1.15rem; font-weight: 700; margin: 6px 0 12px; overflow-wrap: anywhere; }
 .history-body { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.history-body.is-loading { align-items: center; display: flex; justify-content: center; min-height: 320px; }
 #history-chart { display: block; overflow: visible; width: 100%; }
 .history-facts { display: flex; flex-direction: column; gap: 12px; }
 .history-facts .points-block { text-align: left; }
@@ -879,8 +883,6 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .demo-peer-preview { background: var(--ink-veil); border: 1px solid var(--ink-edge); border-radius: 10px; margin-top: 14px; padding: 10px; }
 .demo-peer-preview h3 { font-size: 0.9rem; margin: 3px 0 5px; }
 .demo-peer-preview p { color: var(--ink-mid); font-size: 0.8rem; margin: 0; }
-.demo-peer-bars { display: flex; gap: 5px; margin-top: 9px; }
-.demo-peer-bars i { background: var(--honey); border-radius: 999px; display: block; height: 5px; }
 .demo-guide-actions { align-items: center; display: flex; gap: 10px; justify-content: space-between; margin-top: 14px; }
 .demo-step-actions { display: flex; gap: 6px; }
 .demo-guide-actions .btn { border-color: var(--ink-control); background: transparent; color: var(--ink); font-size: 0.8rem; padding: 6px 10px; }
@@ -897,27 +899,12 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .is-demo .history-nav { display: none !important; }
 .is-demo #plot { cursor: default; }
 .is-demo .handle { cursor: default; pointer-events: none; }
-.demo-target { box-shadow: 0 0 0 3px var(--honey), 0 0 0 7px var(--demo-halo); position: relative; z-index: 5; }
+.demo-target { outline: 3px solid var(--honey); outline-offset: 8px; position: relative; z-index: 5; }
 /* A short, target-anchored tooltip names the current control. The adjacent
    guide carries the longer explanation and, for organizers, the peer view. */
-.demo-target::after {
-  background: var(--card-raised);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  color: var(--ink);
-  content: attr(data-demo-tooltip);
-  font-size: 0.76rem;
-  font-weight: 600;
-  left: 12px;
-  max-width: min(19rem, calc(100vw - 48px));
-  padding: 5px 8px;
-  pointer-events: none;
-  position: absolute;
-  top: -12px;
-  transform: translateY(-100%);
-  white-space: nowrap;
-  z-index: 6;
-}
+.demo-role-switch { display: flex; gap: 6px; margin-top: 14px; }
+.demo-role-switch .btn { flex: 1; font-size: 0.8rem; padding: 6px 10px; }
+.demo-role-switch .btn[aria-pressed="true"] { background: var(--violet); border-color: var(--violet); color: var(--ink); }
 
 /* Below this the side gutter is too narrow to hold the button clear of the
    content column, so it becomes a floating bar above the fold instead. */
@@ -944,7 +931,6 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
   /* The masthead already occupies the top-right on a narrow screen. */
   .timer-float { right: 50%; top: auto; bottom: 16px; transform: translateX(50%); }
   .demo-guide { bottom: 12px; right: 12px; top: auto; width: calc(100% - 24px); }
-  .demo-target::after { max-width: calc(100vw - 48px); overflow: hidden; text-overflow: ellipsis; }
 }
 
 @media (prefers-reduced-motion: no-preference) {

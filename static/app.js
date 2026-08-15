@@ -147,6 +147,7 @@ function el(tag, attrs, parent) {
 }
 
 function buildPlot() {
+  $("plot-wrap").classList.add("is-loading");
   setHidden($("plot-loading"), false);
   plot.svg.innerHTML = "";
   // Nested radar rings make the current value easy to read at a glance.
@@ -208,6 +209,7 @@ function buildPlot() {
   drawMine();
   attachPlotDrag();
   setHidden($("plot-loading"), true);
+  $("plot-wrap").classList.remove("is-loading");
 }
 
 function attachPlotDrag() {
@@ -525,6 +527,8 @@ function toLanding(message) {
    snapshots through the same renderer a real session uses, so the guide stays
    useful whenever the production interface evolves. */
 const DEMO_AXES = ["Uncertainty", "Complexity", "Toil"];
+const DEMO_ISSUE_TITLE = "Throw the clock out the window";
+const DEMO_ISSUE_DESCRIPTION = "Determine once and for all if time can fly";
 const DEMO_SUMMARY = {
   storyPoints: 5,
   pointsWhy: "Weighted blend of the axes scores 4.4, +0.2 because the team disagrees -> 5 points.",
@@ -550,8 +554,8 @@ function demoParticipants(role, submitted) {
 function demoRound(open, submitted, summary, liveShapes) {
   return {
     number: 1,
-    title: "Invite teammates to a project workspace",
-    description: "Let workspace owners invite colleagues, choose a role, and resend a pending invite.",
+    title: DEMO_ISSUE_TITLE,
+    description: DEMO_ISSUE_DESCRIPTION,
     open,
     submittedCount: submitted ? 2 : 0,
     axes: DEMO_AXES,
@@ -559,6 +563,7 @@ function demoRound(open, submitted, summary, liveShapes) {
     axisMaxes: [8, 8, 8],
     summary: summary || undefined,
     liveShapes: liveShapes || [],
+    demoLoading: false,
   };
 }
 
@@ -585,26 +590,25 @@ function demoPeerPreview(step) {
     ["Participant view", "Mina submits. Her estimate is locked while the organizer finishes the round.", [62, 50, 38]],
     ["Participant view", "Mina receives the score and group insights, with peer responses anonymized.", [62, 50, 38]],
   ][Math.min(step, 3)];
-  return `<span class="eyebrow">${copy[0]}</span><h3>Invite teammates to a project workspace</h3><p>${copy[1]}</p>
-    <div class="demo-peer-bars" aria-hidden="true">${copy[2].map((width) => `<i style="width:${width}%"></i>`).join("")}</div>`;
+  return `<span class="eyebrow">${copy[0]}</span><h3>${DEMO_ISSUE_TITLE}</h3><p>${copy[1]}</p>`;
 }
 
 function setDemoGuide(step, title, copy, target, peer) {
   document.querySelectorAll(".demo-target").forEach((node) => {
     node.classList.remove("demo-target");
-    node.removeAttribute("data-demo-tooltip");
     node.removeAttribute("aria-describedby");
   });
   const focus = target && document.querySelector(target);
   if (focus) {
     focus.classList.add("demo-target");
-    focus.dataset.demoTooltip = title;
     focus.setAttribute("aria-describedby", "demo-guide");
   }
   $("demo-step").textContent = `${S.demo.role === "organizer" ? "Organizer" : "Participant"} demo · ${step + 1} of 4`;
   $("demo-title").textContent = title;
   $("demo-copy").textContent = copy;
-  $("demo-progress").textContent = step < 3 ? "Use Next to continue." : "Walkthrough complete.";
+  $("demo-progress").textContent = step === 3 ? "Walkthrough complete." : "";
+  $("btn-demo-organizer-view").setAttribute("aria-pressed", String(S.demo.role === "organizer"));
+  $("btn-demo-participant-view").setAttribute("aria-pressed", String(S.demo.role === "participant"));
   $("btn-demo-prev").disabled = step === 0;
   $("btn-demo-next").disabled = step === 3;
   setHidden($("demo-peer-preview"), !peer);
@@ -616,12 +620,17 @@ function runDemoStep(role, step) {
   if (!S.demo || S.demo.role !== role) return;
   step = Math.max(0, Math.min(3, step));
   S.demo.step = step;
-  const history = [{ number: 1, title: "Invite teammates to a project workspace", summary: DEMO_SUMMARY,
+  const history = [{ number: 1, title: DEMO_ISSUE_TITLE, summary: DEMO_SUMMARY,
     axes: DEMO_AXES, axisMins: [1, 1, 1], axisMaxes: [8, 8, 8] }];
-  const liveShapes = DEMO_SUMMARY.shapes.map((shape) => ({ ...shape }));
+  const liveShapes = [
+    { id: "mina", name: "Mina", values: [2, 6, 3] },
+    { id: "rowan", name: "Rowan", values: [7, 3, 6] },
+  ];
   if (role === "organizer") {
     if (step === 0) {
-      S.state = demoState(role, demoRound(true, false), false);
+      const waitingRound = demoRound(true, false);
+      waitingRound.demoLoading = true;
+      S.state = demoState(role, waitingRound, false);
       setDemoGuide(step, "Start with one issue", "Ada launches a lightweight session. Participants can join from the session code, while the organizer watches the room instead of voting.", ".round-card", demoPeerPreview(step));
     } else if (step === 1) {
       S.state = demoState(role, demoRound(true, false, null, liveShapes), false);
@@ -638,7 +647,9 @@ function runDemoStep(role, step) {
       setDemoGuide(step, "Wrap up or keep pointing", "Ada can share the session result, then continue by adding another issue instead of creating a new room.", "#final-summary-card", demoPeerPreview(step));
     }
   } else if (step === 0) {
-    S.state = demoState(role, null, false);
+    const waitingRound = demoRound(true, false);
+    waitingRound.demoLoading = true;
+    S.state = demoState(role, waitingRound, false);
     setDemoGuide(step, "Join and wait", "Mina joins with a nickname and session code. The organizer starts the issue when the team is ready.", ".round-card");
   } else if (step === 1) {
     S.my = [2, 2, 2];
@@ -663,12 +674,20 @@ function stepDemo(delta) {
   runDemoStep(S.demo.role, S.demo.step + delta);
 }
 
+function switchDemoRole(role) {
+  if (!S.demo || S.demo.role === role) return;
+  S.demo.role = role;
+  S.organizer = role === "organizer";
+  S.selfId = role === "organizer" ? "ada" : "mina";
+  S.name = role === "organizer" ? "Ada" : "Mina";
+  runDemoStep(role, S.demo.step);
+}
+
 function clearDemo() {
   S.demo = null;
   document.body.classList.remove("is-demo");
   document.querySelectorAll(".demo-target").forEach((node) => {
     node.classList.remove("demo-target");
-    node.removeAttribute("data-demo-tooltip");
     node.removeAttribute("aria-describedby");
   });
   setHidden($("demo-guide"), true);
@@ -768,6 +787,12 @@ function render() {
   setHidden($("submit-row"), S.organizer || !!S.demo);
   setHidden($("progress"), !S.organizer);
 
+  const participantChartLoading = !!(r && r.demoLoading) && !S.organizer;
+  setHidden($("plot-loading"), !participantChartLoading);
+  setHidden($("plot"), participantChartLoading);
+  setHidden($("readouts"), participantChartLoading);
+  $("plot-wrap").classList.toggle("is-loading", participantChartLoading);
+
   if (!r) {
     eyebrow.textContent = "Waiting";
     title.textContent = S.organizer
@@ -849,7 +874,7 @@ function render() {
   if (S.organizer) {
     $("live-inputs").hidden = !r.open;
     if (r.open) {
-      renderLiveInputs(r.liveShapes || [], r.liveScores || []);
+      renderLiveInputs(r.liveShapes || [], r.liveScores || [], !!r.demoLoading);
       setHidden($("live-inputs").querySelector(".view-switch"), !!S.demo);
     }
   }
@@ -1237,9 +1262,20 @@ function renderProspectivePlot() {
   setHidden($("setup-chart-loading"), true);
 }
 
-function renderLiveInputs(shapes, scores = []) {
+function renderLiveInputs(shapes, scores = [], loading = false) {
   const section = $("live-inputs");
   section.hidden = false;
+  setHidden($("live-chart-loading"), !loading);
+  $("live-stage").classList.toggle("is-loading", loading);
+  if (loading) {
+    setHidden($("live-toggles"), true);
+    setHidden($("live-overlay"), true);
+    setHidden($("live-grid"), true);
+    setHidden($("live-scores"), true);
+    setHidden($("live-empty"), true);
+    $("live-stage").classList.remove("has-empty");
+    return;
+  }
   setHidden($("live-chart-loading"), false);
   const active = shapes.map((shape) => ({
     ...shape,
@@ -1313,6 +1349,7 @@ function renderLiveInputs(shapes, scores = []) {
   });
   activeScores.forEach((score) => $("live-grid").appendChild(liveScoreCard(score)));
   setHidden($("live-chart-loading"), true);
+  $("live-stage").classList.remove("is-loading");
 }
 
 function scorePercent(score) {
@@ -1500,6 +1537,7 @@ function renderHistory() {
   if (!has) return;
 
   const entry = S.history[S.historyIndex];
+  $("history-body").classList.add("is-loading");
   setHidden($("history-chart-loading"), false);
   const summary = entry.summary || {};
   // An issue keeps the aspects it was estimated against, which may not be the
@@ -1538,6 +1576,7 @@ function renderHistory() {
   }
   drawStaticRadar($("history-chart"), axes, mins, maxes, shapes);
   setHidden($("history-chart-loading"), true);
+  $("history-body").classList.remove("is-loading");
 }
 
 function stepHistory(delta) {
@@ -1672,6 +1711,8 @@ $("btn-demo-participant").onclick = () => startDemo("participant");
 $("btn-demo-prev").onclick = () => stepDemo(-1);
 $("btn-demo-next").onclick = () => stepDemo(1);
 $("btn-demo-exit").onclick = stopDemo;
+$("btn-demo-organizer-view").onclick = () => switchDemoRole("organizer");
+$("btn-demo-participant-view").onclick = () => switchDemoRole("participant");
 $("in-name").oninput = updateEntryActions;
 $("in-code").oninput = updateEntryActions;
 $("btn-join").onclick = () => {
@@ -2169,6 +2210,6 @@ if (["localhost", "127.0.0.1", "[::1]", ""].includes(location.hostname)) {
   window.__test = {
     S, render, showSession, showIntake, showSettings, closeSettings, renderHistory, stepHistory,
     setHidden, addDraftItem, renderSettingsItems, safeLink, parseDuration, setSimple, roundAxes,
-    startDemo, stopDemo, runDemoStep, stepDemo,
+    startDemo, stopDemo, runDemoStep, stepDemo, switchDemoRole,
   };
 }

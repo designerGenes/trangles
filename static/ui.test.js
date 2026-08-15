@@ -1322,20 +1322,41 @@ const historyEntry = (n, title) => ({
   check("guided demo launcher is available", !!win.document.getElementById("btn-demo"));
   T.startDemo("organizer");
   check("organizer demo opens the real session view", shown(win, "view-session") && T.S.organizer);
+  check("demo uses the time-flight issue", T.S.state.round.title === "Throw the clock out the window"
+    && T.S.state.round.description === "Determine once and for all if time can fly");
   check("organizer demo explains the participant perspective", shown(win, "demo-peer-preview")
     && /Participant view/.test(win.document.getElementById("demo-peer-preview").textContent));
   check("demo hides production organizer controls", !shown(win, "organizer-shelf")
     && !shown(win, "end-rail") && !shown(win, "code-chip"));
-  check("demo guide is anchored to its highlighted control", win.document.querySelector(".demo-target").hasAttribute("data-demo-tooltip")
+  check("demo guide is anchored to one highlighted control", !win.document.querySelector(".demo-target").hasAttribute("data-demo-tooltip")
+    && win.document.querySelectorAll(".demo-target").length === 1
     && win.document.querySelector(".demo-target").getAttribute("aria-describedby") === "demo-guide");
+  check("demo focus highlight is separated from the target",
+    /\.demo-target \{[^}]*outline: 3px solid var\(--honey\)[^}]*outline-offset: 8px/.test(read("style.css"))
+    && /\.demo-focusable \{[^}]*margin-bottom: 24px[^}]*margin-top: 12px/.test(read("style.css"))
+    && !/\.demo-target::after/.test(read("style.css")));
   check("demo begins on a manual first frame", T.S.demo.step === 0
     && win.document.getElementById("btn-demo-prev").disabled
     && !win.document.getElementById("btn-demo-next").disabled
-    && /Use Next/.test(win.document.getElementById("demo-progress").textContent));
+    && win.document.getElementById("demo-progress").textContent === "");
+  check("demo offers a view toggle in the guide",
+    !!win.document.getElementById("btn-demo-organizer-view")
+    && !!win.document.getElementById("btn-demo-participant-view"));
+  check("demo guide has no fake segmented progress bars", !win.document.querySelector(".demo-peer-bars"));
+  check("organizer first demo frame shows chart loading",
+    shown(win, "live-chart-loading") && !visible(win, "live-overlay"));
 
   win.document.getElementById("btn-demo-next").click();
   check("organizer demo simulates live participant charts", T.S.state.round.liveShapes.length === 2
+    && T.S.state.round.liveShapes[0].values.join(",") !== T.S.state.round.liveShapes[1].values.join(",")
     && shown(win, "live-inputs"));
+  check("organizer demo shows disparate participant inputs",
+    T.S.state.round.liveShapes[0].values[0] !== T.S.state.round.liveShapes[1].values[0]);
+  win.document.getElementById("btn-demo-participant-view").click();
+  check("demo guide can switch to participant view", T.S.demo.role === "participant"
+    && win.document.getElementById("btn-demo-organizer-view").getAttribute("aria-pressed") === "false");
+  win.document.getElementById("btn-demo-organizer-view").click();
+  check("demo guide can switch back to organizer view", T.S.demo.role === "organizer");
   check("demo hides live-view switches", !visible(win, "btn-live-overlay") && !visible(win, "btn-live-grid"));
   win.document.getElementById("btn-demo-prev").click();
   check("demo can manually return to a prior frame", T.S.demo.step === 0);
@@ -1354,9 +1375,10 @@ const historyEntry = (n, title) => ({
   T.startDemo("participant");
   check("demo disconnects any pending real connection", pending.closed && T.S.ws === null);
   check("participant demo begins waiting for the organizer", !T.S.organizer
-    && /Join and wait/.test(win.document.getElementById("demo-title").textContent));
+    && /Join and wait/.test(win.document.getElementById("demo-title").textContent)
+    && shown(win, "plot-loading") && !visible(win, "plot"));
   T.runDemoStep("participant", 1);
-  check("participant demo shows the private chart after organizer launch", shown(win, "plot-wrap")
+  check("participant demo shows the private chart at stage two", shown(win, "plot-wrap") && visible(win, "plot")
     && /Make a private estimate/.test(win.document.getElementById("demo-title").textContent));
   T.runDemoStep("participant", 2);
   check("participant demo displays a read-only submitted estimate", !shown(win, "submit-row")
@@ -1364,6 +1386,8 @@ const historyEntry = (n, title) => ({
   T.runDemoStep("participant", 3);
   check("participant demo receives an anonymized result", shown(win, "summary-card")
     && /Anonymous response/.test(win.document.getElementById("minis").textContent));
+  check("exit demo uses the coral commitment action",
+    win.document.getElementById("btn-demo-exit").classList.contains("btn-session-commit"));
   T.stopDemo();
 }
 
