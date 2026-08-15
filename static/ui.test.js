@@ -570,7 +570,7 @@ const historyEntry = (n, title) => ({
 }
 
 
-/* ── 17. Intake: one expandable row, nothing else up front ────────────── */
+/* ── 17. Intake: one mode-switching row, nothing else up front ───────── */
 {
   const win = boot();
   const T = win.__test;
@@ -581,14 +581,15 @@ const historyEntry = (n, title) => ({
   check("settings are not up front", !shown(win, "view-settings"));
   check("exactly one issue row to start", win.document.querySelectorAll(".intake-row").length === 1,
     win.document.querySelectorAll(".intake-row").length);
-  check("the single row cannot be removed", !win.document.querySelector(".intake-row .btn-quiet"));
+  check("the single row cannot be removed", !win.document.querySelector(".intake-row .row-minus"));
   check("launch is the primary action",
     win.document.getElementById("btn-launch").textContent === "Launch pointing session",
     win.document.getElementById("btn-launch").textContent);
   check("no aspect rows on the intake screen", !win.document.querySelector("#view-intake #draft-aspects"));
   check("no results action before anything is pointed", !shown(win, "btn-intake-results"));
   check("title uses the natural placeholder", win.document.querySelector(".intake-title-input").placeholder === "Issue title");
-  check("details stay optional and collapsed", !win.document.querySelector(".intake-row .draft-details").open);
+  check("field mode begins as raw title", win.document.querySelector(".issue-mode-field").classList.contains("field-mode-raw"));
+  check("field mode has an icon control", !!win.document.querySelector(".field-mode-toggle svg"));
   check("the lone row carries the add affordance", !!win.document.querySelector(".intake-row .row-plus"));
   check("there is no separate add-issue button", !win.document.getElementById("btn-intake-add"));
 
@@ -596,10 +597,15 @@ const historyEntry = (n, title) => ({
   // competing action elsewhere on the page.
   win.document.querySelector(".intake-row .row-plus").click();
   check("the last-row plus adds another issue", win.document.querySelectorAll(".intake-row").length === 2);
-  check("extra rows can be removed", !!win.document.querySelector(".intake-row .btn-quiet"));
+  check("extra rows use matching minus controls", win.document.querySelectorAll(".intake-row .row-minus").length === 2
+    && !!win.document.querySelector(".intake-row .row-plus"));
+  const css = read("style.css");
+  check("plus and minus share one size rule", /\.row-plus, \.row-minus \{[^}]*flex: 0 0 44px/.test(css));
+  check("settings precede the full-width launch action", win.document.getElementById("btn-open-settings").compareDocumentPosition(win.document.querySelector(".intake-actions"))
+    & win.Node.DOCUMENT_POSITION_FOLLOWING && /#btn-launch \{ width: 100%/.test(css));
 }
 
-/* ── 18. Titles and details stay in step across the two screens ───────── */
+/* ── 18. Field modes preserve title, URL, and description ────────────── */
 {
   const win = boot();
   const T = win.__test;
@@ -612,18 +618,30 @@ const historyEntry = (n, title) => ({
   T.showSettings("intake");
   const titles = Array.from(win.document.querySelectorAll("#settings-items .intake-title-input")).map((n) => n.value);
   check("settings edits the issue typed on intake", titles.includes("PROJ-9 payments"), titles);
-  check("settings offers a link field", !!win.document.querySelector("#settings-items .item-link"));
-  check("settings offers a description field", !!win.document.querySelector("#settings-items .item-description"));
-
-  const link = win.document.querySelector("#settings-items .item-link");
+  const cycle = () => win.document.querySelector("#settings-items .field-mode-toggle").click();
+  cycle();
+  const link = win.document.querySelector("#settings-items .issue-mode-input");
+  check("icon cycles to the URL mode", win.document.querySelector("#settings-items .issue-mode-field").classList.contains("field-mode-link")
+    && link.placeholder === "Issue URL");
   link.value = "https://jira.example.com/PROJ-9";
   link.oninput();
+  cycle();
+  const description = win.document.querySelector("#settings-items .issue-mode-input");
+  description.value = "Invite the payments team after approval.";
+  description.oninput();
+  check("icon cycles to description mode", win.document.querySelector("#settings-items .issue-mode-field").classList.contains("field-mode-description"));
+  cycle();
+  check("cycling keeps the original title", win.document.querySelector("#settings-items .issue-mode-input").value === "PROJ-9 payments");
   T.showIntake("first");
   check("returning to intake keeps the same row", shown(win, "view-intake"));
-  check("the detail survived the round trip",
-    T.S.drafts[0].link === "https://jira.example.com/PROJ-9", T.S.drafts[0]);
-  check("intake keeps metadata behind its disclosure",
-    !win.document.querySelector("#view-intake .draft-details").open);
+  check("all field-mode values survive the round trip",
+    T.S.drafts[0].link === "https://jira.example.com/PROJ-9" && T.S.drafts[0].description === "Invite the payments team after approval.", T.S.drafts[0]);
+  const sent = [];
+  T.S.ws = { readyState: win.WebSocket.OPEN, send: (message) => sent.push(JSON.parse(message)) };
+  win.document.getElementById("btn-launch").click();
+  check("launch submits every field mode", sent[0].items[0].title === "PROJ-9 payments"
+    && sent[0].items[0].link === "https://jira.example.com/PROJ-9"
+    && sent[0].items[0].description === "Invite the payments team after approval.", sent[0]);
 }
 
 /* ── 19. An emptied queue offers more work before it offers totals ────── */

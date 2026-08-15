@@ -1781,6 +1781,7 @@ function addDraftItem(item = {}, focusIn = "intake") {
     title: item.title || "",
     link: item.link || "",
     description: item.description || "",
+    fieldMode: item.fieldMode || "raw",
   });
   renderDraftRows();
   if (S.view === "settings" || focusIn === "settings") renderSettingsItems();
@@ -1790,42 +1791,58 @@ function addDraftItem(item = {}, focusIn = "intake") {
   if (last) last.focus();
 }
 
-function draftDetails(draft) {
-  const details = document.createElement("details");
-  details.className = "draft-details";
-  const summary = document.createElement("summary");
-  summary.append(document.createTextNode("Add description or link"), caretSpan());
-  const fields = document.createElement("div");
-  fields.className = "draft-meta-fields";
-  const description = document.createElement("textarea");
-  description.className = "item-description";
-  description.maxLength = 2000;
-  description.placeholder = "Optional issue description";
-  description.value = draft.description;
-  description.oninput = () => { draft.description = description.value; };
-  const link = document.createElement("input");
-  link.type = "url";
-  link.className = "item-link";
-  link.placeholder = "Optional issue URL";
-  link.value = draft.link;
-  link.oninput = () => { draft.link = link.value; };
-  fields.append(description, link);
-  details.append(summary, fields);
-  return details;
+const ISSUE_FIELD_MODES = [
+  { id: "raw", key: "title", label: "Issue title", next: "URL", icon: '<path d="M5 5h14M12 5v14M8 19h8"/>' },
+  { id: "link", key: "link", label: "Issue URL", next: "description", icon: '<path d="M9.5 14.5l5-5M8 17H6.5a3.5 3.5 0 010-7h3M16 7h1.5a3.5 3.5 0 010 7h-3"/>' },
+  { id: "description", key: "description", label: "Issue description", next: "title", icon: '<path d="M5 7h14M5 12h14M5 17h9"/>' },
+];
+
+function issueFieldMode(draft) {
+  return ISSUE_FIELD_MODES.find((mode) => mode.id === draft.fieldMode) || ISSUE_FIELD_MODES[0];
+}
+
+function cycleDraftField(draft, context) {
+  const current = ISSUE_FIELD_MODES.findIndex((mode) => mode.id === issueFieldMode(draft).id);
+  draft.fieldMode = ISSUE_FIELD_MODES[(current + 1) % ISSUE_FIELD_MODES.length].id;
+  renderDraftRows();
+  if (S.view === "settings" || context === "settings") renderSettingsItems();
+  const host = context === "settings" ? $("settings-items") : $("intake-items");
+  const input = host.querySelector(`[data-draft-id="${draft.id}"] .issue-mode-input`);
+  if (input) input.focus();
+}
+
+function issueModeIcon(mode) {
+  const icon = document.createElementNS(SVGNS, "svg");
+  icon.setAttribute("viewBox", "0 0 24 24");
+  icon.setAttribute("aria-hidden", "true");
+  icon.innerHTML = mode.icon;
+  return icon;
 }
 
 function draftRow(draft, index, context) {
   const row = document.createElement("div");
   row.className = context === "settings" ? "draft-item-entry intake-row" : "intake-row";
   row.dataset.draftId = draft.id;
+  const mode = issueFieldMode(draft);
+  const field = document.createElement("div");
+  field.className = `issue-mode-field field-mode-${mode.id}`;
   const input = document.createElement("input");
   input.type = "text";
-  input.className = "intake-title-input";
-  input.maxLength = 200;
-  input.placeholder = "Issue title";
-  input.value = draft.title;
-  input.oninput = () => { draft.title = input.value; };
-  row.append(input);
+  input.className = "intake-title-input issue-mode-input";
+  input.maxLength = mode.id === "description" ? 2000 : 200;
+  input.placeholder = mode.label;
+  input.setAttribute("aria-label", mode.label);
+  input.value = draft[mode.key];
+  input.oninput = () => { draft[mode.key] = input.value; };
+  const modeButton = document.createElement("button");
+  modeButton.type = "button";
+  modeButton.className = "field-mode-toggle";
+  modeButton.setAttribute("aria-label", `Switch field to ${mode.next}`);
+  modeButton.title = `Switch to ${mode.next}`;
+  modeButton.appendChild(issueModeIcon(mode));
+  modeButton.onclick = () => cycleDraftField(draft, context);
+  field.append(input, modeButton);
+  row.append(field);
   if (index === S.drafts.length - 1) {
     const plus = document.createElement("button");
     plus.type = "button";
@@ -1840,8 +1857,9 @@ function draftRow(draft, index, context) {
   if (S.drafts.length > 1) {
     const remove = document.createElement("button");
     remove.type = "button";
-    remove.className = "btn btn-quiet";
-    remove.textContent = "Remove";
+    remove.className = "btn row-minus";
+    remove.textContent = "-";
+    remove.setAttribute("aria-label", "Remove issue");
     remove.onclick = () => {
       S.drafts = S.drafts.filter((candidate) => candidate.id !== draft.id);
       renderDraftRows();
@@ -1849,7 +1867,6 @@ function draftRow(draft, index, context) {
     };
     row.appendChild(remove);
   }
-  row.appendChild(draftDetails(draft));
   return row;
 }
 
