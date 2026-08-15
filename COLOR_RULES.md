@@ -172,10 +172,10 @@ Generated from `static/style.css`. If this table and the stylesheet disagree, th
 
 | Token | Value | Role |
 | --- | --- | --- |
-| `--primary-action` | `#6C5CE7` | Primary action. |
-| `--primary-edge` | `#8E83F2` | Primary action edge / hover. |
-| `--primary-edge-hot` | `#B0A8FF` | Primary action hover edge. |
-| `--primary-glow` | `rgba(108, 92, 231, 0.30)` | Primary action glow. |
+| `--primary-action` | `#FF6464` | Primary action. Matches the logo triangle and all launch, next, results, and close-session actions. |
+| `--primary-edge` | `#FF8585` | Primary action edge / hover. |
+| `--primary-edge-hot` | `#FFB0B0` | Primary action hover edge. |
+| `--primary-glow` | `rgba(255, 100, 100, 0.30)` | Primary action glow. |
 | `--pencil` | `#FF6464` | Consensus coral. |
 | `--pencil-hot` | `#FF8585` | Consensus coral hover. |
 | `--pencil-fill` | `rgba(255, 100, 100, 0.13)` | Average shape fill. |
@@ -183,6 +183,10 @@ Generated from `static/style.css`. If this table and the stylesheet disagree, th
 | `--pencil-glow` | `rgba(255, 100, 100, 0.36)` | Timer glow. |
 | `--pencil-glow-max` | `rgba(255, 100, 100, 0.55)` | Wordmark glow. |
 | `--pending` | `#C97586` | Pending end-round action. |
+| `--score-low` | `#F4F1E8` | Single-score estimate at the minimum value. |
+| `--score-mid` | `#FFD166` | Single-score estimate at the midpoint. |
+| `--score-high` | `#FF6464` | Single-score estimate at the maximum value. |
+| `--score-track` | `#3A4358` | Unfilled portion of the single-score slider track. |
 
 ### Overlays and depth
 

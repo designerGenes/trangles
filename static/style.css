@@ -26,7 +26,7 @@
   /* @group Text */
   --ink: #F4F1E8;                              /* @label Primary text (on dark) */
   --muted: #AEB7C8;                            /* @label Secondary text (on dark) */
-  --on-primary: #FFFFFF;                       /* @label Text on primary action */
+  --on-primary: #22161B;                        /* @label Text on primary action */
   --on-pencil: #22161B;                        /* @label Text on coral controls */
   --on-pending: #241A22;                       /* @label Text on pending control */
 
@@ -87,17 +87,23 @@
   --ring: #3B345D;                             /* @label Radar grid ring */
 
   /* @group Actions and status */
-  --primary-action: #6C5CE7;                   /* @label Primary action */
-  --primary-edge: #8E83F2;                     /* @label Primary action edge / hover */
-  --primary-edge-hot: #B0A8FF;                 /* @label Primary action hover edge */
-  --primary-glow: rgba(108, 92, 231, 0.30);    /* @label Primary action glow */
+  --primary-action: #FF6464;                    /* @label Primary action */
+  --primary-edge: #FF8585;                      /* @label Primary action edge / hover */
+  --primary-edge-hot: #FFB0B0;                  /* @label Primary action hover edge */
+  --primary-glow: rgba(255, 100, 100, 0.30);    /* @label Primary action glow */
   --pencil: #FF6464;                           /* @label Consensus coral */
   --pencil-hot: #FF8585;                       /* @label Consensus coral hover */
   --pencil-fill: rgba(255, 100, 100, 0.13);    /* @label Average shape fill */
   --pencil-cast: rgba(255, 100, 100, 0.26);    /* @label Coral action shadow */
   --pencil-glow: rgba(255, 100, 100, 0.36);    /* @label Timer glow */
   --pencil-glow-max: rgba(255, 100, 100, 0.55); /* @label Wordmark glow */
-  --pending: #C97586;                          /* @label Pending end-round action */
+  --pending: #C97586;                           /* @label Pending end-round action */
+
+  /* @group Single-score estimate */
+  --score-low: #F4F1E8;                         /* @label Score low — pale white */
+  --score-mid: #FFD166;                         /* @label Score middle — yellow */
+  --score-high: #FF6464;                        /* @label Score high — bright red */
+  --score-track: #3A4358;                       /* @label Score unfilled track */
 
   /* @group Overlays and depth */
   --shadow-light: rgba(4, 6, 13, 0.20);        /* @label Card shadow */
@@ -447,6 +453,8 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
   font-size: 0.85rem;
 }
 .btn-quiet:hover { color: var(--pencil); background: none; }
+.intake-settings.btn-quiet { background: var(--panel-slot); border: 1px solid var(--panel-slot-edge); border-radius: 10px; color: var(--ink); margin-top: 18px; min-height: 46px; padding: 10px 12px; }
+.intake-settings.btn-quiet:hover { background: var(--panel-slot); border-color: var(--ink); color: var(--ink); }
 
 /* Round card --------------------------------------------------------- */
 .eyebrow {
@@ -527,17 +535,18 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .readout .val { font-family: "Spline Sans Mono", monospace; font-weight: 700; font-size: 1.15rem; }
 .readout .lbl { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
 
-.submit-row { display: flex; align-items: center; gap: 14px; justify-content: center; }
+.submit-row { display: flex; align-items: stretch; gap: 14px; justify-content: center; width: 100%; }
+.submit-row .btn { flex: 1 1 auto; padding-bottom: 15px; padding-top: 15px; width: 100%; }
 .progress { font-size: 0.85rem; color: var(--muted); }
 
 /* SVG plot ----------------------------------------------------------- */
 .ring { fill: none; stroke: var(--ring); stroke-width: 1; }
 .ring-outer { stroke: var(--violet); opacity: 0.72; }
-.axis-line { stroke-width: 1.5; opacity: 0.55; }
-.axis-label { font: 600 12px "Public Sans", sans-serif; letter-spacing: 0.06em; text-transform: uppercase; }
+.axis-line { stroke: var(--ink); stroke-width: 1.5; opacity: 0.55; }
+.axis-label { fill: var(--ink); font: 600 12px "Public Sans", sans-serif; letter-spacing: 0.06em; text-transform: uppercase; }
 .tick-label {
   font: 500 9px "Spline Sans Mono", monospace;
-  fill: var(--muted);
+  fill: var(--ink);
   /* Tick numbers now sit on their own axis line; knock the line out from
      behind the glyphs so they stay legible. */
   paint-order: stroke;
@@ -775,9 +784,19 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 /* Simple pointing: one number, given the same room the chart would have had
    so switching modes does not make the card jump. */
 .simple-wrap { align-items: center; display: flex; flex-direction: column; gap: 4px; padding: 22px 0 18px; }
-.simple-value { color: var(--pencil); font-size: 3.4rem; font-weight: 700; line-height: 1; }
+.simple-value { color: var(--score-color, var(--score-low)); font-size: 3.4rem; font-weight: 700; line-height: 1; }
 .simple-label { color: var(--muted); font-size: 0.8rem; letter-spacing: 0.1em; min-height: 1.2em; text-transform: uppercase; }
-.simple-slider { margin-top: 10px; max-width: 30rem; width: 100%; }
+.simple-slider {
+  appearance: none;
+  background: linear-gradient(to right, var(--score-color, var(--score-low)) 0 var(--score-percent, 0%), var(--score-track) var(--score-percent, 0%) 100%);
+  border-radius: 999px;
+  height: 10px;
+  margin-top: 10px;
+  max-width: 30rem;
+  width: 100%;
+}
+.simple-slider::-webkit-slider-thumb { appearance: none; background: var(--score-color, var(--score-low)); border: 2px solid var(--ink); border-radius: 50%; box-shadow: 0 0 0 3px color-mix(in srgb, var(--score-color, var(--score-low)) 30%, transparent); height: 22px; width: 22px; }
+.simple-slider::-moz-range-thumb { background: var(--score-color, var(--score-low)); border: 2px solid var(--ink); border-radius: 50%; box-shadow: 0 0 0 3px color-mix(in srgb, var(--score-color, var(--score-low)) 30%, transparent); height: 18px; width: 18px; }
 .simple-scale { color: var(--muted); display: flex; font-size: 0.75rem; justify-content: space-between; max-width: 30rem; width: 100%; }
 
 /* Scope selects ------------------------------------------------------- */

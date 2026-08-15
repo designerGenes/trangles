@@ -175,7 +175,7 @@ function buildPlot() {
     }
     const position = Radar.labelPosition(x, y, angle(i));
     const label = el("text", {
-      x: position.x, y: position.y, class: "axis-label", fill: axisColor(i),
+      x: position.x, y: position.y, class: "axis-label", fill: themeColor("--ink") || "#F4F1E8",
       "text-anchor": position.anchor,
     });
     label.textContent = name;
@@ -759,6 +759,7 @@ function render() {
   setHidden($("plot-wrap"), S.organizer || S.mode === "simple");
   setHidden($("simple-wrap"), S.organizer || S.mode !== "simple");
   setHidden($("submit-row"), S.organizer || !!S.demo);
+  setHidden($("progress"), !S.organizer);
 
   if (!r) {
     eyebrow.textContent = "Waiting";
@@ -982,6 +983,15 @@ function drawSimple() {
   $("simple-value").textContent = formatValue(S.simple);
   const label = S.pointLabels[Math.round(S.simple)];
   $("simple-label").textContent = label || "";
+  const min = axisMin(0);
+  const max = axisMax(0);
+  const fraction = max === min ? 0 : (S.simple - min) / (max - min);
+  const scoreColor = fraction <= 0.5
+    ? `color-mix(in srgb, var(--score-low) ${Math.round((0.5 - fraction) * 200)}%, var(--score-mid))`
+    : `color-mix(in srgb, var(--score-mid) ${Math.round((1 - fraction) * 200)}%, var(--score-high))`;
+  const wrap = $("simple-wrap");
+  wrap.style.setProperty("--score-color", scoreColor);
+  wrap.style.setProperty("--score-percent", `${Math.round(fraction * 100)}%`);
 }
 
 function setSimple(value) {
@@ -1441,6 +1451,7 @@ function drawStaticRadar(svg, axes, mins, maxes, shapes) {
     label.setAttribute("x", position.x);
     label.setAttribute("y", position.y);
     label.setAttribute("class", "axis-label");
+    label.setAttribute("fill", themeColor("--ink") || "#F4F1E8");
     label.setAttribute("text-anchor", position.anchor);
     label.textContent = axis;
     svg.appendChild(label);

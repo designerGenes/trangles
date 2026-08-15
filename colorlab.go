@@ -52,7 +52,7 @@ type Token struct {
 
 var (
 	// A declaration line, with the optional trailing "@label" comment.
-	tokenLineRe = regexp.MustCompile(`(?m)^\s*(--[A-Za-z0-9-]+):\s*([^;]+);\s*(?:/\*\s*@label\s*(.*?)\s*\*/)?\s*$`)
+	tokenLineRe = regexp.MustCompile(`(?m)^[ \t]*(--[A-Za-z0-9-]+):[ \t]*([^;]+);[ \t]*(?:/\*[ \t]*@label[ \t]*(.*?)[ \t]*\*/)?[ \t]*$`)
 	// A "@group" comment opens a section. The heading may carry prose after it
 	// on following lines; only the first line is the name.
 	groupLineRe = regexp.MustCompile(`(?m)^\s*/\*\s*@group\s*(.*?)\s*$`)

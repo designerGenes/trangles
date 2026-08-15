@@ -631,9 +631,14 @@ const historyEntry = (n, title) => ({
   check("active chart surfaces stay reserved while results are violet",
     /\.round-card \.chart-box, \.live-inputs\.chart-box \{[^}]*background: var\(--card\)/.test(css)
     && /\.chart-box, \.summary-card, \.history-card, \.final-summary-card \{[^}]*var\(--violet-lit\), var\(--violet-deep\)/.test(css));
-  check("launch uses an indigo complement to the honey intake box",
+  check("launch and other primary actions use logo-triangle coral",
     /\.btn-primary \{[^}]*background: var\(--primary-action\)/.test(css)
-    && /\.btn-primary \{[^}]*border-color: var\(--primary-edge\)/.test(css));
+    && /--primary-action:\s+#FF6464/.test(css));
+  check("radar axis labels use the light chart foreground",
+    /\.axis-label \{[^}]*fill: var\(--ink\)/.test(css)
+    && /\.tick-label \{[^}]*fill: var\(--ink\)/.test(css));
+  check("session settings is a taller light-text panel control",
+    /\.intake-settings\.btn-quiet \{[^}]*color: var\(--ink\)[^}]*min-height: 46px/.test(css));
 }
 
 /* ── 16c. Control panels are raised plastic, and stay readable ──────── */
@@ -904,6 +909,21 @@ const historyEntry = (n, title) => ({
     win.document.getElementById("simple-value").textContent === "6",
     win.document.getElementById("simple-value").textContent);
   check("state records the composite score", T.S.simple === 6, T.S.simple);
+  const simpleWrap = win.document.getElementById("simple-wrap");
+  check("single-score value drives its shared slider colour",
+    /score-mid/.test(simpleWrap.style.getPropertyValue("--score-color"))
+    && simpleWrap.style.getPropertyValue("--score-percent") === "71%");
+  T.setSimple(8);
+  check("high single score reaches bright red", /score-high/.test(simpleWrap.style.getPropertyValue("--score-color")));
+  const css = read("style.css");
+  check("single-score slider runs pale white through yellow to red",
+    /--score-low: #F4F1E8/.test(css)
+    && /--score-mid: #FFD166/.test(css)
+    && /--score-high: #FF6464/.test(css));
+  check("participant submit fills the available row with taller padding",
+    /\.submit-row \{[^}]*align-items: stretch[^}]*width: 100%/.test(css)
+    && /\.submit-row \.btn \{[^}]*padding-bottom: 15px[^}]*width: 100%/.test(css));
+  check("participants do not see vote progress", !shown(win, "progress"));
 
   win.document.getElementById("btn-mode-shape").click();
   check("switching back restores the chart", shown(win, "plot-wrap"));
