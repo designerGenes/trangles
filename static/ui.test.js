@@ -897,7 +897,8 @@ const historyEntry = (n, title) => ({
   check("progress so far is stated", /2 issues pointed/.test(win.document.getElementById("intake-tally").textContent),
     win.document.getElementById("intake-tally").textContent);
   check("a single row is still the default", win.document.querySelectorAll(".intake-row").length === 1);
-  check("post-session intake uses the centered stage", /#view-intake \{[^}]*align-items: center[^}]*min-height: calc\(100dvh - 76px\)/.test(read("style.css")));
+  check("post-session intake keeps its card and action rail in one centered column",
+    /#view-intake \{[^}]*align-items: center[^}]*flex-direction: column[^}]*min-height: calc\(100dvh - 76px\)/.test(read("style.css")));
 
   // Reading the last result must not bounce straight back to intake.
   win.document.getElementById("btn-intake-back").click();

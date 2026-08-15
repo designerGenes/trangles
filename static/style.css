@@ -316,7 +316,7 @@ main { max-width: var(--column); margin: 0 auto; padding: 8px 16px 48px; }
 /* The screen that replaces the old launch console. One column, one question:
    which issue are we pointing? Everything configurable is a click away. */
 .intake-card { margin: 40px auto 0; max-width: 34rem; padding: 26px 24px 20px; }
-#view-intake { align-items: center; display: flex; min-height: calc(100dvh - 76px); }
+#view-intake { align-items: center; display: flex; flex-direction: column; min-height: calc(100dvh - 76px); }
 #view-intake.intake-initial { align-items: center; display: flex; min-height: calc(100dvh - 76px); }
 #view-intake .intake-card { margin-top: 0; }
 #view-intake.intake-initial .intake-card { margin: 0 auto; width: 100%; }
