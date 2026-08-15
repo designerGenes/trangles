@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Triangulate</title>
+<title data-i18n="title">Triangulate</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Public+Sans:wght@400;600&family=Spline+Sans+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -11,61 +11,61 @@
 <!-- Inline so there is no extra request and no 404 for a missing icon file. -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23F3F5F1'/%3E%3Cpolygon points='16,6 27,25 5,25' fill='none' stroke='%23C03B2D' stroke-width='2.5' stroke-linejoin='round'/%3E%3C/svg%3E">
 <meta name="color-scheme" content="light">
-<meta name="description" content="Team estimation across whichever aspects you choose, instead of one number.">
+<meta name="description" content="Team estimation across whichever aspects you choose, instead of one number." data-i18n-content="metaDescription">
 </head>
 <body>
 
 <header class="masthead">
   <a id="home-link" class="wordmark" href="/">Tri<span class="wordmark-angle">▲</span>ngulate</a>
   <div class="masthead-actions">
-    <span id="privacy-badge" class="privacy-badge" hidden>Privacy on</span>
-    <button id="code-chip" class="code-chip" hidden title="Copy invite link">
-      session <span id="code-text" class="mono"></span>
+    <span id="privacy-badge" class="privacy-badge" data-i18n="privacyBadge" hidden>Privacy on</span>
+    <button id="code-chip" class="code-chip" hidden title="Copy invite link" data-i18n-title="copyInviteLink">
+      <span data-i18n="sessionLabel">session</span> <span id="code-text" class="mono"></span>
     </button>
   </div>
 </header>
 
 <!-- ───────────────────────────── landing ───────────────────────────── -->
 <main id="view-landing" class="landing">
-  <h1 class="pitch">Estimate the <em>shape</em> of the work.</h1>
+  <h1 class="pitch" data-i18n="landingPitch" data-i18n-html="true">Estimate the <em>shape</em> of the work.</h1>
 
   <div class="card landing-card">
     <div class="landing-split">
       <div class="landing-col">
         <label class="field">
-          <span>Nickname</span>
+          <span data-i18n="landingNickname">Nickname</span>
           <input id="in-name" maxlength="24" autocomplete="off">
         </label>
-        <button id="btn-create" class="btn btn-primary">Start a session</button>
+        <button id="btn-create" class="btn btn-primary" data-i18n="landingStartSession">Start a session</button>
       </div>
       <div class="landing-rule" aria-hidden="true"></div>
       <div class="landing-col">
         <label class="field">
-          <span>Session code</span>
+          <span data-i18n="landingSessionCode">Session code</span>
           <input id="in-code" class="mono" maxlength="5" autocomplete="off"
-                 placeholder="ABCDE" style="text-transform:uppercase">
+                 placeholder="ABCDE" data-i18n-placeholder="landingSessionCodePlaceholder" style="text-transform:uppercase">
         </label>
-        <button id="btn-join" class="btn">Join session</button>
+        <button id="btn-join" class="btn" data-i18n="landingJoinSession">Join session</button>
       </div>
     </div>
     <!-- Sits below the split, so revealing it never shifts either button off
          the line they share. -->
-    <p id="entry-warning" class="entry-warning" role="alert" hidden>A nickname is required.</p>
-    <button id="btn-demo" class="btn btn-quiet demo-launch" type="button">Explore a guided demo</button>
+    <p id="entry-warning" class="entry-warning" role="alert" data-i18n="landingNicknameRequired" hidden>A nickname is required.</p>
+    <button id="btn-demo" class="btn btn-quiet demo-launch" type="button" data-i18n="landingExploreDemo">Explore a guided demo</button>
   </div>
 
   <section id="demo-launcher" class="card demo-launcher-card" hidden aria-labelledby="demo-launcher-title">
     <div class="demo-launcher-head">
       <div>
-        <span class="eyebrow">Guided demo</span>
-        <h2 id="demo-launcher-title">Watch a pointing session unfold.</h2>
+        <span class="eyebrow" data-i18n="demoLauncherEyebrow">Guided demo</span>
+        <h2 id="demo-launcher-title" data-i18n="demoLauncherTitle">Watch a pointing session unfold.</h2>
       </div>
-      <button id="btn-demo-close" class="btn btn-quiet" type="button">Close</button>
+      <button id="btn-demo-close" class="btn btn-quiet" type="button" data-i18n="demoLauncherClose">Close</button>
     </div>
-    <p class="hint">Uses sample issues and simulated submissions. It never creates a session or sends your data.</p>
+    <p class="hint" data-i18n="demoLauncherHint">Uses sample issues and simulated submissions. It never creates a session or sends your data.</p>
     <div class="demo-choice-row">
-      <button id="btn-demo-organizer" class="btn btn-primary" type="button">Organizer walkthrough</button>
-      <button id="btn-demo-participant" class="btn" type="button">Participant walkthrough</button>
+      <button id="btn-demo-organizer" class="btn btn-primary" type="button" data-i18n="demoLauncherOrganizer">Organizer walkthrough</button>
+      <button id="btn-demo-participant" class="btn" type="button" data-i18n="demoLauncherParticipant">Participant walkthrough</button>
     </div>
   </section>
 </main>
@@ -75,8 +75,8 @@
 <div id="timer-float" class="timer-float" hidden>
   <span id="round-timer" class="mono timer"></span>
   <div id="timer-controls" class="timer-controls" hidden>
-    <button id="btn-timer-toggle" class="timer-mini" type="button" aria-label="Pause or resume the timer">Pause</button>
-    <button id="btn-timer-clear" class="timer-mini" type="button" aria-label="Remove the timer">Remove</button>
+    <button id="btn-timer-toggle" class="timer-mini" type="button" aria-label="Pause or resume the timer" data-i18n="timerPause" data-i18n-aria-label="timerPauseAria">Pause</button>
+    <button id="btn-timer-clear" class="timer-mini" type="button" aria-label="Remove the timer" data-i18n="timerRemove" data-i18n-aria-label="timerRemoveAria">Remove</button>
   </div>
 </div>
 
@@ -86,18 +86,18 @@
      picking the next issue off a board is not configuring anything. -->
 <main id="view-intake" hidden>
   <section class="card intake-card">
-    <span id="intake-eyebrow" class="eyebrow">New session</span>
-    <h1 id="intake-title" class="intake-title">Enter the first issue to point.</h1>
+    <span id="intake-eyebrow" class="eyebrow" data-i18n="intakeEyebrow">New session</span>
+    <h1 id="intake-title" class="intake-title" data-i18n="intakeTitle">Enter the first issue to point.</h1>
     <p id="intake-tally" class="hint intake-tally" hidden></p>
 
     <div id="intake-items" class="intake-items"></div>
 
-    <button id="btn-open-settings" class="btn btn-quiet intake-settings" type="button">Session settings</button>
+    <button id="btn-open-settings" class="btn btn-quiet intake-settings" type="button" data-i18n="intakeSettings">Session settings</button>
 
     <div class="intake-actions">
-      <button id="btn-launch" class="btn btn-primary" type="button">Launch pointing session</button>
-      <button id="btn-intake-results" class="btn" type="button" hidden>View session results</button>
-      <button id="btn-intake-back" class="btn btn-quiet" type="button" hidden>Back to the last result</button>
+      <button id="btn-launch" class="btn btn-primary" type="button" data-i18n="intakeLaunchSession">Launch pointing session</button>
+      <button id="btn-intake-results" class="btn" type="button" data-i18n="intakeViewResults" hidden>View session results</button>
+      <button id="btn-intake-back" class="btn btn-quiet" type="button" data-i18n="intakeBack" hidden>Back to the last result</button>
     </div>
     <p id="intake-warning" class="setup-warning" hidden></p>
   </section>
@@ -109,28 +109,28 @@
 <main id="view-settings" hidden>
   <div class="settings-head">
     <div>
-      <span class="eyebrow">Session settings</span>
-      <h1 class="setup-title">Set up how this team estimates.</h1>
+      <span class="eyebrow" data-i18n="settingsEyebrow">Session settings</span>
+      <h1 class="setup-title" data-i18n="settingsTitle">Set up how this team estimates.</h1>
     </div>
     <div class="settings-actions">
-      <button id="btn-settings-back" class="btn" type="button">Back</button>
-      <button id="btn-close-settings" class="btn btn-primary" type="button">Launch pointing session</button>
+      <button id="btn-settings-back" class="btn" type="button" data-i18n="settingsBack">Back</button>
+      <button id="btn-close-settings" class="btn btn-primary" type="button" data-i18n="settingsLaunchSession">Launch pointing session</button>
     </div>
   </div>
 
   <section class="card">
-    <span class="eyebrow">Issue details</span>
-    <p class="hint">Add a title, description, or link for each issue.</p>
+    <span class="eyebrow" data-i18n="settingsIssueDetailsEyebrow">Issue details</span>
+    <p class="hint" data-i18n="settingsIssueDetailsHint">Add a title, description, or link for each issue.</p>
     <div id="settings-items" class="draft-items"></div>
-    <p id="settings-items-empty" class="hint">Issues you enter on the previous screen appear here.</p>
+    <p id="settings-items-empty" class="hint" data-i18n="settingsIssueDetailsEmpty">Issues you enter on the previous screen appear here.</p>
     <p id="settings-items-warning" class="setup-warning" hidden></p>
   </section>
 
   <section class="card">
-    <span class="eyebrow">Aspects</span>
-    <p class="hint">Each aspect becomes one axis of the chart. Two to twelve.</p>
+    <span class="eyebrow" data-i18n="settingsAspectsEyebrow">Aspects</span>
+    <p class="hint" data-i18n="settingsAspectsHint">Each aspect becomes one axis of the chart. Two to twelve.</p>
     <div id="draft-aspects" class="draft-items"></div>
-    <p id="setup-aspect-warning" class="setup-warning" hidden>Choose between 2 and 12 aspects to launch a session.</p>
+    <p id="setup-aspect-warning" class="setup-warning" data-i18n="settingsAspectsWarning" hidden>Choose between 2 and 12 aspects to launch a session.</p>
   </section>
 
   <section class="card">
@@ -138,16 +138,16 @@
       <input id="setup-max" type="hidden" value="8">
     </div>
     <div class="control-group">
-      <span class="eyebrow">Point hover labels</span>
-      <p class="hint">Optional. Shown when a handle rests on that value.</p>
+      <span class="eyebrow" data-i18n="settingsPointLabelsEyebrow">Point hover labels</span>
+      <p class="hint" data-i18n="settingsPointLabelsHint">Optional. Shown when a handle rests on that value.</p>
       <div id="setup-point-labels"></div>
     </div>
   </section>
 
   <section id="setup-full-chart" class="card">
-    <span class="eyebrow">Prospective chart</span>
+    <span class="eyebrow" data-i18n="settingsChartEyebrow">Prospective chart</span>
     <svg id="setup-full-plot" viewBox="-70 -45 500 434" role="img" aria-label="Full prospective estimation chart"></svg>
-    <p class="hint">This is the chart participants will use. Each aspect starts at 2, clamped to the shared point range.</p>
+    <p class="hint" data-i18n="settingsChartHint">This is the chart participants will use. Each aspect starts at 2, clamped to the shared point range.</p>
   </section>
 </main>
 
@@ -157,7 +157,7 @@
  <div id="round-stage" class="round-stage">
   <section class="card round-card">
     <div class="round-head">
-      <span id="round-eyebrow" class="eyebrow">Waiting</span>
+      <span id="round-eyebrow" class="eyebrow" data-i18n="roundWaitingEyebrow">Waiting</span>
       <div class="round-head-actions">
         <div id="color-picker" class="color-picker" hidden>
           <button id="btn-color" class="color-swatch" type="button"
@@ -167,12 +167,12 @@
         </div>
       </div>
     </div>
-    <h2 class="round-title"><a id="round-title">Waiting for the organizer to post an issue.</a></h2>
+    <h2 class="round-title"><a id="round-title" data-i18n="roundWaitingTitle">Waiting for the organizer to post an issue.</a></h2>
     <p id="round-description" class="round-description" hidden></p>
 
     <div id="mode-switch" class="mode-switch" role="group" aria-label="How to estimate" hidden>
-      <button id="btn-mode-shape" class="btn" type="button" aria-pressed="true">Shape</button>
-      <button id="btn-mode-simple" class="btn" type="button" aria-pressed="false">Single score</button>
+      <button id="btn-mode-shape" class="btn" type="button" aria-pressed="true" data-i18n="roundModeShape">Shape</button>
+      <button id="btn-mode-simple" class="btn" type="button" aria-pressed="false" data-i18n="roundModeSimple">Single score</button>
     </div>
 
     <div id="plot-wrap" class="plot-wrap">
@@ -192,17 +192,17 @@
     </div>
 
     <div id="submit-row" class="submit-row">
-      <button id="btn-submit" class="btn btn-primary" disabled>Submit estimate</button>
+      <button id="btn-submit" class="btn btn-primary" disabled data-i18n="roundSubmitEstimate">Submit estimate</button>
       <span id="progress" class="progress mono"></span>
     </div>
   </section>
 
   <section id="live-inputs" class="card live-inputs" hidden>
     <div class="live-head">
-      <div><span class="eyebrow">Live input</span><p class="hint">Unsaved charts update as the team adjusts them.</p></div>
+      <div><span class="eyebrow" data-i18n="liveInputEyebrow">Live input</span><p class="hint" data-i18n="liveInputHint">Unsaved charts update as the team adjusts them.</p></div>
       <div class="view-switch" role="group" aria-label="Live chart view">
-        <button id="btn-live-overlay" class="btn" type="button" aria-pressed="true">Sum</button>
-        <button id="btn-live-grid" class="btn" type="button" aria-pressed="false">Individual</button>
+        <button id="btn-live-overlay" class="btn" type="button" aria-pressed="true" data-i18n="liveInputSum">Sum</button>
+        <button id="btn-live-grid" class="btn" type="button" aria-pressed="false" data-i18n="liveInputIndividual">Individual</button>
       </div>
     </div>
     <div id="live-toggles" class="live-toggles"></div>
@@ -220,24 +220,24 @@
     <div class="summary-head">
       <div class="points-block">
         <span id="points-num" class="points-num mono">3</span>
-        <span class="points-label">story points</span>
+        <span class="points-label" data-i18n="summaryStoryPoints">story points</span>
       </div>
       <p id="points-why" class="points-why"></p>
     </div>
     <div id="axis-stats" class="axis-stats"></div>
-    <h3 id="summary-insights-title" class="insights-title">Pointing insights</h3>
+    <h3 id="summary-insights-title" class="insights-title" data-i18n="summaryPointingInsights">Pointing insights</h3>
     <ul id="observations" class="observations"></ul>
     <div id="minis" class="minis"></div>
   </section>
 
   <section class="people-card">
-    <span class="eyebrow">In the room</span>
+    <span class="eyebrow" data-i18n="peopleInRoom">In the room</span>
     <div id="people" class="people"></div>
   </section>
 
   <section id="history-card" class="card history-card" hidden>
     <div class="history-head">
-      <span class="eyebrow">Completed issues</span>
+      <span class="eyebrow" data-i18n="historyCompletedIssues">Completed issues</span>
       <div class="history-nav">
         <button id="btn-history-prev" class="btn history-arrow" type="button"
                 aria-label="Previous completed issue">&#8592;</button>
@@ -253,20 +253,20 @@
       <div class="history-facts">
         <div class="points-block">
           <span id="history-points" class="points-num mono"></span>
-          <span class="points-label">story points</span>
+          <span class="points-label" data-i18n="summaryStoryPoints">story points</span>
         </div>
         <div id="history-stats" class="axis-stats"></div>
-        <h3 id="history-insights-title" class="insights-title">Pointing insights</h3>
+        <h3 id="history-insights-title" class="insights-title" data-i18n="historyPointingInsights">Pointing insights</h3>
         <ul id="history-observations" class="observations"></ul>
       </div>
     </div>
-    <p class="hint">Use the left and right arrow keys to page through issues.</p>
+    <p class="hint" data-i18n="historyHint">Use the left and right arrow keys to page through issues.</p>
   </section>
 
  </div>
 
   <div id="end-rail" class="end-rail" hidden>
-    <button id="btn-end" class="btn end-float" type="button">Next Issue</button>
+    <button id="btn-end" class="btn end-float" type="button" data-i18n="endNextIssue">Next Issue</button>
     <span id="end-vote-count" class="end-vote-count mono"></span>
     <span id="end-hint" class="end-hint" hidden></span>
   </div>
@@ -275,68 +275,68 @@
        edge as the shelf's own label so the eye reads a single column. -->
   <details id="organizer-shelf" class="organizer-shelf" hidden>
     <summary>
-      <span>Organizer controls</span>
+      <span data-i18n="organizerControls">Organizer controls</span>
       <span class="caret" aria-hidden="true"></span>
     </summary>
     <div class="shelf-body">
       <div id="privacy-group" class="shelf-group">
-        <span class="eyebrow">Sharing your screen</span>
+        <span class="eyebrow" data-i18n="organizerPrivacyEyebrow">Sharing your screen</span>
         <div class="console-row">
           <label class="aspect-toggle">
             <input id="in-privacy" type="checkbox">
-            <span>Privacy mode — show participant aliases in my view</span>
+            <span data-i18n="organizerPrivacyLabel">Privacy mode — show participant aliases in my view</span>
           </label>
         </div>
-        <p class="hint">Only changes what you see. Everyone else keeps their own view.</p>
+        <p class="hint" data-i18n="organizerPrivacyHint">Only changes what you see. Everyone else keeps their own view.</p>
       </div>
 
       <div id="round-group" class="shelf-group">
-        <span class="eyebrow">Timer</span>
+        <span class="eyebrow" data-i18n="organizerTimerEyebrow">Timer</span>
         <div class="console-row">
           <input id="in-seconds" class="mono" type="text" maxlength="8"
-                  placeholder="90s" aria-label="Round timer, e.g. 90s or 5m"
-                  title="Optional round length — 90s, 5m, 1m30s or a plain number of seconds">
+                  placeholder="90s" data-i18n-placeholder="organizerTimerPlaceholder" aria-label="Round timer, e.g. 90s or 5m" data-i18n-aria-label="organizerTimerAria"
+                  title="Optional round length — 90s, 5m, 1m30s or a plain number of seconds" data-i18n-title="organizerTimerTitle">
           <select id="timer-scope" class="scope-select" aria-label="What this timer applies to">
-            <option value="issue">for this issue</option>
-            <option value="remaining">for all remaining issues</option>
+            <option value="issue" data-i18n="organizerTimerOptionIssue">for this issue</option>
+            <option value="remaining" data-i18n="organizerTimerOptionRemaining">for all remaining issues</option>
           </select>
-          <button id="btn-timer" class="btn" type="button" hidden>Start timer</button>
-          <button id="btn-timer-remove" class="btn btn-quiet" type="button" hidden>Remove timer</button>
-          <button id="btn-restart-round" class="btn" type="button" hidden>Restart round</button>
+          <button id="btn-timer" class="btn" type="button" data-i18n="organizerTimerStart" hidden>Start timer</button>
+          <button id="btn-timer-remove" class="btn btn-quiet" type="button" data-i18n="organizerTimerRemove" hidden>Remove timer</button>
+          <button id="btn-restart-round" class="btn" type="button" data-i18n="organizerTimerRestart" hidden>Restart round</button>
         </div>
         <p id="timer-standing" class="hint" hidden></p>
       </div>
 
       <div id="aspect-group" class="shelf-group">
-        <span class="eyebrow">Add an aspect</span>
+        <span class="eyebrow" data-i18n="organizerAspectEyebrow">Add an aspect</span>
         <div class="console-row">
-          <input id="in-aspect" maxlength="24" autocomplete="off" placeholder="Risk" aria-label="New aspect name">
+          <input id="in-aspect" maxlength="24" autocomplete="off" placeholder="Risk" data-i18n-placeholder="organizerAspectPlaceholder" aria-label="New aspect name" data-i18n-aria-label="organizerAspectAria">
           <select id="aspect-scope" class="scope-select" aria-label="What this aspect applies to">
-            <option value="remaining">for all remaining issues</option>
-            <option value="issue">for this issue</option>
+            <option value="remaining" data-i18n="organizerTimerOptionRemaining">for all remaining issues</option>
+            <option value="issue" data-i18n="organizerTimerOptionIssue">for this issue</option>
           </select>
-          <button id="btn-apply-aspect" class="btn" type="button">Add</button>
+          <button id="btn-apply-aspect" class="btn" type="button" data-i18n="organizerAspectAdd">Add</button>
         </div>
-        <p class="hint">Adding one to this issue resets estimates for it — the question changed.</p>
+        <p class="hint" data-i18n="organizerAspectHint">Adding one to this issue resets estimates for it — the question changed.</p>
       </div>
 
       <div id="pending-panel" class="shelf-group" hidden>
-        <span class="eyebrow">Waiting on</span>
+        <span class="eyebrow" data-i18n="organizerPendingEyebrow">Waiting on</span>
         <div class="console-row">
           <span id="pending-people" class="pending-people"></span>
-          <button id="btn-remind" class="btn" type="button">Send reminder</button>
+          <button id="btn-remind" class="btn" type="button" data-i18n="organizerPendingRemind">Send reminder</button>
         </div>
       </div>
 
       <div id="queue-editor" class="shelf-group">
-        <span class="eyebrow">Issue queue</span>
+        <span class="eyebrow" data-i18n="organizerQueueEyebrow">Issue queue</span>
         <div id="queue-items" class="queue-items"></div>
-        <button id="btn-add-queue-item" class="btn queue-add" type="button" aria-label="Add issue">+</button>
+        <button id="btn-add-queue-item" class="btn queue-add" type="button" aria-label="Add issue" data-i18n-aria-label="organizerQueueAddAria">+</button>
       </div>
 
       <div class="shelf-group">
-        <button id="btn-session-settings" class="btn shelf-action" type="button">Session settings</button>
-        <button id="btn-close" class="btn btn-quiet shelf-action">Close session for everyone</button>
+        <button id="btn-session-settings" class="btn shelf-action" type="button" data-i18n="organizerSettings">Session settings</button>
+        <button id="btn-close" class="btn btn-quiet shelf-action" data-i18n="organizerCloseSession">Close session for everyone</button>
       </div>
     </div>
   </details>
@@ -345,21 +345,21 @@
       should not read as one more step in the same stack. -->
  <section id="final-summary-card" class="final-summary-card" hidden>
    <header class="capstone-head">
-     <span class="capstone-kicker">Session complete</span>
-     <h2 class="capstone-title">Final summary</h2>
-     <p class="capstone-sub">Every issue this session, and what the team's shapes added up to.</p>
+     <span class="capstone-kicker" data-i18n="capstoneKicker">Session complete</span>
+     <h2 class="capstone-title" data-i18n="capstoneTitle">Final summary</h2>
+     <p class="capstone-sub" data-i18n="capstoneSub">Every issue this session, and what the team's shapes added up to.</p>
    </header>
    <div class="capstone-total">
      <span id="final-points" class="capstone-points mono"></span>
-     <span class="capstone-points-label">total story points</span>
+     <span class="capstone-points-label" data-i18n="capstoneTotalPoints">total story points</span>
      <span id="final-meta" class="capstone-meta mono"></span>
     </div>
     <div id="final-issues" class="final-issues"></div>
     <section id="session-insights" class="session-insights" hidden>
-      <span class="capstone-kicker">Session insights</span>
+      <span class="capstone-kicker" data-i18n="capstoneInsightsKicker">Session insights</span>
       <ul id="final-insights" class="capstone-insights"></ul>
     </section>
-    <p class="capstone-foot hint">Restart the session to run these issues again or queue new work.</p>
+    <p class="capstone-foot hint" data-i18n="capstoneFoot">Restart the session to run these issues again or queue new work.</p>
  </section>
 
 </main>
@@ -371,20 +371,21 @@
 <aside id="demo-guide" class="demo-guide" aria-live="polite" hidden>
   <div class="demo-guide-head">
     <span id="demo-step" class="eyebrow"></span>
-    <button id="btn-demo-exit" class="btn btn-quiet" type="button">Exit demo</button>
+    <button id="btn-demo-exit" class="btn btn-quiet" type="button" data-i18n="demoExit">Exit demo</button>
   </div>
   <h2 id="demo-title" class="demo-title"></h2>
   <p id="demo-copy" class="demo-copy"></p>
   <section id="demo-peer-preview" class="demo-peer-preview" hidden></section>
   <div class="demo-guide-actions">
     <div class="demo-step-actions">
-      <button id="btn-demo-prev" class="btn" type="button">Previous</button>
-      <button id="btn-demo-next" class="btn" type="button">Next</button>
+      <button id="btn-demo-prev" class="btn" type="button" data-i18n="demoPrevious">Previous</button>
+      <button id="btn-demo-next" class="btn" type="button" data-i18n="demoNext">Next</button>
     </div>
     <span id="demo-progress" class="hint"></span>
   </div>
 </aside>
 
+  <script src="i18n.js"></script>
   <script src="radar.js"></script>
   <script src="app.js"></script>
 </body>
