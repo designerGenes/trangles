@@ -10,6 +10,8 @@ COPY --from=build /triangulate /triangulate
 # .dockerignore keeps static/*.test.js out of the runtime image; they are
 # development assets and would otherwise be served publicly.
 COPY static /static
+# devtools/ is deliberately absent: the colour lab is a local development tool
+# that writes to style.css, and the runtime image has no business carrying it.
 # Client-side strings the browser fetches from /resources/strings.json.
 COPY resources /resources
 # Tunables and the nickname pool. Without this the binary logs a warning and

@@ -388,9 +388,12 @@ const historyEntry = (n, title) => ({
   const capstone = win.document.getElementById("final-summary-card");
   check("capstone is not styled as a process card", !capstone.classList.contains("card"));
   const sheet = read("style.css");
-  const capstoneRule = /\.final-summary-card \{[^}]*\}/.exec(sheet);
+  const resultRule = /\.chart-box, \.summary-card, \.history-card, \.final-summary-card \{[^}]*\}/.exec(sheet);
+  // Anchored: the shared result rule also ends in ".final-summary-card {".
+  const capstoneRule = /^\.final-summary-card \{[^}]*\}/m.exec(sheet);
   check("capstone uses the violet result surface",
-    capstoneRule && /background: linear-gradient\(145deg, #493A78/.test(capstoneRule[0]) && /color: var\(--ink\)/.test(capstoneRule[0]),
+    resultRule && /var\(--violet-lit\), var\(--violet-deep\)/.test(resultRule[0])
+    && capstoneRule && /color: var\(--ink\)/.test(capstoneRule[0]),
     capstoneRule && capstoneRule[0].slice(0, 90));
 
   // The organizer keeps the one action that matters: restart.
@@ -614,10 +617,9 @@ const historyEntry = (n, title) => ({
   check("issues use honey fields and focus", /\.issues-box \{[^}]*--honey/.test(css)
     && /\.issues-box input:focus-visible \{[^}]*--honey/.test(css));
   check("preparation boxes are filled with their semantic colours",
-    /\.issues-box \{[^}]*background: linear-gradient\(145deg, #6A5421/.test(css)
-    && /\.aspects-box \{[^}]*background: linear-gradient\(145deg, #75431E/.test(css)
-    && /\.point-labels-box \{[^}]*background: linear-gradient\(145deg, #1E5872/.test(css)
-    && /\.chart-box \{[^}]*background: linear-gradient\(145deg, #493A78/.test(css));
+    /\.issues-box \{[^}]*--panel-lit: var\(--honey-lit\)/.test(css)
+    && /\.aspects-box \{[^}]*--panel-lit: var\(--orange-lit\)/.test(css)
+    && /\.point-labels-box \{[^}]*--panel-lit: var\(--blue-lit\)/.test(css));
   check("aspects use orange fields and focus", /\.aspects-box \{[^}]*--orange/.test(css)
     && /\.aspects-box input:focus-visible \{[^}]*--orange/.test(css));
   check("point labels use blue fields and focus", /\.point-labels-box \{[^}]*--blue/.test(css)
@@ -628,13 +630,130 @@ const historyEntry = (n, title) => ({
     && /\.ring-outer \{[^}]*var\(--violet\)/.test(css));
   check("active chart surfaces stay reserved while results are violet",
     /\.round-card \.chart-box, \.live-inputs\.chart-box \{[^}]*background: var\(--card\)/.test(css)
-    && /\.summary-card \{[^}]*background: linear-gradient\(145deg, #493A78/.test(css)
-    && /\.final-summary-card \{[^}]*background: linear-gradient\(145deg, #493A78/.test(css));
+    && /\.chart-box, \.summary-card, \.history-card, \.final-summary-card \{[^}]*var\(--violet-lit\), var\(--violet-deep\)/.test(css));
   check("launch uses an indigo complement to the honey intake box",
-    /\.btn-primary \{[^}]*background: #6F62D7/.test(css)
-    && /\.btn-primary \{[^}]*border-color: #8E83F2/.test(css));
+    /\.btn-primary \{[^}]*background: var\(--primary-action\)/.test(css)
+    && /\.btn-primary \{[^}]*border-color: var\(--primary-edge\)/.test(css));
 }
 
+/* ── 16c. Control panels are raised plastic, and stay readable ──────── */
+/* The organizer's editing surfaces are bright, which inverts their text. The
+   checks below are the ones that a colour edit can silently break: the lab at
+   /dev/colors writes straight into the token block, so the floor lives here
+   rather than in a reviewer's eye. */
+{
+  const win = boot();
+  const css = read("style.css");
+
+  const TOKENS = (() => {
+    const block = /TRIANGULATE-TOKENS:START([\s\S]*?)TRIANGULATE-TOKENS:END/.exec(css);
+    const found = {};
+    if (!block) return found;
+    const decl = /--([a-zA-Z0-9-]+):\s*([^;]+);/g;
+    let m;
+    while ((m = decl.exec(block[1]))) found["--" + m[1]] = m[2].trim();
+    return found;
+  })();
+
+  // sRGB relative luminance and WCAG contrast, over an opaque backdrop.
+  const parse = (value) => {
+    const raw = String(value).trim();
+    const hex = /^#([0-9a-fA-F]{6})$/.exec(raw);
+    if (hex) {
+      const n = parseInt(hex[1], 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255, 1];
+    }
+    const fn = /^rgba?\(([^)]+)\)$/.exec(raw);
+    if (!fn) return null;
+    const parts = fn[1].split(",").map((p) => parseFloat(p));
+    return [parts[0], parts[1], parts[2], parts.length > 3 ? parts[3] : 1];
+  };
+  const over = (fg, bg) => {
+    const f = parse(fg), b = parse(bg);
+    if (!f || !b) return null;
+    return [0, 1, 2].map((i) => Math.round((f[3] * f[i]) + ((1 - f[3]) * b[i]))).concat([1]);
+  };
+  const toCss = (rgb) => `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 1)`;
+  const luminance = (value) => {
+    const c = parse(value);
+    if (!c) return null;
+    const chan = (v) => { const x = v / 255; return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+    return (0.2126 * chan(c[0])) + (0.7152 * chan(c[1])) + (0.0722 * chan(c[2]));
+  };
+  const ratio = (a, b) => {
+    const la = luminance(a), lb = luminance(b);
+    if (la === null || lb === null) return 0;
+    return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+  };
+  const T = (name) => TOKENS[name];
+
+  check("every colour token the theme needs is declared",
+    ["--panel-ink", "--panel-ink-soft", "--panel-warn", "--panel-slot", "--honey-deep",
+     "--orange-deep", "--blue-deep", "--violet-lit", "--ink", "--muted", "--primary-action",
+     "--on-primary", "--panel-shade-deep", "--deep-gloss", "--axis-1", "--axis-8"]
+      .every((name) => !!T(name)),
+    Object.keys(TOKENS).length);
+
+  // A panel is a ramp with a sheen over it, so the surface that actually sits
+  // behind the text is darkest in the shaded corner — and darker still inside a
+  // recessed row. That composite, not the raw token, is what text must clear.
+  const families = [["issues", "--honey-deep"], ["aspects", "--orange-deep"], ["labels", "--blue-deep"]];
+  let panelFloor = Infinity, panelWorst = "";
+  for (const [name, deep] of families) {
+    const shaded = toCss(over(T("--panel-shade-deep"), T(deep)));
+    const slot = toCss(over(T("--panel-slot"), shaded));
+    const soft = toCss(over(T("--panel-ink-soft"), slot));
+    const pairs = [
+      [`${name}: panel ink`, ratio(T("--panel-ink"), shaded)],
+      [`${name}: panel ink in a row`, ratio(T("--panel-ink"), slot)],
+      [`${name}: quiet copy in a row`, ratio(soft, slot)],
+      [`${name}: warning copy`, ratio(T("--panel-warn"), shaded)],
+      [`${name}: recessed field`, ratio(T("--surface-input"), slot)],
+    ];
+    for (const [label, value] of pairs) {
+      if (value < panelFloor) { panelFloor = value; panelWorst = label; }
+    }
+  }
+  check("bright control panels keep dark text above the AA floor",
+    panelFloor >= 4.5, { worst: panelWorst, ratio: Number(panelFloor.toFixed(2)) });
+
+  // Results run the same construction in the other direction: light text, so
+  // the lightest corner is the one that can fail.
+  const resultLit = toCss(over(T("--deep-gloss"), T("--violet-lit")));
+  check("result surfaces keep light text above the AA floor",
+    ratio(T("--ink"), resultLit) >= 4.5 && ratio(T("--muted"), resultLit) >= 4.5,
+    { ink: Number(ratio(T("--ink"), resultLit).toFixed(2)), muted: Number(ratio(T("--muted"), resultLit).toFixed(2)) });
+
+  check("the primary action carries its own label",
+    ratio(T("--on-primary"), T("--primary-action")) >= 4.5,
+    Number(ratio(T("--on-primary"), T("--primary-action")).toFixed(2)));
+
+  // Participant colours are stroke AND name label, so they are read as text.
+  const axes = [1, 2, 3, 4, 5, 6, 7, 8].map((i) => T(`--axis-${i}`));
+  const axisFloor = Math.min(...axes.map((c) => ratio(c, T("--card"))));
+  check("every participant colour is legible on the live round surface",
+    axisFloor >= 4.5, Number(axisFloor.toFixed(2)));
+  check("participant colours stay distinguishable from each other",
+    new Set(axes.map((c) => c.toLowerCase())).size === axes.length, axes);
+
+  // The lab can only be authoritative if nothing outside the block paints.
+  const afterBlock = css.slice(css.indexOf("TRIANGULATE-TOKENS:END"));
+  const strays = afterBlock.match(/#[0-9a-fA-F]{3,8}\b|\brgba?\(/g) || [];
+  check("no colour is hard-coded outside the token block", strays.length === 0, strays.slice(0, 6));
+
+  check("panels invert to dark ink rather than inheriting light text",
+    /\.panel \{[^}]*color: var\(--panel-ink\)/.test(css)
+    && win.document.querySelectorAll(".panel").length >= 3);
+  check("panels are lit on the diagonal with a sheen across it",
+    /\.panel \{[^}]*linear-gradient\(var\(--panel-sheen-angle\)/.test(css)
+    && /\.panel \{[^}]*linear-gradient\(var\(--panel-angle\), var\(--panel-lit\), var\(--panel-deep\)\)/.test(css)
+    && /--panel-angle:\s*\d+deg/.test(css));
+  check("panels carry a bevel so they read as raised",
+    /\.panel \{[^}]*inset 0 1px 0 var\(--panel-bevel\)/.test(css)
+    && /inset 0 -1px 0 var\(--panel-bevel-dark\)/.test(css));
+  check("panel rows recess instead of lightening",
+    /\.panel \.intake-row,[\s\S]{0,200}background: var\(--panel-slot\)/.test(css));
+}
 
 /* ── 17. Intake: one mode-switching row, nothing else up front ───────── */
 {

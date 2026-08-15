@@ -37,6 +37,9 @@ func main() {
 		w.Header().Set("Cache-Control", "public, max-age=300")
 		_ = json.NewEncoder(w).Encode(map[string]any{"nicknames": cfg.Nicknames})
 	})
+	// Local-only theme editor. Registers a flat 404 unless TRIANGULATE_DEV=1,
+	// so /dev/ can never fall through to the static file server.
+	RegisterColorLab(mux)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
@@ -57,6 +60,9 @@ func main() {
 		IdleTimeout:       120 * time.Second,
 	}
 	log.Printf("triangulate %s listening on :%s", version, port)
+	if ColorLabEnabled() {
+		log.Printf("colour lab enabled (loopback only): http://localhost:%s/dev/colors", port)
+	}
 	log.Fatal(server.ListenAndServe())
 }
 

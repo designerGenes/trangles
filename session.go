@@ -189,9 +189,14 @@ type Client struct {
 // ShapeColors is the fixed pool participants pick from. It is sent to the
 // client on join so the palette lives in exactly one place, and uniqueness
 // within a session is enforced here rather than trusted from the browser.
+//
+// These mirror the --axis-1..--axis-8 tokens in static/style.css, which is
+// where the colour lab edits them; keep the two lists in step. The previous
+// pool was a separate, muted set that only reached 2.7:1 against the round
+// surface — too weak for the participant names it also colours.
 var ShapeColors = []string{
-	"#6D57B8", "#2A6F8E", "#A87428", "#C03B2D",
-	"#43775C", "#9A4E86", "#536B9B", "#875E3A",
+	"#A98CFF", "#4FC3FF", "#FFB14A", "#FF6464",
+	"#65D69A", "#FF7AC6", "#739AFF", "#FF9D42",
 }
 
 func validShapeColor(want string) bool {

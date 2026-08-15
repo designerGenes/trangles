@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Triangulate — colour lab (local only)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Public+Sans:wght@400;600&family=Spline+Sans+Mono:wght@500;700&display=swap" rel="stylesheet">
+<!-- The specimens below are the shipped classes rendered against the shipped
+     stylesheet. Nothing here restates a colour: if a swatch and the app ever
+     disagree, the swatch is wrong by construction. -->
+<link rel="stylesheet" href="/style.css">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex, nofollow">
+<style>
+  /* Lab chrome only. Prefixed so it can never shadow an app rule. */
+  .lab-shell { display: grid; gap: 24px; grid-template-columns: minmax(0, 22rem) minmax(0, 1fr); max-width: 1500px; margin: 0 auto; padding: 18px 20px 80px; }
+  .lab-head { border-bottom: 1px solid var(--border); margin: 0 auto; max-width: 1500px; padding: 18px 20px 14px; }
+  .lab-head h1 { font-family: "Bricolage Grotesque", sans-serif; font-size: 1.5rem; letter-spacing: -0.02em; margin: 0 0 4px; }
+  .lab-warn { color: var(--honey); font-size: 0.8rem; margin: 0; }
+  .lab-editor { align-self: start; max-height: calc(100dvh - 40px); overflow: auto; position: sticky; top: 12px; }
+  .lab-group { margin-bottom: 18px; }
+  .lab-group > h3 { color: var(--muted); font-size: 0.7rem; letter-spacing: 0.1em; margin: 0 0 8px; text-transform: uppercase; }
+  .lab-token { align-items: center; display: grid; gap: 8px; grid-template-columns: 26px minmax(0, 1fr); margin-bottom: 7px; }
+  .lab-token input[type=color] { background: none; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; height: 26px; padding: 1px; width: 26px; }
+  .lab-chip { border: 1px solid var(--border); border-radius: 6px; height: 26px; width: 26px; }
+  .lab-token input[type=text] { border-radius: 7px; font-family: "Spline Sans Mono", monospace; font-size: 0.74rem; padding: 5px 8px; }
+  .lab-token.is-dirty input[type=text] { border-color: var(--honey); }
+  .lab-name { color: var(--muted); font-size: 0.68rem; font-family: "Spline Sans Mono", monospace; grid-column: 2; margin-top: -4px; }
+  .lab-name b { color: var(--ink); font-family: "Public Sans", sans-serif; font-weight: 600; }
+  .lab-bar { background: var(--card-raised); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; padding: 10px; position: sticky; top: 0; z-index: 5; }
+  .lab-status { color: var(--muted); font-size: 0.78rem; width: 100%; }
+  .lab-specimens { display: flex; flex-direction: column; gap: 4px; }
+  .lab-section > h2 { font-family: "Bricolage Grotesque", sans-serif; font-size: 1.05rem; letter-spacing: -0.01em; margin: 22px 0 8px; }
+  .lab-note { color: var(--muted); font-size: 0.78rem; margin: 0 0 10px; }
+  .lab-row { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; }
+  .lab-swatches { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); }
+  .lab-swatch { border: 1px solid var(--border); border-radius: 10px; font-size: 0.7rem; overflow: hidden; }
+  .lab-swatch i { display: block; height: 44px; }
+  .lab-swatch span { display: block; font-family: "Spline Sans Mono", monospace; padding: 5px 7px; }
+  /* Fixed-position components would fly out of the page; pin them in flow. */
+  .lab-inflow { bottom: auto !important; left: auto !important; position: static !important; right: auto !important; top: auto !important; transform: none !important; width: auto !important; }
+  .lab-checks { border-collapse: collapse; font-size: 0.78rem; width: 100%; }
+  .lab-checks th { color: var(--muted); font-size: 0.68rem; letter-spacing: 0.08em; text-align: left; text-transform: uppercase; }
+  .lab-checks td, .lab-checks th { border-bottom: 1px solid var(--grid); padding: 5px 8px 5px 0; }
+  .lab-checks td.num { font-family: "Spline Sans Mono", monospace; text-align: right; }
+  .lab-pass { color: var(--axis-5); }
+  .lab-fail { color: var(--pencil); font-weight: 700; }
+  @media (max-width: 1000px) {
+    .lab-shell { grid-template-columns: minmax(0, 1fr); }
+    .lab-editor { max-height: none; position: static; }
+  }
+</style>
+</head>
+<body>
+
+<header class="lab-head">
+  <h1>Colour lab</h1>
+  <p class="lab-warn" id="lab-path">Local only — edits are written straight into static/style.css.</p>
+</header>
+
+<div class="lab-shell">
+
+  <!-- ── editor ───────────────────────────────────────────────────── -->
+  <aside class="lab-editor">
+    <div class="lab-bar">
+      <button id="lab-save" class="btn btn-primary" type="button">Save to style.css</button>
+      <button id="lab-revert" class="btn" type="button">Revert</button>
+      <button id="lab-copy" class="btn" type="button">Copy block</button>
+      <span id="lab-status" class="lab-status">Loading tokens…</span>
+    </div>
+    <div id="lab-tokens"></div>
+  </aside>
+
+  <!-- ── specimens ────────────────────────────────────────────────── -->
+  <main class="lab-specimens">
+
+    <section class="lab-section">
+      <h2>Legibility floor</h2>
+      <p class="lab-note">The same pairings the test suite enforces, measured on the composited surface rather than the raw token. A red row here is a red build.</p>
+      <div class="card">
+        <table class="lab-checks"><thead><tr><th>Pairing</th><th>Surface</th><th class="num">Ratio</th><th class="num">Min</th></tr></thead>
+        <tbody id="lab-check-rows"></tbody></table>
+      </div>
+    </section>
+
+    <section class="lab-section">
+      <h2>Base surfaces and text</h2>
+      <div class="card">
+        <div class="lab-swatches" id="lab-base"></div>
+      </div>
+    </section>
+
+    <section class="lab-section">
+      <h2>Organizer control panels</h2>
+      <p class="lab-note">Bright, lit on the diagonal, dark ink. Fields stay recessed and dark inside them.</p>
+
+      <section class="card panel issues-box">
+        <span class="eyebrow">Issues</span>
+        <p class="hint">Honey family — issue entry and issue details.</p>
+        <div class="intake-items">
+          <div class="intake-row">
+            <div class="issue-mode-field field-mode-raw">
+              <input value="PROJ-142 payment retries" aria-label="Issue title">
+              <button class="field-mode-toggle" type="button" aria-label="Field mode">
+                <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+              </button>
+            </div>
+            <button class="btn row-plus" type="button">+</button>
+            <button class="btn row-minus" type="button">−</button>
+          </div>
+        </div>
+        <div class="draft-item-entry">
+          <div class="settings-item-title">A row that sits in a recessed slot</div>
+          <details class="draft-item-meta"><summary>Details<span class="caret"></span></summary></details>
+        </div>
+        <p class="setup-warning">A warning that must survive the bright surface.</p>
+        <div class="intake-actions">
+          <button class="btn btn-primary" type="button">Launch pointing session</button>
+          <button class="btn btn-quiet" type="button">Session settings</button>
+        </div>
+      </section>
+
+      <section class="card panel aspects-box">
+        <span class="eyebrow">Aspects</span>
+        <p class="hint">Orange family — the editable aspect rows.</p>
+        <div id="draft-aspects" class="draft-items">
+          <div class="draft-item"><input value="Uncertainty" aria-label="Aspect"><button class="btn btn-quiet" type="button">Remove</button></div>
+          <div class="draft-item"><input value="Complexity" aria-label="Aspect"><button class="btn btn-quiet" type="button">Remove</button></div>
+        </div>
+      </section>
+
+      <section class="card panel point-labels-box">
+        <div class="control-group">
+          <span class="eyebrow">Point labels</span>
+          <p class="hint">Blue family — what each ring on the chart means.</p>
+          <div id="setup-point-labels">
+            <div class="point-label-row"><span>1</span><input value="Trivial" aria-label="Label for 1"></div>
+            <div class="point-label-row"><span>8</span><input value="Needs breaking down" aria-label="Label for 8"></div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section class="lab-section">
+      <h2>Result surfaces</h2>
+      <p class="lab-note">Deep violet on the same diagonal at lower intensity, so the chart's light strokes keep a dark floor.</p>
+
+      <section id="lab-chart-box" class="card chart-box">
+        <span class="eyebrow">Prospective chart</span>
+        <svg id="lab-radar" viewBox="-70 -45 500 434" role="img" aria-label="Specimen estimation chart"></svg>
+        <p class="hint">Rings, axes, personal shape, group average and a drag handle.</p>
+      </section>
+
+      <section class="card summary-card">
+        <div class="summary-head">
+          <div class="points-block"><span class="points-num">5</span><span class="points-label">points</span></div>
+          <p class="points-why">Group agreed on complexity; toil was the outlier.</p>
+        </div>
+        <div class="axis-stats" id="lab-axis-stats"></div>
+        <p class="insights-title">Observations</p>
+        <ul class="observations"><li>Two participants sat a ring above the rest on uncertainty.</li></ul>
+        <div class="minis" id="lab-minis"></div>
+      </section>
+
+      <section id="final-summary-card" class="final-summary-card">
+        <header class="capstone-head">
+          <span class="capstone-kicker">Session complete</span>
+          <h2 class="capstone-title">Sprint 41 grooming</h2>
+          <p class="capstone-sub">Everything the room pointed, in one place.</p>
+        </header>
+        <div class="capstone-total">
+          <span class="capstone-points">21</span>
+          <span class="capstone-points-label">total points</span>
+          <span class="capstone-meta">3 issues · 5 people</span>
+        </div>
+        <div class="final-issues">
+          <div class="final-issue"><span class="title">PROJ-142 payment retries</span><span class="mono">8</span></div>
+          <div class="final-issue"><span class="title">PROJ-160 audit log export</span><span class="mono">5</span></div>
+        </div>
+        <div class="session-insights">
+          <p class="insights-title">Session insights</p>
+          <ul class="capstone-insights"><li>3 issues estimated in 22 minutes.</li></ul>
+        </div>
+        <p class="capstone-foot">Close the room whenever you are ready.</p>
+      </section>
+    </section>
+
+    <section class="lab-section">
+      <h2>Live round</h2>
+      <p class="lab-note">Deliberately neutral: several participant colours share this surface, so a tint would bias how they read against each other.</p>
+      <section class="card live-inputs chart-box">
+        <div class="live-head">
+          <div><span class="eyebrow">Live input</span><p class="hint">Shapes arrive as people submit.</p></div>
+          <div class="view-switch"><button class="btn" type="button">Overlay</button><button class="btn" type="button">Individual</button></div>
+        </div>
+        <div class="live-toggles" id="lab-live-toggles"></div>
+        <div class="live-scores" id="lab-live-scores">
+          <div class="live-scores-head"><span>Composite</span><strong>Group 5.2</strong></div>
+        </div>
+        <div class="people" id="lab-people"></div>
+      </section>
+    </section>
+
+    <section class="lab-section">
+      <h2>Actions, status and overlays</h2>
+      <div class="card">
+        <div class="lab-row">
+          <button class="btn btn-primary" type="button">Primary action</button>
+          <button class="btn" type="button">Generic control</button>
+          <button class="btn btn-quiet" type="button">Quiet control</button>
+          <button class="btn end-float" type="button">Finish round</button>
+          <button class="btn end-float is-pending" type="button">Finish round (2 pending)</button>
+          <span class="privacy-badge">Private</span>
+          <button class="code-chip" type="button">Session <span class="mono">ABCDE</span></button>
+        </div>
+        <div class="lab-row" style="margin-top:14px">
+          <div class="timer-float lab-inflow">
+            <span class="mono timer">01:24</span>
+            <div class="timer-controls"><button class="timer-mini" type="button">Pause</button><button class="timer-mini" type="button">Remove</button></div>
+          </div>
+          <div class="toast lab-inflow">Invite link copied</div>
+        </div>
+        <div class="lab-row" style="margin-top:14px">
+          <div class="color-options lab-inflow" id="lab-color-options"></div>
+          <div class="live-score-card">
+            <div class="live-score-row">
+              <span class="live-score-name">Waffle Wizard</span>
+              <span class="live-score-track"><i style="width:64%"></i></span>
+              <strong>5</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-guide lab-inflow" style="margin-top:12px">
+        <div class="demo-guide-head"><span class="eyebrow">Guided demo</span><button class="btn btn-quiet" type="button">Exit</button></div>
+        <h3 class="demo-title">Set the aspects</h3>
+        <p class="demo-copy">The guide stays beside the real interface rather than covering it.</p>
+        <div class="demo-peer-preview">
+          <h3>What everyone else sees</h3>
+          <p>Participants only see their own shape until the round closes.</p>
+          <div class="demo-peer-bars"><i style="width:38px"></i><i style="width:22px"></i><i style="width:52px"></i></div>
+        </div>
+        <div class="demo-guide-actions">
+          <div class="demo-step-actions"><button class="btn" type="button">Back</button><button class="btn" type="button">Next</button></div>
+          <span class="hint">Step 3 of 8</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="lab-section">
+      <h2>Participant palette</h2>
+      <p class="lab-note">Also the radar axis colours. The server sends the authoritative copy on join; these tokens are what it mirrors.</p>
+      <div class="card"><div class="lab-swatches" id="lab-axes"></div></div>
+    </section>
+
+  </main>
+</div>
+
+<script src="/radar.js"></script>
+<script src="/dev/colors/colors.js"></script>
+</body>
+</html>

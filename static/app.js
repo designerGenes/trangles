@@ -12,11 +12,36 @@ function setHidden(node, hidden) {
   else node.removeAttribute("hidden");
 }
 const SVGNS = "http://www.w3.org/2000/svg";
-const AXIS_COLORS = ["#A98CFF", "#4FC3FF", "#FFB14A", "#FF6464", "#65D69A", "#FF7AC6", "#739AFF", "#FF9D42"];
+/* Colours live in style.css, never here. These literals are the last-resort
+   copy for the case where the stylesheet has not applied yet; the real values
+   come from the --axis-N tokens so the colour lab can retune charts without
+   anyone remembering that JS holds a second list. */
+const AXIS_FALLBACK = ["#A98CFF", "#4FC3FF", "#FFB14A", "#FF6464", "#65D69A", "#FF7AC6", "#739AFF", "#FF9D42"];
+let axisCache = null;
+/* "" when the stylesheet has not answered yet, so callers decide the fallback. */
+function themeColor(name) {
+  try {
+    const value = getComputedStyle(document.documentElement).getPropertyValue(name);
+    return value ? value.trim() : "";
+  } catch {
+    return "";
+  }
+}
+/* Cached because getComputedStyle on every handle of every redraw is real
+   work — but only once the stylesheet has actually answered. Caching
+   unconditionally would let one early call, made before the CSS applied, pin
+   the fallbacks for the life of the page. */
+function axisColors() {
+  if (axisCache) return axisCache;
+  const resolved = AXIS_FALLBACK.map((hex, i) => themeColor(`--axis-${i + 1}`) || hex);
+  if (resolved.some((hex, i) => hex !== AXIS_FALLBACK[i]) || themeColor("--ink")) axisCache = resolved;
+  return resolved;
+}
 /* Participants pick their own shape colour from this pool. The server owns the
    authoritative list and sends it on join — uniqueness is enforced there — so
    this copy is only the fallback for a boot that never reached a session. */
-let PALETTE = AXIS_COLORS.slice();
+let SERVER_PALETTE = null;
+const palette = () => SERVER_PALETTE || axisColors();
 /* The real pool lives in config/app.json and arrives from /api/config, so
    adding names never means touching JS. These few keep the placeholder
    working if the fetch fails or has not landed yet. */
@@ -102,7 +127,7 @@ function roundAxes(state) {
 /* ── plot geometry ─────────────────────────────────────────────────── */
 const CX = 180, CY = 180, R = 132;
 const angle = (i) => Radar.axisAngle(i, S.axes.length);
-const axisColor = (i) => AXIS_COLORS[i % AXIS_COLORS.length];
+const axisColor = (i) => { const c = axisColors(); return c[i % c.length]; };
 const axisMin = (i) => S.axisMins[i] ?? 0;
 const axisMax = (i) => S.axisMaxes[i] ?? 10;
 const axisValue = (i, fraction) => axisMin(i) + (axisMax(i) - axisMin(i)) * fraction;
@@ -326,7 +351,7 @@ function handleMessage(msg) {
       S.selfId = msg.selfId;
       S.organizer = msg.organizer;
       S.axes = msg.axes;
-      if (Array.isArray(msg.colors) && msg.colors.length) PALETTE = msg.colors.slice();
+      if (Array.isArray(msg.colors) && msg.colors.length) SERVER_PALETTE = msg.colors.slice();
       S.axisMins = msg.axisMins || S.axes.map(() => 1);
       S.axisMaxes = msg.axisMaxes || S.axes.map(() => msg.axisMax || 10);
       S.pointLabels = msg.pointLabels || defaultPointLabels(S.axisMaxes[0]);
@@ -510,8 +535,8 @@ const DEMO_SUMMARY = {
 function demoParticipants(role, submitted) {
   return [
     { id: "ada", name: "Ada", organizer: true, submitted: false },
-    { id: "mina", name: role === "participant" ? "You" : "Mina", organizer: false, submitted: !!submitted, color: "#A98CFF" },
-    { id: "rowan", name: "Rowan", organizer: false, submitted: !!submitted, color: "#4FC3FF" },
+    { id: "mina", name: role === "participant" ? "You" : "Mina", organizer: false, submitted: !!submitted, color: axisColor(0) },
+    { id: "rowan", name: "Rowan", organizer: false, submitted: !!submitted, color: axisColor(1) },
   ];
 }
 
@@ -1189,7 +1214,7 @@ function renderProspectivePlot() {
   const mins = aspects.map(() => 1);
   const maxes = aspects.map(() => max);
   const values = aspects.map(() => Math.min(max, START_VALUE));
-  drawStaticRadar($("setup-full-plot"), aspects, mins, maxes, [{ name: "Starting values", values, color: "#F4F1E8" }]);
+  drawStaticRadar($("setup-full-plot"), aspects, mins, maxes, [{ name: "Starting values", values, color: themeColor("--ink") || "#F4F1E8" }]);
 }
 
 function renderLiveInputs(shapes, scores = []) {
@@ -1321,7 +1346,8 @@ function participantColor(id) {
   const people = (S.state && S.state.participants) || [];
   const index = people.findIndex((person) => person.id === id);
   if (index >= 0 && people[index].color) return people[index].color;
-  return PALETTE[(index < 0 ? 0 : index) % PALETTE.length];
+  const pool = palette();
+  return pool[(index < 0 ? 0 : index) % pool.length];
 }
 
 // My own colour, or null before the server has assigned one.
@@ -1352,7 +1378,7 @@ function renderColorPicker(st) {
     .map((person) => person.color.toLowerCase()));
   const box = $("color-options");
   box.innerHTML = "";
-  PALETTE.forEach((color) => {
+  palette().forEach((color) => {
     const option = document.createElement("button");
     option.type = "button";
     option.className = "color-option";
@@ -1481,7 +1507,7 @@ function renderHistory() {
   // still see who diverged on an issue they have already moved past.
   const shapes = (summary.shapes || []).map((shape, i) => ({
     id: `history-${i}`, name: shape.name, values: shape.values,
-    color: knownColor(shape.id) || PALETTE[i % PALETTE.length],
+    color: knownColor(shape.id) || palette()[i % palette().length],
   }));
   if (averages.length) {
     shapes.push({ id: "history-avg", name: "Group", values: averages, color: "var(--pencil)" });
