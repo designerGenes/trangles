@@ -130,7 +130,6 @@
     <span class="eyebrow">Aspects</span>
     <p class="hint">Each aspect becomes one axis of the chart. Two to twelve.</p>
     <div id="draft-aspects" class="draft-items"></div>
-    <button id="btn-add-aspect" class="btn row-plus" type="button" aria-label="Add aspect">+</button>
     <p id="setup-aspect-warning" class="setup-warning" hidden>Choose between 2 and 12 aspects to launch a session.</p>
   </section>
 
@@ -138,13 +137,8 @@
     <span class="eyebrow">Point range</span>
     <div class="control-group">
       <span class="field-label">Points per aspect</span>
-      <div class="point-range-control">
-        <button id="btn-setup-max-minus" class="btn row-minus" type="button" aria-label="Remove highest point">-</button>
-        <output id="setup-max-display" class="mono" for="btn-setup-max-minus btn-setup-max-plus">8</output>
-        <button id="btn-setup-max-plus" class="btn row-plus" type="button" aria-label="Add point">+</button>
-        <input id="setup-max" type="hidden" value="8">
-      </div>
-      <p class="hint">Start with eight points. Add or remove the highest point to change the shared range.</p>
+      <p class="hint">Start with eight points. Add a row to extend the range or remove one to renumber the remaining points.</p>
+      <input id="setup-max" type="hidden" value="8">
     </div>
     <div class="control-group">
       <span class="eyebrow">Point hover labels</span>

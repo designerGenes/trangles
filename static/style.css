@@ -194,10 +194,8 @@ details[open] > summary .caret { transform: rotate(225deg); }
 .control-group { display: flex; flex-direction: column; gap: 6px; }
 .control-group + .control-group { border-top: 1px solid var(--grid); margin-top: 16px; padding-top: 14px; }
 .field-label { color: var(--muted); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }
-.point-range-control { align-items: center; display: flex; gap: 8px; }
-.point-range-control output { font-size: 1.3rem; font-weight: 700; min-width: 2ch; text-align: center; }
-#setup-point-labels { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; max-height: 320px; overflow-y: auto; }
-.point-label-row { align-items: center; display: grid; gap: 8px; grid-template-columns: 2rem 1fr; }
+#setup-point-labels { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.point-label-row { align-items: center; display: grid; gap: 8px; grid-template-columns: 2rem minmax(0, 1fr) 44px 44px; }
 .point-label-row span { color: var(--muted); font-family: "Spline Sans Mono", monospace; text-align: right; }
 #setup-full-plot { display: block; margin: 4px auto; max-width: 620px; overflow: visible; width: 100%; }
 

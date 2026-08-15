@@ -1084,34 +1084,74 @@ function renderSetupRange() {
   renderProspectivePlot();
 }
 
-function renderPointLabelRows() {
+function currentPointLabels() {
+  return Array.from($("setup-point-labels").querySelectorAll("input")).map((input) => input.value);
+}
+
+function normalizePointLabels(labels) {
+  if (!labels[0]) labels[0] = "Light";
+  if (!labels[labels.length - 1]) labels[labels.length - 1] = "Heavy";
+  return labels;
+}
+
+function renderPointLabelRows(labelsIn) {
   const max = setupMax();
-  const current = Array.from($("setup-point-labels").querySelectorAll("input")).map((input) => input.value);
+  const current = labelsIn || currentPointLabels();
   $("setup-point-labels").innerHTML = "";
-  $("setup-max-display").textContent = max || "—";
-  $("btn-setup-max-minus").disabled = !max || max <= 2;
-  $("btn-setup-max-plus").disabled = !max || max >= 100;
   if (!max) return;
-  for (let value = 1; value <= max; value++) {
-    const row = document.createElement("label");
+  const labels = current.slice(0, max);
+  while (labels.length < max) labels.push("");
+  normalizePointLabels(labels);
+  for (let index = 0; index < max; index++) {
+    const row = document.createElement("div");
     row.className = "point-label-row";
     const number = document.createElement("span");
-    number.textContent = String(value);
+    number.textContent = String(index + 1);
     const input = document.createElement("input");
     input.maxLength = 24;
-    input.placeholder = value === 1 ? "Light" : value === max ? "Heavy" : "Optional label";
-    input.value = current[value - 1] ?? (value === 1 ? "Light" : value === max ? "Heavy" : "");
+    input.placeholder = index === 0 ? "Light" : index === max - 1 ? "Heavy" : "Optional label";
+    input.value = labels[index];
     row.append(number, input);
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "btn row-minus";
+    remove.textContent = "-";
+    remove.disabled = max <= 2;
+    remove.setAttribute("aria-label", `Remove point ${index + 1}`);
+    remove.onclick = () => removePointLabel(index);
+    row.appendChild(remove);
+    if (index === max - 1) {
+      const plus = document.createElement("button");
+      plus.type = "button";
+      plus.className = "btn row-plus";
+      plus.textContent = "+";
+      plus.disabled = max >= 100;
+      plus.setAttribute("aria-label", "Add point");
+      plus.onclick = appendPointLabel;
+      row.appendChild(plus);
+    }
     $("setup-point-labels").appendChild(row);
   }
 }
 
-function adjustSetupMax(delta) {
-  const current = setupMax() || 8;
-  const next = Math.max(2, Math.min(100, current + delta));
-  if (next === current) return;
-  $("setup-max").value = String(next);
-  renderSetupRange();
+function appendPointLabel() {
+  const labels = currentPointLabels();
+  if (labels.length >= 100) return;
+  if (labels[labels.length - 1] === "Heavy") labels[labels.length - 1] = "";
+  labels.push("Heavy");
+  $("setup-max").value = String(labels.length);
+  renderPointLabelRows(labels);
+  renderProspectivePlot();
+}
+
+function removePointLabel(index) {
+  const labels = currentPointLabels();
+  if (labels.length <= 2) return;
+  labels.splice(index, 1);
+  normalizePointLabels(labels);
+  $("setup-max").value = String(labels.length);
+  renderPointLabelRows(labels);
+  renderProspectivePlot();
 }
 
 function setupPointLabels() {
@@ -1778,7 +1818,6 @@ window.addEventListener("beforeunload", (event) => {
   event.returnValue = "";
 });
 
-$("btn-add-aspect").onclick = () => addDraftAspect();
 $("btn-open-settings").onclick = () => showSettings("intake", true);
 $("btn-session-settings").onclick = () => showSettings("session", true);
 $("btn-settings-back").onclick = backFromSettings;
@@ -1829,8 +1868,6 @@ function launchDrafts() {
 }
 $("btn-launch").onclick = launchDrafts;
 $("setup-max").oninput = renderSetupRange;
-$("btn-setup-max-minus").onclick = () => adjustSetupMax(-1);
-$("btn-setup-max-plus").onclick = () => adjustSetupMax(1);
 $("btn-live-overlay").onclick = () => {
   S.liveView = "overlay";
   const round = S.state && S.state.round;
@@ -2074,17 +2111,46 @@ function addDraftAspect(value = "", edited = true) {
   input.maxLength = 24;
   input.placeholder = "Aspect name";
   input.value = value;
-  input.oninput = () => { S.settingsEdited = true; renderProspectivePlot(); };
+  input.oninput = () => {
+    S.settingsEdited = true;
+    refreshAspectControls();
+    renderProspectivePlot();
+  };
   const remove = document.createElement("button");
   remove.type = "button";
   remove.className = "btn row-minus";
   remove.textContent = "-";
   remove.setAttribute("aria-label", "Remove aspect");
-  remove.onclick = () => { S.settingsEdited = true; row.remove(); renderProspectivePlot(); };
+  remove.onclick = () => {
+    S.settingsEdited = true;
+    const rows = Array.from($("draft-aspects").children);
+    // Leave one blank row behind so a deliberately empty schema still has a
+    // right-edge plus affordance instead of stranding the organizer.
+    if (rows.length === 1) input.value = "";
+    else row.remove();
+    refreshAspectControls();
+    renderProspectivePlot();
+  };
   row.append(input, remove);
   $("draft-aspects").appendChild(row);
+  refreshAspectControls();
   input.focus();
   renderProspectivePlot();
+}
+
+function refreshAspectControls() {
+  const rows = Array.from($("draft-aspects").children);
+  rows.forEach((row) => row.querySelector(".row-plus")?.remove());
+  const last = rows[rows.length - 1];
+  if (!last) return;
+  const plus = document.createElement("button");
+  plus.type = "button";
+  plus.className = "btn row-plus";
+  plus.textContent = "+";
+  plus.disabled = setupAspectNames().length >= 12;
+  plus.setAttribute("aria-label", "Add aspect");
+  plus.onclick = () => addDraftAspect();
+  last.appendChild(plus);
 }
 
 function requiredNickname() {

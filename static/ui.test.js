@@ -984,21 +984,28 @@ const historyEntry = (n, title) => ({
   check("issue details are the first settings container", /Issue details/.test(firstCard.textContent));
   check("settings offers Back beside Launch", !!win.document.getElementById("btn-settings-back")
     && shown(win, "btn-close-settings"));
-  check("point range starts at eight with row controls", win.document.getElementById("setup-max-display").textContent === "8"
-    && !win.document.getElementById("btn-setup-max-minus").disabled);
+  let pointRows = Array.from(win.document.querySelectorAll("#setup-point-labels .point-label-row"));
+  check("point range starts with eight inline rows", pointRows.length === 8
+    && pointRows.every((row) => !!row.querySelector(".row-minus"))
+    && !!pointRows.at(-1).querySelector(".row-plus"));
 
-  win.document.getElementById("btn-setup-max-plus").click();
-  check("point range plus adds the next label row", win.document.getElementById("setup-max-display").textContent === "9"
-    && win.document.querySelectorAll("#setup-point-labels input").length === 9);
-  win.document.getElementById("btn-setup-max-minus").click();
-  check("point range minus removes the highest label row", win.document.getElementById("setup-max-display").textContent === "8"
-    && win.document.querySelectorAll("#setup-point-labels input").length === 8);
+  pointRows.at(-1).querySelector(".row-plus").click();
+  pointRows = Array.from(win.document.querySelectorAll("#setup-point-labels .point-label-row"));
+  check("last point row plus appends the next label row", pointRows.length === 9
+    && !!pointRows.at(-1).querySelector(".row-plus"));
+  pointRows[2].querySelector("input").value = "remove me";
+  pointRows[2].querySelector(".row-minus").click();
+  pointRows = Array.from(win.document.querySelectorAll("#setup-point-labels .point-label-row"));
+  check("point row minus removes and renumbers a point", pointRows.length === 8
+    && pointRows[2].querySelector("span").textContent === "3");
 
   const initialAspects = win.document.querySelectorAll("#draft-aspects .draft-item").length;
-  win.document.getElementById("btn-add-aspect").click();
+  let aspectRows = Array.from(win.document.querySelectorAll("#draft-aspects .draft-item"));
+  aspectRows.at(-1).querySelector(".row-plus").click();
+  aspectRows = Array.from(win.document.querySelectorAll("#draft-aspects .draft-item"));
   check("aspects use a plus control", win.document.querySelectorAll("#draft-aspects .draft-item").length === initialAspects + 1
-    && win.document.getElementById("btn-add-aspect").textContent === "+");
-  check("aspect rows use matching minus controls", win.document.querySelectorAll("#draft-aspects .row-minus").length === initialAspects + 1);
+    && !!aspectRows.at(-1).querySelector(".row-plus"));
+  check("aspect rows use matching inline minus controls", win.document.querySelectorAll("#draft-aspects .row-minus").length === initialAspects + 1);
 
   win.document.getElementById("btn-close-settings").click();
   const warning = win.document.getElementById("settings-items-warning");
