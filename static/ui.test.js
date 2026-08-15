@@ -997,5 +997,48 @@ const historyEntry = (n, title) => ({
     { view: T.S.view, state: win.history.state });
 }
 
+/* ── 31. Guided demos use the real views without creating a session ───── */
+{
+  const win = boot();
+  const T = win.__test;
+  check("guided demo launcher is available", !!win.document.getElementById("btn-demo"));
+  T.startDemo("organizer");
+  check("organizer demo opens the real session view", shown(win, "view-session") && T.S.organizer);
+  check("organizer demo explains the participant perspective", shown(win, "demo-peer-preview")
+    && /Participant view/.test(win.document.getElementById("demo-peer-preview").textContent));
+  check("organizer demo starts with organizer controls", shown(win, "organizer-shelf"));
+  check("demo guide is anchored to its highlighted control", win.document.querySelector(".demo-target").hasAttribute("data-demo-tooltip")
+    && win.document.querySelector(".demo-target").getAttribute("aria-describedby") === "demo-guide");
+
+  T.runDemoStep("organizer", 1);
+  check("organizer demo simulates live participant charts", T.S.state.round.liveShapes.length === 2
+    && shown(win, "live-inputs"));
+  T.runDemoStep("organizer", 2);
+  check("organizer demo simulates a concluded issue", shown(win, "history-card")
+    && /Finish the round/.test(win.document.getElementById("demo-title").textContent));
+  T.runDemoStep("organizer", 3);
+  check("organizer demo reaches session results", shown(win, "final-summary-card")
+    && /Wrap up/.test(win.document.getElementById("demo-title").textContent));
+  T.stopDemo();
+  check("exiting organizer demo returns to landing", shown(win, "view-landing") && !shown(win, "demo-guide"));
+
+  const pending = { close() { this.closed = true; }, onopen() {}, onmessage() {}, onclose() {} };
+  T.S.ws = pending;
+  T.startDemo("participant");
+  check("demo disconnects any pending real connection", pending.closed && T.S.ws === null);
+  check("participant demo begins waiting for the organizer", !T.S.organizer
+    && /Join and wait/.test(win.document.getElementById("demo-title").textContent));
+  T.runDemoStep("participant", 1);
+  check("participant demo shows the private chart after organizer launch", shown(win, "plot-wrap")
+    && /Make a private estimate/.test(win.document.getElementById("demo-title").textContent));
+  T.runDemoStep("participant", 2);
+  check("participant demo automatically submits the estimate", win.document.getElementById("btn-submit").disabled
+    && /Submit your shape/.test(win.document.getElementById("demo-title").textContent));
+  T.runDemoStep("participant", 3);
+  check("participant demo receives an anonymized result", shown(win, "summary-card")
+    && /Anonymous response/.test(win.document.getElementById("minis").textContent));
+  T.stopDemo();
+}
+
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

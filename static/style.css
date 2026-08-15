@@ -116,6 +116,11 @@ main { max-width: var(--column); margin: 0 auto; padding: 8px 16px 48px; }
 .landing-rule { width: 1px; background: var(--border); }
 .entry-warning { color: var(--pencil); font-size: 0.8rem; margin: 10px 0 0; text-align: left; }
 .hint { font-size: 0.8rem; color: var(--muted); margin: 0; }
+.demo-launch { display: block; margin: 14px auto 0; }
+.demo-launcher-card { margin: 14px auto 0; max-width: 30rem; text-align: left; }
+.demo-launcher-head { align-items: flex-start; display: flex; gap: 12px; justify-content: space-between; }
+.demo-launcher-head h2 { font-family: "Bricolage Grotesque", sans-serif; font-size: 1.2rem; letter-spacing: -0.01em; margin: 3px 0 0; }
+.demo-choice-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 
 /* Issue intake -------------------------------------------------------- */
 /* The screen that replaces the old launch console. One column, one question:
@@ -580,6 +585,60 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
   max-width: 90vw;
 }
 
+/* Guided demo --------------------------------------------------------- */
+/* The guide is deliberately a compact companion instead of a modal. The
+   production interface remains visible so the explanation and behavior stay
+   connected. */
+.demo-guide {
+  background: var(--ink);
+  border: 1px solid #40555B;
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(30, 43, 47, 0.28);
+  color: var(--paper);
+  max-width: 25rem;
+  padding: 16px;
+  position: fixed;
+  right: 18px;
+  top: 76px;
+  width: calc(100% - 36px);
+  z-index: 70;
+}
+.demo-guide .eyebrow { color: #E7A79E; }
+.demo-guide .btn-quiet { color: rgba(243, 245, 241, 0.72); }
+.demo-guide .btn-quiet:hover { color: #fff; }
+.demo-guide-head { align-items: center; display: flex; justify-content: space-between; }
+.demo-title { font-family: "Bricolage Grotesque", sans-serif; font-size: 1.25rem; letter-spacing: -0.01em; margin: 8px 0 4px; }
+.demo-copy { color: rgba(243, 245, 241, 0.78); font-size: 0.9rem; margin: 0; }
+.demo-peer-preview { background: rgba(243, 245, 241, 0.1); border: 1px solid rgba(243, 245, 241, 0.16); border-radius: 7px; margin-top: 14px; padding: 10px; }
+.demo-peer-preview h3 { font-size: 0.9rem; margin: 3px 0 5px; }
+.demo-peer-preview p { color: rgba(243, 245, 241, 0.72); font-size: 0.8rem; margin: 0; }
+.demo-peer-bars { display: flex; gap: 5px; margin-top: 9px; }
+.demo-peer-bars i { background: #E7A79E; border-radius: 999px; display: block; height: 5px; }
+.demo-guide-actions { align-items: center; display: flex; gap: 10px; justify-content: space-between; margin-top: 14px; }
+.demo-guide-actions .btn { border-color: rgba(243, 245, 241, 0.65); background: transparent; color: var(--paper); font-size: 0.8rem; padding: 6px 10px; }
+.demo-guide-actions .hint { color: rgba(243, 245, 241, 0.58); text-align: right; }
+.demo-target { box-shadow: 0 0 0 3px #E7A79E, 0 0 0 7px rgba(231, 167, 158, 0.25); position: relative; z-index: 5; }
+/* A short, target-anchored tooltip names the current control. The adjacent
+   guide carries the longer explanation and, for organizers, the peer view. */
+.demo-target::after {
+  background: var(--ink);
+  border: 1px solid #40555B;
+  border-radius: 5px;
+  color: var(--paper);
+  content: attr(data-demo-tooltip);
+  font-size: 0.76rem;
+  font-weight: 600;
+  left: 12px;
+  max-width: min(19rem, calc(100vw - 48px));
+  padding: 5px 8px;
+  pointer-events: none;
+  position: absolute;
+  top: -12px;
+  transform: translateY(-100%);
+  white-space: nowrap;
+  z-index: 6;
+}
+
 /* Below this the side gutter is too narrow to hold the button clear of the
    content column, so it becomes a floating bar above the fold instead. */
 @media (max-width: 1080px) {
@@ -602,6 +661,8 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
   .live-head { align-items: stretch; flex-direction: column; }
   /* The masthead already occupies the top-right on a narrow screen. */
   .timer-float { right: 50%; top: auto; bottom: 16px; transform: translateX(50%); }
+  .demo-guide { bottom: 12px; right: 12px; top: auto; width: calc(100% - 24px); }
+  .demo-target::after { max-width: calc(100vw - 48px); overflow: hidden; text-overflow: ellipsis; }
 }
 
 @media (prefers-reduced-motion: no-preference) {

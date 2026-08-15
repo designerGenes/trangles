@@ -51,7 +51,23 @@
     <!-- Sits below the split, so revealing it never shifts either button off
          the line they share. -->
     <p id="entry-warning" class="entry-warning" role="alert" hidden>A nickname is required.</p>
+    <button id="btn-demo" class="btn btn-quiet demo-launch" type="button">Explore a guided demo</button>
   </div>
+
+  <section id="demo-launcher" class="card demo-launcher-card" hidden aria-labelledby="demo-launcher-title">
+    <div class="demo-launcher-head">
+      <div>
+        <span class="eyebrow">Guided demo</span>
+        <h2 id="demo-launcher-title">Watch a pointing session unfold.</h2>
+      </div>
+      <button id="btn-demo-close" class="btn btn-quiet" type="button">Close</button>
+    </div>
+    <p class="hint">Uses sample issues and simulated submissions. It never creates a session or sends your data.</p>
+    <div class="demo-choice-row">
+      <button id="btn-demo-organizer" class="btn btn-primary" type="button">Organizer walkthrough</button>
+      <button id="btn-demo-participant" class="btn" type="button">Participant walkthrough</button>
+    </div>
+  </section>
 </main>
 
 <!-- Floats above everything for the whole room. The organizer gets the two
@@ -367,6 +383,22 @@
 </main>
 
 <div id="toast" class="toast" role="status" hidden></div>
+
+<!-- A tour stays above the real UI rather than replacing it: every step points
+     at the production screen being demonstrated. -->
+<aside id="demo-guide" class="demo-guide" aria-live="polite" hidden>
+  <div class="demo-guide-head">
+    <span id="demo-step" class="eyebrow"></span>
+    <button id="btn-demo-exit" class="btn btn-quiet" type="button">Exit demo</button>
+  </div>
+  <h2 id="demo-title" class="demo-title"></h2>
+  <p id="demo-copy" class="demo-copy"></p>
+  <section id="demo-peer-preview" class="demo-peer-preview" hidden></section>
+  <div class="demo-guide-actions">
+    <button id="btn-demo-replay" class="btn" type="button">Replay this walkthrough</button>
+    <span id="demo-progress" class="hint"></span>
+  </div>
+</aside>
 
   <script src="radar.js"></script>
   <script src="app.js"></script>

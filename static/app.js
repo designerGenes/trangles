@@ -84,6 +84,7 @@ const S = {
   feedbackVote: null,   // my vote on the round just concluded
   settingsReturn: "intake",
   settingsEdited: false, // distinguishes default settings from deliberate removal
+  demo: null,            // client-only scripted walkthrough; never reaches the server
 };
 
 /* The round on screen owns the aspect list; the session-level set is only the
@@ -359,6 +360,7 @@ function handleMessage(msg) {
 }
 
 function send(obj) {
+  if (S.demo) return;
   if (S.ws && S.ws.readyState === WebSocket.OPEN) S.ws.send(JSON.stringify(obj));
 }
 
@@ -442,6 +444,7 @@ function closeSettings(record) {
 }
 
 function toLanding(message) {
+  clearDemo();
   S.leftDeliberately = true;
   if (S.ws) try { S.ws.close(); } catch (_) {}
   S.ws = null; S.state = null; S.code = null; S.submittedRound = null; S.live = false;
@@ -468,8 +471,203 @@ function toLanding(message) {
   $("setup-max").value = "8";
   stopCountdown();
   setHidden($("privacy-badge"), true);
+  setHidden($("btn-demo"), false);
   showView("landing");
   if (message) toast(message);
+}
+
+/* ── guided demo ───────────────────────────────────────────────────── */
+/* The walkthrough sends no WebSocket messages. It feeds representative state
+   snapshots through the same renderer a real session uses, so the guide stays
+   useful whenever the production interface evolves. */
+const DEMO_AXES = ["Uncertainty", "Complexity", "Toil"];
+const DEMO_SUMMARY = {
+  storyPoints: 5,
+  pointsWhy: "Weighted blend of the axes scores 4.4, +0.2 because the team disagrees -> 5 points.",
+  averages: [5, 4, 3],
+  spread: [0.8, 0.5, 0.5],
+  observations: ["Strong agreement across all aspects.", "Well understood but heavy: mostly an engineering-time problem, not a research one."],
+  outliers: [],
+  shapes: [
+    { id: "mina", name: "Mina", values: [5, 4, 3] },
+    { id: "rowan", name: "Rowan", values: [5, 4, 3] },
+  ],
+  scores: [],
+};
+
+function demoParticipants(role, submitted) {
+  return [
+    { id: "ada", name: "Ada", organizer: true, submitted: false },
+    { id: "mina", name: role === "participant" ? "You" : "Mina", organizer: false, submitted: !!submitted, color: "#6D57B8" },
+    { id: "rowan", name: "Rowan", organizer: false, submitted: !!submitted, color: "#2A6F8E" },
+  ];
+}
+
+function demoRound(open, submitted, summary, liveShapes) {
+  return {
+    number: 1,
+    title: "Invite teammates to a project workspace",
+    description: "Let workspace owners invite colleagues, choose a role, and resend a pending invite.",
+    open,
+    submittedCount: submitted ? 2 : 0,
+    axes: DEMO_AXES,
+    axisMins: [1, 1, 1],
+    axisMaxes: [8, 8, 8],
+    summary: summary || undefined,
+    liveShapes: liveShapes || [],
+  };
+}
+
+function demoState(role, round, submitted, history, finalSummary) {
+  return {
+    type: "state",
+    code: "DEMO1",
+    axes: DEMO_AXES,
+    axisMins: [1, 1, 1],
+    axisMaxes: [8, 8, 8],
+    pointLabels: ["", "Light", "", "", "", "", "", "", "Heavy"],
+    participants: demoParticipants(role, submitted),
+    queuedItems: 0,
+    round,
+    history: role === "organizer" ? (history || []) : [],
+    finalSummary: finalSummary || undefined,
+  };
+}
+
+function demoPeerPreview(step) {
+  const copy = [
+    ["Participant view", "Mina receives the same issue and drags a private shape before anyone else can see a result.", [55, 45, 35]],
+    ["Participant view", "Mina sees her own chart while the organizer sees only the live, unnamed aggregate.", [62, 50, 38]],
+    ["Participant view", "Mina submits. Her estimate is locked while the organizer finishes the round.", [62, 50, 38]],
+    ["Participant view", "Mina receives the score and group insights, with peer responses anonymized.", [62, 50, 38]],
+  ][Math.min(step, 3)];
+  return `<span class="eyebrow">${copy[0]}</span><h3>Invite teammates to a project workspace</h3><p>${copy[1]}</p>
+    <div class="demo-peer-bars" aria-hidden="true">${copy[2].map((width) => `<i style="width:${width}%"></i>`).join("")}</div>`;
+}
+
+function setDemoGuide(step, title, copy, target, peer) {
+  document.querySelectorAll(".demo-target").forEach((node) => {
+    node.classList.remove("demo-target");
+    node.removeAttribute("data-demo-tooltip");
+    node.removeAttribute("aria-describedby");
+  });
+  const focus = target && document.querySelector(target);
+  if (focus) {
+    focus.classList.add("demo-target");
+    focus.dataset.demoTooltip = title;
+    focus.setAttribute("aria-describedby", "demo-guide");
+  }
+  $("demo-step").textContent = `${S.demo.role === "organizer" ? "Organizer" : "Participant"} demo · ${step + 1} of 4`;
+  $("demo-title").textContent = title;
+  $("demo-copy").textContent = copy;
+  $("demo-progress").textContent = step < 3 ? "Next moment appears automatically." : "Walkthrough complete.";
+  setHidden($("demo-peer-preview"), !peer);
+  $("demo-peer-preview").innerHTML = peer || "";
+  setHidden($("demo-guide"), false);
+}
+
+function runDemoStep(role, step) {
+  if (!S.demo || S.demo.role !== role) return;
+  S.demo.step = step;
+  const history = [{ number: 1, title: "Invite teammates to a project workspace", summary: DEMO_SUMMARY,
+    axes: DEMO_AXES, axisMins: [1, 1, 1], axisMaxes: [8, 8, 8] }];
+  const liveShapes = DEMO_SUMMARY.shapes.map((shape) => ({ ...shape }));
+  if (role === "organizer") {
+    if (step === 0) {
+      S.state = demoState(role, demoRound(true, false), false);
+      setDemoGuide(step, "Start with one issue", "Ada launches a lightweight session. Participants can join from the session code, while the organizer watches the room instead of voting.", ".round-card", demoPeerPreview(step));
+    } else if (step === 1) {
+      S.state = demoState(role, demoRound(true, false, null, liveShapes), false);
+      setDemoGuide(step, "Watch shapes arrive", "Mina and Rowan adjust their charts. The organizer sees the live overlay and can switch to individual cards without exposing a final score.", "#live-inputs", demoPeerPreview(step));
+    } else if (step === 2) {
+      S.state = demoState(role, demoRound(false, true, DEMO_SUMMARY), true, history);
+      setDemoGuide(step, "Finish the round", "When everyone has submitted, Ada ends the issue. The completed-issue view keeps the score, aspect averages, and discussion prompts together.", "#history-card", demoPeerPreview(step));
+    } else {
+      S.state = demoState(role, demoRound(false, true, DEMO_SUMMARY), true, history, {
+        totalPoints: 5,
+        issues: history,
+        sessionInsights: ["1 issue estimated across this session.", "Strong agreement on 1 issue."],
+      });
+      setDemoGuide(step, "Wrap up or keep pointing", "Ada can share the session result, then continue by adding another issue instead of creating a new room.", "#final-summary-card", demoPeerPreview(step));
+    }
+  } else if (step === 0) {
+    S.state = demoState(role, null, false);
+    setDemoGuide(step, "Join and wait", "Mina joins with a nickname and session code. The organizer starts the issue when the team is ready.", ".round-card");
+  } else if (step === 1) {
+    S.my = [2, 2, 2];
+    S.touched = false;
+    S.state = demoState(role, demoRound(true, false), false);
+    setDemoGuide(step, "Make a private estimate", "The organizer has started an issue. Mina adjusts every aspect on her own chart; no team result is shown yet.", "#plot-wrap");
+  } else if (step === 2) {
+    S.my = [5, 4, 3];
+    S.touched = true;
+    S.state = demoState(role, demoRound(true, true), true);
+    setDemoGuide(step, "Submit your shape", "Mina's estimate is submitted automatically for the demo. Her chart locks, while the organizer waits for the room or finishes the round.", "#submit-row");
+  } else {
+    const anonymous = { ...DEMO_SUMMARY, shapes: DEMO_SUMMARY.shapes.map((shape, index) => ({ ...shape, id: "", name: `Anonymous response ${index + 1}` })) };
+    S.state = demoState(role, demoRound(false, true, anonymous), true);
+    setDemoGuide(step, "Read the shared outcome", "Ada closes the issue. Mina sees the story-point result and useful group insights without seeing anyone else's named estimate.", "#summary-card");
+  }
+  render();
+}
+
+function queueDemo(role) {
+  const demo = S.demo;
+  [2200, 4600, 7000].forEach((delay, index) => {
+    demo.timers.push(setTimeout(() => {
+      if (S.demo === demo) runDemoStep(role, index + 1);
+    }, delay));
+  });
+}
+
+function clearDemo() {
+  if (S.demo) S.demo.timers.forEach((timer) => clearTimeout(timer));
+  S.demo = null;
+  document.querySelectorAll(".demo-target").forEach((node) => {
+    node.classList.remove("demo-target");
+    node.removeAttribute("data-demo-tooltip");
+    node.removeAttribute("aria-describedby");
+  });
+  setHidden($("demo-guide"), true);
+}
+
+function startDemo(role) {
+  // A demo never shares a transport with a real session. The visible launcher
+  // is hidden as soon as create/join begins; this closes the remaining race for
+  // programmatic starts or a connection that has not finished opening yet.
+  if (S.ws) {
+    S.leftDeliberately = true;
+    S.ws.onopen = null;
+    S.ws.onmessage = null;
+    S.ws.onclose = null;
+    try { S.ws.close(); } catch (_) {}
+    S.ws = null;
+  }
+  clearDemo();
+  setHidden($("demo-launcher"), true);
+  S.demo = { role, step: 0, timers: [] };
+  S.code = "DEMO1";
+  S.name = role === "organizer" ? "Ada" : "Mina";
+  S.selfId = role === "organizer" ? "ada" : "mina";
+  S.organizer = role === "organizer";
+  S.axes = DEMO_AXES.slice();
+  S.axisMins = [1, 1, 1];
+  S.axisMaxes = [8, 8, 8];
+  S.pointLabels = ["", "Light", "", "", "", "", "", "", "Heavy"];
+  S.live = true;
+  S.reviewing = true;
+  S.history = [];
+  S.historyIndex = 0;
+  S.mode = "radar";
+  S.my = [2, 2, 2];
+  showSession();
+  runDemoStep(role, 0);
+  queueDemo(role);
+}
+
+function stopDemo() {
+  clearDemo();
+  toLanding();
 }
 
 function render() {
@@ -1285,6 +1483,7 @@ function escapeHTML(s) {
 $("btn-create").onclick = () => {
   S.name = requiredNickname();
   if (!S.name) return;
+  setHidden($("btn-demo"), true);
   S.live = false;
   S.drafts = [];
   S.settingsEdited = false;
@@ -1295,6 +1494,12 @@ $("btn-create").onclick = () => {
   $("setup-max").value = "8";
   connect({ type: "create", name: S.name });
 };
+$("btn-demo").onclick = () => setHidden($("demo-launcher"), false);
+$("btn-demo-close").onclick = () => setHidden($("demo-launcher"), true);
+$("btn-demo-organizer").onclick = () => startDemo("organizer");
+$("btn-demo-participant").onclick = () => startDemo("participant");
+$("btn-demo-replay").onclick = () => { if (S.demo) startDemo(S.demo.role); };
+$("btn-demo-exit").onclick = stopDemo;
 $("in-name").oninput = updateEntryActions;
 $("in-code").oninput = updateEntryActions;
 $("btn-join").onclick = () => {
@@ -1302,6 +1507,7 @@ $("btn-join").onclick = () => {
   if (!name) return;
   const code = $("in-code").value.trim().toUpperCase();
   if (code.length < 4) { toast("Enter the 5-character session code."); return; }
+  setHidden($("btn-demo"), true);
   S.name = name;
   const saved = savedCreds();
   connect({
@@ -1445,10 +1651,15 @@ $("code-chip").onclick = () => {
 };
 
 function confirmSessionDeparture() {
-  return !S.code || confirm("Leave this session? You can rejoin with the saved session code while it remains active.");
+  return !!S.demo || !S.code || confirm("Leave this session? You can rejoin with the saved session code while it remains active.");
 }
 
 $("home-link").onclick = (event) => {
+  if (S.demo) {
+    event.preventDefault();
+    stopDemo();
+    return;
+  }
   if (!S.code) return;
   if (!confirmSessionDeparture()) {
     event.preventDefault();
@@ -1461,6 +1672,10 @@ $("home-link").onclick = (event) => {
 window.addEventListener("popstate", (event) => {
   const requested = event.state && event.state.view ? event.state.view : "landing";
   if (requested === "landing") {
+    if (S.demo) {
+      stopDemo();
+      return;
+    }
     if (S.code && !confirmSessionDeparture()) {
       recordView(S.view);
       return;
@@ -1495,7 +1710,7 @@ window.addEventListener("popstate", (event) => {
 });
 
 window.addEventListener("beforeunload", (event) => {
-  if (!S.code) return;
+  if (!S.code || S.demo) return;
   event.preventDefault();
   event.returnValue = "";
 });
@@ -1810,5 +2025,6 @@ if (["localhost", "127.0.0.1", "[::1]", ""].includes(location.hostname)) {
   window.__test = {
     S, render, showSession, showIntake, showSettings, closeSettings, renderHistory, stepHistory,
     setHidden, addDraftItem, renderSettingsItems, safeLink, parseDuration, setSimple, roundAxes,
+    startDemo, stopDemo, runDemoStep,
   };
 }
