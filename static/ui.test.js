@@ -584,6 +584,17 @@ const historyEntry = (n, title) => ({
   const nameCol = win.document.getElementById("in-name").closest(".landing-col");
   const codeCol = win.document.getElementById("in-code").closest(".landing-col");
   check("both fields sit in the split", !!nameCol && !!codeCol && nameCol !== codeCol);
+  check("session code aligns to the shared container edge",
+    /\.masthead \{[^}]*max-width: var\(--column\)/.test(css)
+    && /\.code-chip \{[^}]*border-radius: var\(--radius\)/.test(css));
+  check("primary views center their container stacks",
+    /\.landing, #view-intake, #view-settings, #view-session \{[^}]*min-height: calc\(100dvh - 76px\)/.test(css)
+    && /\.landing, #view-intake\.intake-initial, #view-settings, #view-session \{[^}]*justify-content: center/.test(css));
+  check("guided demo sits outside the landing card with stable bright text",
+    !win.document.getElementById("btn-demo").closest(".landing-card")
+    && /\.demo-launch \{[^}]*left: calc\(100% \+ 16px\)[^}]*position: absolute/.test(css)
+    && /\.demo-launch\.btn-quiet \{[^}]*color: var\(--ink\)/.test(css)
+    && /\.demo-launch\.btn-quiet:hover \{ color: var\(--ink\)/.test(css));
 
   // The prospective chart is a settings-screen concern now, not a launch one.
   check("prospective chart lives on the settings screen",
@@ -875,6 +886,14 @@ const historyEntry = (n, title) => ({
     win.document.getElementById("btn-launch").textContent === "Add more issues",
     win.document.getElementById("btn-launch").textContent);
   check("results are offered alongside", shown(win, "btn-intake-results"));
+  check("view session results is full-width below the intake card",
+    win.document.getElementById("btn-intake-results").closest(".intake-after-rail")
+    && /#btn-intake-results \{ width: 100%/.test(read("style.css")));
+  check("session settings is removed after all issues are pointed", !shown(win, "btn-open-settings"));
+  check("back to the last result floats like the end action",
+    win.document.getElementById("btn-intake-back").classList.contains("intake-back-float")
+    && /\.intake-back-float \{[^}]*right: calc\(100% \+ 16px\)/.test(read("style.css"))
+    && /\.intake-back-float \{[^}]*position: absolute/.test(read("style.css")));
   check("progress so far is stated", /2 issues pointed/.test(win.document.getElementById("intake-tally").textContent),
     win.document.getElementById("intake-tally").textContent);
   check("a single row is still the default", win.document.querySelectorAll(".intake-row").length === 1);
@@ -886,6 +905,29 @@ const historyEntry = (n, title) => ({
     history: [historyEntry(1, "PROJ-1"), historyEntry(2, "PROJ-2")] });
   T.render();
   check("a broadcast does not yank the organizer away", shown(win, "view-session"));
+}
+
+/* ── 19b. Session reset and summary controls do not leak ─────────────── */
+{
+  const win = boot();
+  const T = win.__test;
+  T.S.organizer = true; T.S.code = "ABCDE"; T.S.selfId = "o"; T.S.privacy = true;
+  T.showSession();
+  const closed = { number: 1, title: "PROJ-1", open: false, submittedCount: 1,
+    summary: historyEntry(1, "PROJ-1").summary };
+  T.S.state = stateMsg({ round: closed, queuedItems: 1, privacy: true });
+  T.render();
+  check("closed round summary hides timer controls", !shown(win, "btn-timer") && !shown(win, "timer-standing"));
+  check("finish round uses bright white text", /\.end-float \{[^}]*color: var\(--on-pencil\)/.test(read("style.css"))
+    && /--on-pencil:\s+#FFFFFF/.test(read("style.css")));
+
+  const sent = [];
+  T.S.ws = { readyState: win.WebSocket.OPEN, send: (message) => sent.push(JSON.parse(message)) };
+  win.sessionStorage.setItem("tri", JSON.stringify({ code: "ABCDE", token: "old" }));
+  win.document.getElementById("in-name").value = "Ada";
+  win.document.getElementById("btn-create").click();
+  check("new session creation clears prior privacy", !T.S.privacy && !shown(win, "privacy-badge"));
+  check("new session creation clears the previous code", T.S.code === null && !win.sessionStorage.getItem("tri"));
 }
 
 /* ── 20. Simple pointing swaps the chart for one number ───────────────── */

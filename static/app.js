@@ -350,6 +350,8 @@ function handleMessage(msg) {
       S.code = msg.code;
       S.selfId = msg.selfId;
       S.organizer = msg.organizer;
+      S.privacy = false;
+      setHidden($("privacy-badge"), true);
       S.axes = msg.axes;
       if (Array.isArray(msg.colors) && msg.colors.length) SERVER_PALETTE = msg.colors.slice();
       S.axisMins = msg.axisMins || S.axes.map(() => 1);
@@ -447,6 +449,7 @@ function renderIntakeCopy() {
     ? "Point another issue, or wrap up."
     : S.drafts.length > 1 ? "Enter each issue to point." : "Enter the first issue to point.";
   setHidden($("intake-detail"), more);
+  setHidden($("btn-open-settings"), more);
   $("btn-launch").textContent = more ? "Add more issues" : "Launch pointing session";
   setHidden($("btn-intake-results"), !more);
   setHidden($("btn-intake-back"), !more || !(S.state && S.state.round));
@@ -1044,7 +1047,7 @@ function renderConsole(round) {
   $("timer-standing").textContent = standing
     ? `Every remaining issue starts with ${clockText(standing * 1000)} on the clock.`
     : "";
-  setHidden($("timer-standing"), !standing || final);
+  setHidden($("timer-standing"), !standing || final || !canTime);
   $("in-privacy").checked = !!S.privacy;
   // A group whose every control is hidden would otherwise leave a bare heading
   // floating in the shelf.
@@ -1636,6 +1639,12 @@ $("btn-create").onclick = () => {
   if (!S.name) return;
   setHidden($("btn-demo"), true);
   S.live = false;
+  S.code = null;
+  S.orgToken = null;
+  S.state = null;
+  S.privacy = false;
+  sessionStorage.removeItem("tri");
+  setHidden($("privacy-badge"), true);
   S.drafts = [];
   S.settingsEdited = false;
   $("intake-items").innerHTML = "";

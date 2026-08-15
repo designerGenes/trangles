@@ -29,28 +29,30 @@
 <main id="view-landing" class="landing">
   <h1 class="pitch" data-i18n="landingPitch" data-i18n-html="true"></h1>
 
-  <div class="card landing-card">
-    <div class="landing-split">
-      <div class="landing-col">
-        <label class="field">
-          <span data-i18n="landingNickname"></span>
-          <input id="in-name" maxlength="24" autocomplete="off">
-        </label>
-        <button id="btn-create" class="btn btn-primary" data-i18n="landingStartSession"></button>
+  <div class="landing-primary">
+    <div class="card landing-card">
+      <div class="landing-split">
+        <div class="landing-col">
+          <label class="field">
+            <span data-i18n="landingNickname"></span>
+            <input id="in-name" maxlength="24" autocomplete="off">
+          </label>
+          <button id="btn-create" class="btn btn-primary" data-i18n="landingStartSession"></button>
+        </div>
+        <div class="landing-rule" aria-hidden="true"></div>
+        <div class="landing-col">
+          <label class="field">
+            <span data-i18n="landingSessionCode"></span>
+            <input id="in-code" class="mono" maxlength="5" autocomplete="off"
+                   placeholder="" data-i18n-placeholder="landingSessionCodePlaceholder" style="text-transform:uppercase">
+          </label>
+          <button id="btn-join" class="btn" data-i18n="landingJoinSession"></button>
+        </div>
       </div>
-      <div class="landing-rule" aria-hidden="true"></div>
-      <div class="landing-col">
-        <label class="field">
-          <span data-i18n="landingSessionCode"></span>
-          <input id="in-code" class="mono" maxlength="5" autocomplete="off"
-                 placeholder="" data-i18n-placeholder="landingSessionCodePlaceholder" style="text-transform:uppercase">
-        </label>
-        <button id="btn-join" class="btn" data-i18n="landingJoinSession"></button>
-      </div>
+      <!-- Sits below the split, so revealing it never shifts either button off
+           the line they share. -->
+      <p id="entry-warning" class="entry-warning" role="alert" data-i18n="landingNicknameRequired" hidden></p>
     </div>
-    <!-- Sits below the split, so revealing it never shifts either button off
-         the line they share. -->
-    <p id="entry-warning" class="entry-warning" role="alert" data-i18n="landingNicknameRequired" hidden></p>
     <button id="btn-demo" class="btn btn-quiet demo-launch" type="button" data-i18n="landingExploreDemo"></button>
   </div>
 
@@ -97,11 +99,13 @@
 
     <div class="intake-actions">
       <button id="btn-launch" class="btn btn-panel-action" type="button" data-i18n="intakeLaunchSession"></button>
-      <button id="btn-intake-results" class="btn btn-panel-action" type="button" data-i18n="intakeViewResults" hidden></button>
-      <button id="btn-intake-back" class="btn btn-quiet" type="button" data-i18n="intakeBack" hidden></button>
     </div>
     <p id="intake-warning" class="setup-warning" hidden></p>
   </section>
+  <div class="intake-after-rail">
+    <button id="btn-intake-results" class="btn btn-primary" type="button" data-i18n="intakeViewResults" hidden></button>
+    <button id="btn-intake-back" class="btn intake-back-float" type="button" data-i18n="intakeBack" hidden></button>
+  </div>
 </main>
 
 <!-- ─────────────────────────── session settings ────────────────────── -->
