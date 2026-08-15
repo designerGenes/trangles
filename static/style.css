@@ -195,16 +195,17 @@ main { max-width: var(--column); margin: 0 auto; padding: 8px 16px 48px; }
 .draft-item-meta .draft-meta-fields { padding-top: 10px; }
 .draft-meta-fields { display: flex; flex-direction: column; gap: 8px; }
 .issues-box { border-color: color-mix(in srgb, var(--honey) 58%, var(--border)); }
-.issues-box .intake-row, .issues-box .draft-item-entry { background: rgba(255, 209, 102, 0.06); }
+.issues-box { background: linear-gradient(145deg, #6A5421, #4A3A1B); }
+.issues-box .intake-row, .issues-box .draft-item-entry { background: rgba(255, 244, 210, 0.08); }
 .issues-box .issue-mode-field input { border-color: var(--honey); }
 .issues-box .field-mode-toggle { color: var(--honey); }
-.aspects-box { border-color: color-mix(in srgb, var(--orange) 58%, var(--border)); }
-#draft-aspects .draft-item { background: rgba(255, 157, 66, 0.07); border: 1px solid var(--orange); border-radius: 12px; padding: 7px; }
+.aspects-box { background: linear-gradient(145deg, #75431E, #4D2D1B); border-color: color-mix(in srgb, var(--orange) 58%, var(--border)); }
+#draft-aspects .draft-item { background: rgba(255, 236, 210, 0.08); border: 1px solid var(--orange); border-radius: 12px; padding: 7px; }
 #draft-aspects .draft-item input { border-color: var(--orange); }
-.point-labels-box { border-color: color-mix(in srgb, var(--blue) 58%, var(--border)); }
-.point-labels-box .point-label-row { background: rgba(85, 201, 255, 0.06); border: 1px solid color-mix(in srgb, var(--blue) 46%, transparent); border-radius: 12px; padding: 7px; }
+.point-labels-box { background: linear-gradient(145deg, #1E5872, #193B5C); border-color: color-mix(in srgb, var(--blue) 58%, var(--border)); }
+.point-labels-box .point-label-row { background: rgba(220, 246, 255, 0.08); border: 1px solid color-mix(in srgb, var(--blue) 46%, transparent); border-radius: 12px; padding: 7px; }
 .point-labels-box .point-label-row input { border-color: var(--blue); }
-.chart-box { border-color: color-mix(in srgb, var(--violet) 58%, var(--border)); }
+.chart-box { background: linear-gradient(145deg, #493A78, #2E2958); border-color: color-mix(in srgb, var(--violet) 58%, var(--border)); }
 .chart-box #setup-full-plot { filter: drop-shadow(0 8px 18px rgba(169, 140, 255, 0.12)); }
 .caret { border-bottom: 2px solid var(--muted); border-right: 2px solid var(--muted); height: 7px; margin: 0 4px; transform: rotate(45deg); transition: transform 120ms; width: 7px; }
 details[open] > summary .caret { transform: rotate(225deg); }
@@ -256,8 +257,8 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
   cursor: pointer;
 }
 .btn:hover:not(:disabled) { background: #343D53; border-color: var(--violet); }
-.btn-primary { background: var(--pencil); border-color: var(--pencil); color: #22161B; box-shadow: 0 8px 18px rgba(255, 100, 100, 0.22); }
-.btn-primary:hover:not(:disabled) { background: #FF8585; border-color: #FF8585; }
+.btn-primary { background: #6F62D7; border-color: #8E83F2; color: #F7F5FF; box-shadow: 0 8px 18px rgba(111, 98, 215, 0.28); }
+.btn-primary:hover:not(:disabled) { background: #8E83F2; border-color: #B0A8FF; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-quiet {
   border-color: transparent;
@@ -337,7 +338,9 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .round-description { color: var(--muted); margin: -2px 0 10px; white-space: pre-wrap; }
 
 .plot-wrap { display: flex; flex-direction: column; align-items: center; }
-.plot-wrap.chart-box, .simple-wrap.chart-box { background: rgba(169, 140, 255, 0.06); border: 1px solid rgba(169, 140, 255, 0.42); border-radius: 14px; padding: 12px; }
+.round-card .chart-box, .live-inputs.chart-box { background: var(--card); border-color: var(--border); }
+.history-card.chart-box { background: linear-gradient(145deg, #493A78, #2E2958); border-color: color-mix(in srgb, var(--violet) 58%, var(--border)); }
+.plot-wrap.chart-box, .simple-wrap.chart-box { border-radius: 14px; padding: 12px; }
 #plot { width: 100%; max-width: 600px; touch-action: none; user-select: none; cursor: crosshair; overflow: visible; }
 
 .readouts { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 18px; margin: 2px 0 12px; }
@@ -379,15 +382,16 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .live-shape { cursor: help; fill-opacity: 0.13; stroke-width: 2.5; stroke-linejoin: round; }
 
 /* Summary ------------------------------------------------------------ */
-.summary-card { border-left: 4px solid var(--pencil); }
+.summary-card { background: linear-gradient(145deg, #493A78, #2E2958); border-color: color-mix(in srgb, var(--violet) 58%, var(--border)); border-left: 4px solid var(--violet); }
 /* Capstone ----------------------------------------------------------- */
 /* Deliberately NOT a .card. The estimating screens are pale cards on graph
    paper; this inverts to dark so the session reads as finished at a glance
    rather than as one more step in the same stack. */
 .final-summary-card {
-  background: var(--ink);
+  background: linear-gradient(145deg, #493A78, #2E2958);
+  border: 1px solid color-mix(in srgb, var(--violet) 58%, var(--border));
   border-radius: var(--radius);
-  color: var(--paper);
+  color: var(--ink);
   margin: 28px 0 16px;
   padding: 34px 30px 28px;
 }
@@ -411,7 +415,7 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 
 .capstone-total { align-items: baseline; display: flex; flex-wrap: wrap; gap: 12px; padding: 22px 0 6px; }
 .capstone-points {
-  color: var(--paper);
+  color: var(--ink);
   font-size: clamp(3rem, 9vw, 4.5rem);
   font-weight: 700;
   line-height: 1;
@@ -620,8 +624,9 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
   left: 50%;
   bottom: 24px;
   transform: translateX(-50%);
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--card-raised);
+  border: 1px solid var(--border);
+  color: var(--ink);
   padding: 8px 18px;
   border-radius: 6px;
   font-size: 0.9rem;
@@ -633,11 +638,11 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
    production interface remains visible so the explanation and behavior stay
    connected. */
 .demo-guide {
-  background: var(--ink);
+  background: var(--card-raised);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: 0 16px 36px rgba(4, 6, 13, 0.5);
-  color: var(--paper);
+  color: var(--ink);
   max-width: 25rem;
   padding: 16px;
   position: fixed;
@@ -659,7 +664,7 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .demo-peer-bars i { background: var(--honey); border-radius: 999px; display: block; height: 5px; }
 .demo-guide-actions { align-items: center; display: flex; gap: 10px; justify-content: space-between; margin-top: 14px; }
 .demo-step-actions { display: flex; gap: 6px; }
-.demo-guide-actions .btn { border-color: rgba(244, 241, 232, 0.65); background: transparent; color: var(--paper); font-size: 0.8rem; padding: 6px 10px; }
+.demo-guide-actions .btn { border-color: rgba(244, 241, 232, 0.65); background: transparent; color: var(--ink); font-size: 0.8rem; padding: 6px 10px; }
 .demo-guide-actions .btn:disabled { opacity: 0.35; }
 .demo-guide-actions .hint { color: rgba(244, 241, 232, 0.58); text-align: right; }
 .is-demo #code-chip,
@@ -677,10 +682,10 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 /* A short, target-anchored tooltip names the current control. The adjacent
    guide carries the longer explanation and, for organizers, the peer view. */
 .demo-target::after {
-  background: var(--ink);
+  background: var(--card-raised);
   border: 1px solid var(--border);
   border-radius: 5px;
-  color: var(--paper);
+  color: var(--ink);
   content: attr(data-demo-tooltip);
   font-size: 0.76rem;
   font-weight: 600;

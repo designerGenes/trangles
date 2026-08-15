@@ -384,13 +384,13 @@ const historyEntry = (n, title) => ({
   win.dispatchEvent(new win.PopStateEvent("popstate", { state: { view: "settings" } }));
   check("browser navigation cannot reopen settings after completion", shown(win, "view-session") && !shown(win, "view-settings"));
 
-  // The capstone must not read as another card in the same stack.
+  // Results use the shared violet result surface, not the active-session card.
   const capstone = win.document.getElementById("final-summary-card");
   check("capstone is not styled as a process card", !capstone.classList.contains("card"));
   const sheet = read("style.css");
   const capstoneRule = /\.final-summary-card \{[^}]*\}/.exec(sheet);
-  check("capstone inverts against the pale process cards",
-    capstoneRule && /background: var\(--ink\)/.test(capstoneRule[0]) && /color: var\(--paper\)/.test(capstoneRule[0]),
+  check("capstone uses the violet result surface",
+    capstoneRule && /background: linear-gradient\(145deg, #493A78/.test(capstoneRule[0]) && /color: var\(--ink\)/.test(capstoneRule[0]),
     capstoneRule && capstoneRule[0].slice(0, 90));
 
   // The organizer keeps the one action that matters: restart.
@@ -613,6 +613,11 @@ const historyEntry = (n, title) => ({
     && win.document.querySelector("#setup-full-chart.chart-box"));
   check("issues use honey fields and focus", /\.issues-box \{[^}]*--honey/.test(css)
     && /\.issues-box input:focus-visible \{[^}]*--honey/.test(css));
+  check("preparation boxes are filled with their semantic colours",
+    /\.issues-box \{[^}]*background: linear-gradient\(145deg, #6A5421/.test(css)
+    && /\.aspects-box \{[^}]*background: linear-gradient\(145deg, #75431E/.test(css)
+    && /\.point-labels-box \{[^}]*background: linear-gradient\(145deg, #1E5872/.test(css)
+    && /\.chart-box \{[^}]*background: linear-gradient\(145deg, #493A78/.test(css));
   check("aspects use orange fields and focus", /\.aspects-box \{[^}]*--orange/.test(css)
     && /\.aspects-box input:focus-visible \{[^}]*--orange/.test(css));
   check("point labels use blue fields and focus", /\.point-labels-box \{[^}]*--blue/.test(css)
@@ -621,6 +626,13 @@ const historyEntry = (n, title) => ({
     win.document.querySelector("#plot-wrap.chart-box")
     && win.document.querySelector("#live-inputs.chart-box")
     && /\.ring-outer \{[^}]*var\(--violet\)/.test(css));
+  check("active chart surfaces stay reserved while results are violet",
+    /\.round-card \.chart-box, \.live-inputs\.chart-box \{[^}]*background: var\(--card\)/.test(css)
+    && /\.summary-card \{[^}]*background: linear-gradient\(145deg, #493A78/.test(css)
+    && /\.final-summary-card \{[^}]*background: linear-gradient\(145deg, #493A78/.test(css));
+  check("launch uses an indigo complement to the honey intake box",
+    /\.btn-primary \{[^}]*background: #6F62D7/.test(css)
+    && /\.btn-primary \{[^}]*border-color: #8E83F2/.test(css));
 }
 
 
