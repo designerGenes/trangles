@@ -590,11 +590,10 @@ const historyEntry = (n, title) => ({
   check("primary views center their container stacks",
     /\.landing, #view-intake, #view-settings, #view-session \{[^}]*min-height: calc\(100dvh - 76px\)/.test(css)
     && /\.landing, #view-intake\.intake-initial, #view-settings, #view-session \{[^}]*justify-content: center/.test(css));
-  check("guided demo sits outside the landing card with stable bright text",
-    !win.document.getElementById("btn-demo").closest(".landing-card")
-    && /\.demo-launch \{[^}]*left: calc\(100% \+ 16px\)[^}]*position: absolute/.test(css)
-    && /\.demo-launch\.btn-quiet \{[^}]*color: var\(--ink\)/.test(css)
-    && /\.demo-launch\.btn-quiet:hover \{ color: var\(--ink\)/.test(css));
+  check("guided demo is a masthead question-mark help icon",
+    win.document.getElementById("btn-demo").closest(".masthead-actions")
+    && !!win.document.querySelector("#btn-demo svg")
+    && /\.demo-help \{[^}]*height: 42px[^}]*width: 42px/.test(css));
 
   // The prospective chart is a settings-screen concern now, not a launch one.
   check("prospective chart lives on the settings screen",
@@ -882,13 +881,22 @@ const historyEntry = (n, title) => ({
 
   check("an emptied queue lands on intake, not the capstone", shown(win, "view-intake"));
   check("the capstone is not forced on the organizer", !shown(win, "final-summary-card"));
-  check("more issues is the primary action",
-    win.document.getElementById("btn-launch").textContent === "Add more issues",
+  check("empty continuation is withheld until an issue is entered",
+    !shown(win, "btn-launch"));
+  const continuationInput = win.document.querySelector(".intake-title-input");
+  continuationInput.value = "PROJ-3 next";
+  continuationInput.oninput();
+  check("entered continuation becomes submit and continue",
+    shown(win, "btn-launch") && win.document.getElementById("btn-launch").textContent === "Submit & continue",
     win.document.getElementById("btn-launch").textContent);
   check("results are offered alongside", shown(win, "btn-intake-results"));
   check("view session results is full-width below the intake card",
     win.document.getElementById("btn-intake-results").closest(".intake-after-rail")
     && /#btn-intake-results \{ width: 100%/.test(read("style.css")));
+  check("post-session card and actions share one fixed-width stage",
+    win.document.querySelector("#view-intake .intake-stage .intake-card")
+    && win.document.querySelector("#view-intake .intake-stage .intake-after-rail")
+    && /#view-intake \.intake-stage \{[^}]*max-width: 34rem[^}]*width: 100%/.test(read("style.css")));
   check("session settings is removed after all issues are pointed", !shown(win, "btn-open-settings"));
   check("back to the last result floats like the end action",
     win.document.getElementById("btn-intake-back").classList.contains("intake-back-float")

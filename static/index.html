@@ -22,6 +22,9 @@
     <button id="code-chip" class="code-chip" hidden title="" data-i18n-title="copyInviteLink">
       <span data-i18n="sessionLabel"></span> <span id="code-text" class="mono"></span>
     </button>
+    <button id="btn-demo" class="demo-help" type="button" title="" data-i18n-title="landingExploreDemo" aria-label="" data-i18n-aria-label="landingExploreDemo">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M9.7 9a2.4 2.4 0 0 1 4.6.9c0 1.6-1.8 2.1-2.3 3.2"></path><path d="M12 17h.01"></path></svg>
+    </button>
   </div>
 </header>
 
@@ -53,7 +56,6 @@
            the line they share. -->
       <p id="entry-warning" class="entry-warning" role="alert" data-i18n="landingNicknameRequired" hidden></p>
     </div>
-    <button id="btn-demo" class="btn btn-quiet demo-launch" type="button" data-i18n="landingExploreDemo"></button>
   </div>
 
   <section id="demo-launcher" class="card demo-launcher-card" hidden aria-labelledby="demo-launcher-title">
@@ -87,24 +89,26 @@
      organizer might want lives behind Session settings, because a scrum lead
      picking the next issue off a board is not configuring anything. -->
 <main id="view-intake" hidden>
-  <section class="card panel intake-card issues-box">
-    <span id="intake-eyebrow" class="eyebrow" data-i18n="intakeEyebrow"></span>
-    <h1 id="intake-title" class="intake-title" data-i18n="intakeTitle"></h1>
-    <p id="intake-detail" class="hint" data-i18n="intakeDetail"></p>
-    <p id="intake-tally" class="hint intake-tally" hidden></p>
+  <div class="intake-stage">
+    <section class="card panel intake-card issues-box">
+      <span id="intake-eyebrow" class="eyebrow" data-i18n="intakeEyebrow"></span>
+      <h1 id="intake-title" class="intake-title" data-i18n="intakeTitle"></h1>
+      <p id="intake-detail" class="hint" data-i18n="intakeDetail"></p>
+      <p id="intake-tally" class="hint intake-tally" hidden></p>
 
-    <div id="intake-items" class="intake-items"></div>
+      <div id="intake-items" class="intake-items"></div>
 
-    <button id="btn-open-settings" class="btn btn-panel-action intake-settings" type="button" data-i18n="intakeSettings"></button>
+      <button id="btn-open-settings" class="btn btn-panel-action intake-settings" type="button" data-i18n="intakeSettings"></button>
 
-    <div class="intake-actions">
-      <button id="btn-launch" class="btn btn-panel-action" type="button" data-i18n="intakeLaunchSession"></button>
+      <div class="intake-actions">
+        <button id="btn-launch" class="btn btn-panel-action" type="button" data-i18n="intakeLaunchSession"></button>
+      </div>
+      <p id="intake-warning" class="setup-warning" hidden></p>
+    </section>
+    <div class="intake-after-rail">
+      <button id="btn-intake-results" class="btn btn-primary" type="button" data-i18n="intakeViewResults" hidden></button>
+      <button id="btn-intake-back" class="btn intake-back-float" type="button" data-i18n="intakeBack" hidden></button>
     </div>
-    <p id="intake-warning" class="setup-warning" hidden></p>
-  </section>
-  <div class="intake-after-rail">
-    <button id="btn-intake-results" class="btn btn-primary" type="button" data-i18n="intakeViewResults" hidden></button>
-    <button id="btn-intake-back" class="btn intake-back-float" type="button" data-i18n="intakeBack" hidden></button>
   </div>
 </main>
 

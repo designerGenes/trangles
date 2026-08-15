@@ -414,6 +414,7 @@ function showView(name, record) {
   setHidden($("view-settings"), name !== "settings");
   setHidden($("view-session"), name !== "session");
   setHidden($("code-chip"), name === "landing" || !S.code || !!S.demo);
+  setHidden($("btn-demo"), name !== "landing" || !!S.demo);
   if (S.code) $("code-text").textContent = S.code;
   if (record) recordView(name);
 }
@@ -452,7 +453,8 @@ function renderIntakeCopy() {
     : S.drafts.length > 1 ? "Enter each issue to point." : "Enter the first issue to point.";
   setHidden($("intake-detail"), more);
   setHidden($("btn-open-settings"), more);
-  $("btn-launch").textContent = more ? "Add more issues" : "Launch pointing session";
+  $("btn-launch").textContent = more ? "Submit & continue" : "Launch pointing session";
+  setHidden($("btn-launch"), more && draftItemValues().length === 0);
   setHidden($("btn-intake-results"), !more);
   setHidden($("btn-intake-back"), !more || !(S.state && S.state.round));
   const done = (S.history || []).length;
@@ -2004,10 +2006,11 @@ function draftRow(draft, index, context) {
   input.placeholder = mode.label;
   input.setAttribute("aria-label", mode.label);
   input.value = draft[mode.key];
-  input.oninput = () => {
-    draft[mode.key] = input.value;
-    if (mode.key === "title" && input.value.trim()) setHidden($("settings-items-warning"), true);
-  };
+    input.oninput = () => {
+      draft[mode.key] = input.value;
+      if (mode.key === "title" && input.value.trim()) setHidden($("settings-items-warning"), true);
+      if (context === "intake" && S.intakeStage === "more") renderIntakeCopy();
+    };
   const modeButton = document.createElement("button");
   modeButton.type = "button";
   modeButton.className = "field-mode-toggle";
