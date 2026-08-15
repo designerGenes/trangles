@@ -10,10 +10,13 @@ COPY --from=build /triangulate /triangulate
 # .dockerignore keeps static/*.test.js out of the runtime image; they are
 # development assets and would otherwise be served publicly.
 COPY static /static
+# Client-side strings the browser fetches from /resources/strings.json.
+COPY resources /resources
 # Tunables and the nickname pool. Without this the binary logs a warning and
 # falls back to built-in defaults, which is safe but not what is configured.
 COPY config /config
 ENV STATIC_DIR=/static
+ENV RESOURCES_DIR=/resources
 ENV CONFIG_PATH=/config/app.json
 EXPOSE 8080
 ENTRYPOINT ["/triangulate"]

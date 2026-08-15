@@ -29,6 +29,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.Dir(staticDir())))
+	mux.Handle("/resources/", http.StripPrefix("/resources/", http.FileServer(http.Dir(resourcesDir()))))
 	mux.HandleFunc("/ws", hub.HandleWS)
 	// Client-facing slice of the config only — the limits stay server-side.
 	mux.HandleFunc("/api/config", func(w http.ResponseWriter, _ *http.Request) {
@@ -64,4 +65,11 @@ func staticDir() string {
 		return d
 	}
 	return "static"
+}
+
+func resourcesDir() string {
+	if d := os.Getenv("RESOURCES_DIR"); d != "" {
+		return d
+	}
+	return "resources"
 }
