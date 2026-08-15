@@ -897,6 +897,7 @@ const historyEntry = (n, title) => ({
   check("progress so far is stated", /2 issues pointed/.test(win.document.getElementById("intake-tally").textContent),
     win.document.getElementById("intake-tally").textContent);
   check("a single row is still the default", win.document.querySelectorAll(".intake-row").length === 1);
+  check("post-session intake uses the centered stage", /#view-intake \{[^}]*align-items: center[^}]*min-height: calc\(100dvh - 76px\)/.test(read("style.css")));
 
   // Reading the last result must not bounce straight back to intake.
   win.document.getElementById("btn-intake-back").click();
@@ -928,6 +929,21 @@ const historyEntry = (n, title) => ({
   win.document.getElementById("btn-create").click();
   check("new session creation clears prior privacy", !T.S.privacy && !shown(win, "privacy-badge"));
   check("new session creation clears the previous code", T.S.code === null && !win.sessionStorage.getItem("tri"));
+}
+
+/* ── 19c. Radar surfaces have a calm loading state ──────────────────── */
+{
+  const win = boot();
+  const T = win.__test;
+  T.S.organizer = true; T.S.code = "ABCDE"; T.S.selfId = "o";
+  T.showSettings("intake");
+  check("chart loading copy exists and pulses", !!win.document.getElementById("setup-chart-loading")
+    && /Loading chart\.\.\./.test(win.document.getElementById("setup-chart-loading").textContent)
+    && /@keyframes chart-pulse/.test(read("style.css")));
+  check("setup chart hides loading after render", !shown(win, "setup-chart-loading"));
+  T.showSession();
+  check("participant chart loading copy exists", !!win.document.getElementById("plot-loading"));
+  check("session chart hides loading after render", !shown(win, "plot-loading"));
 }
 
 /* ── 20. Simple pointing swaps the chart for one number ───────────────── */

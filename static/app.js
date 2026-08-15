@@ -147,6 +147,7 @@ function el(tag, attrs, parent) {
 }
 
 function buildPlot() {
+  setHidden($("plot-loading"), false);
   plot.svg.innerHTML = "";
   // Nested radar rings make the current value easy to read at a glance.
   for (let fraction = 0.2; fraction <= 1; fraction += 0.2) {
@@ -206,6 +207,7 @@ function buildPlot() {
   buildReadouts();
   drawMine();
   attachPlotDrag();
+  setHidden($("plot-loading"), true);
 }
 
 function attachPlotDrag() {
@@ -1222,17 +1224,21 @@ function renderProspectivePlot() {
   setHidden($("setup-full-chart"), !validAspects || !max);
   if (!validAspects || !max) {
     $("setup-full-plot").innerHTML = "";
+    setHidden($("setup-chart-loading"), true);
     return;
   }
+  setHidden($("setup-chart-loading"), false);
   const mins = aspects.map(() => 1);
   const maxes = aspects.map(() => max);
   const values = aspects.map(() => Math.min(max, START_VALUE));
   drawStaticRadar($("setup-full-plot"), aspects, mins, maxes, [{ name: "Starting values", values, color: themeColor("--ink") || "#F4F1E8" }]);
+  setHidden($("setup-chart-loading"), true);
 }
 
 function renderLiveInputs(shapes, scores = []) {
   const section = $("live-inputs");
   section.hidden = false;
+  setHidden($("live-chart-loading"), false);
   const active = shapes.map((shape) => ({
     ...shape,
     color: participantColor(shape.id),
@@ -1304,6 +1310,7 @@ function renderLiveInputs(shapes, scores = []) {
     $("live-grid").appendChild(card);
   });
   activeScores.forEach((score) => $("live-grid").appendChild(liveScoreCard(score)));
+  setHidden($("live-chart-loading"), true);
 }
 
 function scorePercent(score) {
@@ -1491,6 +1498,7 @@ function renderHistory() {
   if (!has) return;
 
   const entry = S.history[S.historyIndex];
+  setHidden($("history-chart-loading"), false);
   const summary = entry.summary || {};
   // An issue keeps the aspects it was estimated against, which may not be the
   // ones the session is using now.
@@ -1527,6 +1535,7 @@ function renderHistory() {
     shapes.push({ id: "history-avg", name: "Group", values: averages, color: "var(--pencil)" });
   }
   drawStaticRadar($("history-chart"), axes, mins, maxes, shapes);
+  setHidden($("history-chart-loading"), true);
 }
 
 function stepHistory(delta) {

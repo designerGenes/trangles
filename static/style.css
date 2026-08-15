@@ -316,7 +316,9 @@ main { max-width: var(--column); margin: 0 auto; padding: 8px 16px 48px; }
 /* The screen that replaces the old launch console. One column, one question:
    which issue are we pointing? Everything configurable is a click away. */
 .intake-card { margin: 40px auto 0; max-width: 34rem; padding: 26px 24px 20px; }
-#view-intake.intake-initial { align-items: center; display: flex; min-height: calc(100dvh - 72px); }
+#view-intake { align-items: center; display: flex; min-height: calc(100dvh - 76px); }
+#view-intake.intake-initial { align-items: center; display: flex; min-height: calc(100dvh - 76px); }
+#view-intake .intake-card { margin-top: 0; }
 #view-intake.intake-initial .intake-card { margin: 0 auto; width: 100%; }
 .intake-title {
   font-family: "Bricolage Grotesque", sans-serif;
@@ -359,6 +361,9 @@ main { max-width: var(--column); margin: 0 auto; padding: 8px 16px 48px; }
 #btn-intake-results { width: 100%; }
 .intake-back-float { background: var(--pencil); border-color: var(--pencil-hot); color: var(--on-pencil); left: auto; padding: 12px 18px; position: absolute; right: calc(100% + 16px); top: 50%; transform: translateY(-50%); white-space: nowrap; }
 .intake-back-float:hover:not(:disabled) { background: var(--pencil-hot); border-color: var(--pencil-hot); color: var(--on-pencil); }
+.chart-loading { animation: chart-pulse 1.1s ease-in-out infinite; color: var(--muted); font-size: 0.85rem; letter-spacing: 0.08em; margin: 24px auto; text-align: center; text-transform: uppercase; }
+.chart-box > .chart-loading { color: var(--ink-mid); }
+@keyframes chart-pulse { 0%, 100% { opacity: 0.38; } 50% { opacity: 1; } }
 
 /* Session settings ---------------------------------------------------- */
 #view-settings { max-width: 720px; }
