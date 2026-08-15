@@ -498,20 +498,13 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .shelf-group { display: flex; flex-direction: column; gap: 8px; }
 .shelf-group + .shelf-group { border-top: 1px solid var(--grid); margin-top: 16px; padding-top: 16px; }
 .shelf-action { align-self: flex-start; margin-top: 0; }
-.queue-add { align-self: flex-end; font-size: 1.2rem; line-height: 1; padding: 7px 11px; }
-.queue-items { display: flex; flex-direction: column; gap: 10px; }
-.queue-items:empty { display: none; }
-.queue-item.confirmed { background: #F0FAEE; border-color: #C4DEC1; }
-.queue-item.confirmed input, .queue-item.confirmed textarea { color: var(--muted); }
-.queue-confirm { margin-left: auto; }
+/* Close session is the one shelf action that should not be missed: it spans
+   the full content column so it reads as the same width as the cards above. */
+.shelf-close-group { padding-top: 18px; }
+.btn-close-session { width: 100%; }
 .console-row { align-items: center; display: flex; gap: 8px; flex-wrap: wrap; }
-.issue-field { flex: 1 1 260px; }
-.issue-field textarea { min-height: 88px; resize: vertical; }
 .aspect-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--muted); }
 .aspect-toggle input { width: auto; }
-.console-row textarea { width: 100%; font: inherit; color: var(--ink); padding: 9px 12px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
-.console-row textarea:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-/* Wide enough for "1m30s" and its placeholder; it used to clip mid-word. */
 .console-row input#in-seconds { flex: 0 0 7rem; text-align: center; }
 .pending-people { color: var(--muted); flex: 1 1 12rem; font-size: 0.85rem; }
 
@@ -583,16 +576,19 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 
 /* Scope selects ------------------------------------------------------- */
 /* Every optional control says what it applies to, so "for this issue" and
-   "for all remaining issues" are never left to be inferred. */
+   "for all remaining issues" are never left to be inferred. The padding mirrors
+   .btn and input so a dropdown never reads shorter than the control beside it. */
 .scope-select {
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--ink);
   font: inherit;
-  font-size: 0.85rem;
-  padding: 8px 10px;
+  padding: 9px 12px;
 }
+/* Selects size to content; keep them from collapsing narrower than the field
+   they sit next to, and align them to the same baseline as the buttons. */
+.console-row .scope-select { flex: 0 0 auto; }
 
 /* Toast -------------------------------------------------------------- */
 .toast {

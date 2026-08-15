@@ -7,6 +7,9 @@ const { JSDOM } = require("jsdom"); // devDependency: npm i --no-save jsdom
 
 const DIR = __dirname;
 const read = (f) => fs.readFileSync(path.join(DIR, f), "utf8");
+// i18n strings live outside static/ (the server serves /resources/); the test
+// harness serves them the same way so data-i18n text resolves as in a browser.
+const strings = JSON.parse(fs.readFileSync(path.join(DIR, "..", "resources", "strings.json"), "utf8"));
 
 let failures = 0;
 function check(name, cond, extra) {
@@ -28,6 +31,10 @@ function boot() {
       window.WebSocket = function () { this.readyState = 0; this.send = () => {}; this.close = () => {}; };
       window.WebSocket.OPEN = 1;
       window.matchMedia = () => ({ matches: false, addListener() {}, removeListener() {} });
+      // i18n.js reads /resources/strings.json at load; hand them over
+      // synchronously so data-i18n text resolves before assertions run, the
+      // way a real browser resolves it after the fetch completes.
+      window.__I18N_STRINGS = strings;
     },
   });
   const { window } = dom;
@@ -264,13 +271,15 @@ const historyEntry = (n, title) => ({
   const opened = win.getComputedStyle(caret).transform;
   check("caret flips when the shelf opens", closed !== opened, { closed, opened });
 
-  win.document.getElementById("btn-add-queue-item").click();
-  const queueRow = win.document.querySelector(".queue-item");
-  const queueTitle = queueRow.querySelector(".draft-item input");
-  queueTitle.value = "PROJ-3 queued";
-  queueRow.querySelector(".queue-confirm").click();
-  check("confirmed queue row locks its title", queueRow.classList.contains("confirmed") && queueTitle.disabled);
-  check("confirmed queue row exposes deletion", !queueRow.querySelector(".btn-quiet").hidden);
+  // The shelf used to host an issue queue, an "add an aspect" control, and a
+  // session-settings shortcut. All three are gone: adding work is reserved for
+  // the intake screen, aspects are configured before launch, and settings open
+  // from the intake — the shelf is organizer-only session controls.
+  check("shelf has no issue queue editor", !win.document.getElementById("queue-editor"));
+  check("shelf has no add-aspect control", !win.document.getElementById("aspect-group"));
+  check("shelf has no session-settings shortcut", !win.document.getElementById("btn-session-settings"));
+  check("close session is the shelf's full-width action",
+    win.document.getElementById("btn-close").classList.contains("btn-close-session"));
 }
 
 /* ── 6. Every disclosure signals itself the same way ───────────────── */
@@ -279,12 +288,12 @@ const historyEntry = (n, title) => ({
   const T = win.__test;
   T.S.organizer = true; T.S.code = "ABCDE"; T.S.selfId = "o";
 
-  // Populate the JS-built drawers in both the setup and shelf paths.
+  // Populate a JS-built intake row; the organizer shelf is the app's one
+  // remaining disclosure now that the issue queue and its per-row link/description
+  // drawers are gone.
   T.showIntake("first");
   T.addDraftItem({ title: "PROJ-1" });
-  T.showSettings("intake");
   win.document.getElementById("organizer-shelf").hidden = false;
-  win.document.getElementById("btn-add-queue-item").click();
 
   const summaries = Array.from(win.document.querySelectorAll("details > summary"));
   check("found the app's disclosures", summaries.length >= 1, summaries.length);
@@ -294,16 +303,10 @@ const historyEntry = (n, title) => ({
   check("every summary has a caret", missingCaret.length === 0, missingCaret);
 
   // Drawers inside drawers bury controls and push their labels to different
-  // left edges. The one allowed nesting is an issue's own link/description,
-  // which sits inside that issue's container and nowhere else.
+  // left edges. No disclosure should nest another.
   const nested = Array.from(win.document.querySelectorAll("details details"))
-    .filter((d) => !d.classList.contains("draft-item-meta"))
     .map((d) => d.querySelector("summary").textContent.trim().slice(0, 40));
   check("no drawer contains another drawer", nested.length === 0, nested);
-
-  const strays = Array.from(win.document.querySelectorAll(".draft-meta-fields"))
-    .filter((fields) => !fields.closest(".draft-item-entry, .queue-item, .intake-row"));
-  check("item fields stay inside their issue container", strays.length === 0, strays.length);
 
   // A native triangle alongside the custom caret would double the affordance.
   // jsdom hardcodes display:list-item for <summary> whatever the stylesheet
@@ -317,13 +320,12 @@ const historyEntry = (n, title) => ({
     (css.match(/\.[a-z-]+ summary::(-webkit-details-)?marker/g) || []));
 
   // Closed points down, open points up — same rotation everywhere.
-  const details = win.document.querySelector(".queue-item .draft-item-meta")
-    || win.document.querySelector("details");
-  const caret = details.querySelector(".caret");
+  const details = win.document.getElementById("organizer-shelf");
+  const caret = details.querySelector("summary .caret");
   const closed = win.getComputedStyle(caret).transform;
   details.open = true;
   const opened = win.getComputedStyle(caret).transform;
-  check("issue field caret flips when opened", closed !== opened, { closed, opened });
+  check("shelf caret flips when opened", closed !== opened, { closed, opened });
 }
 
 /* ── 7. Organizer-controlled strings cannot inject markup ──────────── */
@@ -409,18 +411,13 @@ const historyEntry = (n, title) => ({
   T.S.state = stateMsg({ round: finished, queuedItems: 0, history: [historyEntry(1, "PROJ-1")],
     finalSummary: { totalPoints: 3, issues: [{ title: "PROJ-1", summary: { storyPoints: 3 } }] } });
   T.render();
-  check("queue editor gone once concluded", !shown(win, "queue-editor"));
-  check("queue editor is a plain group, not a drawer",
-    win.document.getElementById("queue-editor").tagName === "DIV");
   check("timer button gone once concluded", !shown(win, "btn-timer"));
-  check("aspect controls gone once concluded", !shown(win, "aspect-group"));
   check("timer input gone once concluded", !shown(win, "in-seconds"));
   check("empty round group leaves no bare heading", !shown(win, "round-group"));
 
-  // Restarting brings them back.
+  // Restarting brings the timer back.
   T.S.state = stateMsg({ round: { number: 1, title: "PROJ-1", open: true, submittedCount: 0 }, queuedItems: 1 });
   T.render();
-  check("queue editor returns after restart", shown(win, "queue-editor"));
   check("timer returns after restart", shown(win, "btn-timer"));
 }
 
@@ -796,23 +793,14 @@ const historyEntry = (n, title) => ({
   T.S.state = stateMsg();
   T.render();
 
-  const scopes = ["timer-scope", "aspect-scope"];
-  scopes.forEach((id) => {
-    const values = Array.from(win.document.getElementById(id).options).map((o) => o.value);
-    check(`${id} offers both scopes`, values.includes("issue") && values.includes("remaining"), values);
-    const labels = Array.from(win.document.getElementById(id).options).map((o) => o.textContent);
-    check(`${id} spells the scope out`,
-      labels.some((l) => /this issue/.test(l)) && labels.some((l) => /all remaining issues/.test(l)), labels);
-  });
+  // The timer is the one shelf control that still says what it applies to.
+  const scope = win.document.getElementById("timer-scope");
+  const values = Array.from(scope.options).map((o) => o.value);
+  check("timer-scope offers both scopes", values.includes("issue") && values.includes("remaining"), values);
+  const labels = Array.from(scope.options).map((o) => o.textContent);
+  check("timer-scope spells the scope out",
+    labels.some((l) => /this issue/.test(l)) && labels.some((l) => /all remaining issues/.test(l)), labels);
   check("the timer scope is offered while a round runs", shown(win, "timer-scope"));
-  check("aspects can be added mid-session", shown(win, "aspect-group"));
-
-  // Between issues there is no "this issue" to scope to.
-  T.S.state = stateMsg({ round: { number: 1, title: "PROJ-1", open: false, submittedCount: 1,
-    summary: historyEntry(1, "x").summary }, history: [historyEntry(1, "PROJ-1")] });
-  T.render();
-  const issueOption = win.document.querySelector('#aspect-scope option[value="issue"]');
-  check("no open round means no per-issue aspect", issueOption.disabled);
 }
 
 /* ── 23. Privacy mode anonymizes the organizer's live screen ─────────── */

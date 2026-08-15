@@ -301,23 +301,10 @@
             <option value="remaining" data-i18n="organizerTimerOptionRemaining"></option>
           </select>
           <button id="btn-timer" class="btn" type="button" data-i18n="organizerTimerStart" hidden></button>
-          <button id="btn-timer-remove" class="btn btn-quiet" type="button" data-i18n="organizerTimerRemove" hidden></button>
+          <button id="btn-timer-remove" class="btn" type="button" data-i18n="organizerTimerRemove" hidden></button>
           <button id="btn-restart-round" class="btn" type="button" data-i18n="organizerTimerRestart" hidden></button>
         </div>
         <p id="timer-standing" class="hint" hidden></p>
-      </div>
-
-      <div id="aspect-group" class="shelf-group">
-        <span class="eyebrow" data-i18n="organizerAspectEyebrow"></span>
-        <div class="console-row">
-          <input id="in-aspect" maxlength="24" autocomplete="off" placeholder="" data-i18n-placeholder="organizerAspectPlaceholder" aria-label="" data-i18n-aria-label="organizerAspectAria">
-          <select id="aspect-scope" class="scope-select" aria-label="What this aspect applies to">
-            <option value="remaining" data-i18n="organizerTimerOptionRemaining"></option>
-            <option value="issue" data-i18n="organizerTimerOptionIssue"></option>
-          </select>
-          <button id="btn-apply-aspect" class="btn" type="button" data-i18n="organizerAspectAdd"></button>
-        </div>
-        <p class="hint" data-i18n="organizerAspectHint"></p>
       </div>
 
       <div id="pending-panel" class="shelf-group" hidden>
@@ -328,15 +315,8 @@
         </div>
       </div>
 
-      <div id="queue-editor" class="shelf-group">
-        <span class="eyebrow" data-i18n="organizerQueueEyebrow"></span>
-        <div id="queue-items" class="queue-items"></div>
-        <button id="btn-add-queue-item" class="btn queue-add" type="button" aria-label="" data-i18n-aria-label="organizerQueueAddAria">+</button>
-      </div>
-
-      <div class="shelf-group">
-        <button id="btn-session-settings" class="btn shelf-action" type="button" data-i18n="organizerSettings"></button>
-        <button id="btn-close" class="btn btn-quiet shelf-action" data-i18n="organizerCloseSession"></button>
+      <div class="shelf-group shelf-close-group">
+        <button id="btn-close" class="btn btn-close-session" data-i18n="organizerCloseSession"></button>
       </div>
     </div>
   </details>

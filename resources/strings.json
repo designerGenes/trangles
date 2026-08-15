@@ -68,13 +68,8 @@
   "organizerTimerStart": "Start timer",
   "organizerTimerRemove": "Remove timer",
   "organizerTimerRestart": "Restart round",
-  "organizerAspectEyebrow": "Add an aspect",
-  "organizerAspectAdd": "Add",
-  "organizerAspectHint": "Adding one to this issue resets estimates for it \u2014 the question changed.",
   "organizerPendingEyebrow": "Waiting on",
   "organizerPendingRemind": "Send reminder",
-  "organizerQueueEyebrow": "Issue queue",
-  "organizerSettings": "Session settings",
   "organizerCloseSession": "Close session for everyone",
   "capstoneKicker": "Session complete",
   "capstoneTitle": "Final summary",
@@ -87,8 +82,5 @@
   "demoNext": "Next",
   "organizerTimerPlaceholder": "90s",
   "organizerTimerAria": "Round timer, e.g. 90s or 5m",
-  "organizerTimerTitle": "Optional round length \u2014 90s, 5m, 1m30s or a plain number of seconds",
-  "organizerAspectPlaceholder": "Risk",
-  "organizerAspectAria": "New aspect name",
-  "organizerQueueAddAria": "Add issue"
+  "organizerTimerTitle": "Optional round length \u2014 90s, 5m, 1m30s or a plain number of seconds"
 }

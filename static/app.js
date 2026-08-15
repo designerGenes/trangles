@@ -51,6 +51,7 @@ const S = {
   organizer: false,
   orgToken: null,
   name: "",
+  hadParticipants: false, // once a participant has joined, leaving them all gone keeps the organizer's view intact
   axes: ["Uncertainty", "Complexity", "Toil"],
   axisMins: [1, 1, 1],
   axisMaxes: [8, 8, 8],
@@ -971,13 +972,22 @@ function renderConsole(round) {
   const open = !!(round && round.open);
   const queued = S.state.queuedItems || 0;
   const final = !!S.state.finalSummary;
-  // Results are a readout, not a place to change the completed session.
-  setHidden($("organizer-shelf"), final);
-  const finished = !!round && !open && queued === 0;
   const pending = (S.state.participants || []).filter((person) => !person.organizer && !person.submitted);
   const eligible = (S.state.participants || []).filter((person) => !person.organizer);
   const submitted = eligible.length - pending.length;
   const allSubmitted = eligible.length > 0 && pending.length === 0;
+  // The organizer's active controls (timer, end-rail, the shelf itself) only
+  // earn their place once someone is in the room. Once anyone has joined, the
+  // organizer keeps their current view even if the room empties — they are
+  // still present, just no longer a participating estimate.
+  const hasParticipants = eligible.length > 0;
+  if (hasParticipants) S.hadParticipants = true;
+  const waiting = !hasParticipants && !S.hadParticipants;
+  // Results are a readout, not a place to change the completed session.
+  setHidden($("organizer-shelf"), final || waiting);
+  setHidden($("end-rail"), final || waiting);
+  if (waiting) return;
+  const finished = !!round && !open && queued === 0;
   const canTime = open && !final;
   const canRestart = !!round && !open && !final;
   $("btn-timer").hidden = !canTime;
@@ -994,17 +1004,10 @@ function renderConsole(round) {
     ? `Every remaining issue starts with ${clockText(standing * 1000)} on the clock.`
     : "";
   setHidden($("timer-standing"), !standing || final);
-  // Aspects can only be added while there is a session to add them to.
-  setHidden($("aspect-group"), final);
-  $("aspect-scope").querySelector('option[value="issue"]').disabled = !open;
-  if (!open && $("aspect-scope").value === "issue") $("aspect-scope").value = "remaining";
   $("in-privacy").checked = !!S.privacy;
   // A group whose every control is hidden would otherwise leave a bare heading
   // floating in the shelf.
   setHidden($("round-group"), !canTime && !canRestart);
-  // Adding work after the totals are published would change what the final
-  // summary covers, so the queue editor goes away until restart.
-  setHidden($("queue-editor"), final);
   // The floating action remains available after a summary while queued work
   // remains, so a closed shelf never implies the session is finished.
   setHidden($("end-rail"), !round || (!open && queued === 0 && !finished && !final));
@@ -1625,9 +1628,8 @@ $("btn-submit").onclick = () => {
   send(estimatePayload("submit"));
   const r = S.state && S.state.round;
   if (r) S.submittedRound = r.number;
-  render();
+   render();
 };
-$("btn-add-queue-item").onclick = () => addQueueItem();
 $("btn-timer").onclick = () => {
   const round = S.state && S.state.round;
   if (round && round.deadlineMs) {
@@ -1659,15 +1661,6 @@ $("btn-timer-toggle").onclick = () => {
   else send({ type: "set_timer", seconds: 0, scope: "issue" });
 };
 $("in-privacy").onchange = () => send({ type: "set_privacy", on: $("in-privacy").checked });
-$("btn-apply-aspect").onclick = () => {
-  const aspect = $("in-aspect").value.trim();
-  if (!aspect) {
-    toast("Name the aspect first.");
-    return;
-  }
-  send({ type: "add_aspect", aspect, scope: $("aspect-scope").value });
-  $("in-aspect").value = "";
-};
 $("btn-mode-shape").onclick = () => { S.mode = "radar"; S.touched = true; render(); schedulePreview(); };
 $("btn-mode-simple").onclick = () => { S.mode = "simple"; S.touched = true; render(); schedulePreview(); };
 $("simple-slider").oninput = () => setSimple(Number($("simple-slider").value));
@@ -1819,7 +1812,6 @@ window.addEventListener("beforeunload", (event) => {
 });
 
 $("btn-open-settings").onclick = () => showSettings("intake", true);
-$("btn-session-settings").onclick = () => showSettings("session", true);
 $("btn-settings-back").onclick = backFromSettings;
 $("btn-close-settings").onclick = () => closeSettings(true);
 $("btn-intake-results").onclick = () => send({ type: "show_final_summary" });
@@ -2014,87 +2006,6 @@ function draftItemValues() {
       description: draft.description.trim(),
     }))
     .filter((item) => item.title);
-}
-
-/* The shelf's queue rows keep their own collapsed link/description fields:
-   mid-session an organizer is adding one issue in place, not visiting a
-   settings screen to finish it. */
-function itemMeta(item) {
-  const meta = document.createElement("details");
-  meta.className = "draft-item-meta";
-  const summary = document.createElement("summary");
-  summary.append(document.createTextNode("Add link or description"), caretSpan());
-  const fields = document.createElement("div");
-  fields.className = "draft-meta-fields";
-  const link = document.createElement("input");
-  link.type = "url";
-  link.className = "item-link";
-  link.placeholder = "Optional issue link";
-  link.value = item.link || "";
-  const description = document.createElement("textarea");
-  description.className = "item-description";
-  description.maxLength = 2000;
-  description.placeholder = "Optional issue description";
-  description.value = item.description || "";
-  fields.append(link, description);
-  meta.append(summary, fields);
-  return meta;
-}
-
-function addQueueItem(item = {}) {
-  const entry = document.createElement("div");
-  entry.className = "queue-item";
-  entry.dataset.itemId = item.id || itemID();
-  const row = document.createElement("div");
-  row.className = "draft-item";
-  const title = document.createElement("input");
-  title.type = "text";
-  title.maxLength = 200;
-  title.placeholder = "Issue title";
-  title.value = item.title || "";
-  const confirmButton = document.createElement("button");
-  confirmButton.type = "button";
-  confirmButton.className = "btn btn-primary queue-confirm";
-  confirmButton.textContent = "Confirm";
-  const remove = document.createElement("button");
-  remove.type = "button";
-  remove.className = "btn btn-quiet";
-  remove.textContent = "Delete";
-  remove.hidden = true;
-  row.append(title, confirmButton, remove);
-  const meta = itemMeta(item);
-  const link = meta.querySelector(".item-link");
-  const description = meta.querySelector(".item-description");
-  entry.append(row, meta);
-
-  confirmButton.onclick = () => {
-    const queued = {
-      id: entry.dataset.itemId,
-      title: title.value.trim(),
-      link: link.value.trim(),
-      description: description.value.trim(),
-    };
-    if (!queued.title) {
-      toast("Give the issue a title before confirming it.");
-      title.focus();
-      return;
-    }
-    send({ type: "append_items", items: [queued] });
-    entry.classList.add("confirmed");
-    title.disabled = true;
-    link.disabled = true;
-    description.disabled = true;
-    confirmButton.hidden = true;
-    remove.hidden = false;
-  };
-  remove.onclick = () => {
-    if (entry.classList.contains("confirmed")) {
-      send({ type: "delete_queued_item", itemId: entry.dataset.itemId });
-    }
-    entry.remove();
-  };
-  $("queue-items").appendChild(entry);
-  title.focus();
 }
 
 function itemID() {
