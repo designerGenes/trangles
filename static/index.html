@@ -112,32 +112,39 @@
       <span class="eyebrow">Session settings</span>
       <h1 class="setup-title">Set up how this team estimates.</h1>
     </div>
-    <button id="btn-close-settings" class="btn" type="button">Launch pointing session</button>
+    <div class="settings-actions">
+      <button id="btn-settings-back" class="btn" type="button">Back</button>
+      <button id="btn-close-settings" class="btn btn-primary" type="button">Launch pointing session</button>
+    </div>
   </div>
-
-  <section class="card">
-    <span class="eyebrow">Aspects</span>
-    <p class="hint">Each aspect becomes one axis of the chart. Two to twelve.</p>
-    <div id="draft-aspects" class="draft-items"></div>
-    <button id="btn-add-aspect" class="btn" type="button">Add aspect</button>
-    <p id="setup-aspect-warning" class="setup-warning" hidden>Choose between 2 and 12 aspects to launch a session.</p>
-  </section>
 
   <section class="card">
     <span class="eyebrow">Issue details</span>
     <p class="hint">Add a title, description, or link for each issue.</p>
     <div id="settings-items" class="draft-items"></div>
     <p id="settings-items-empty" class="hint">Issues you enter on the previous screen appear here.</p>
+    <p id="settings-items-warning" class="setup-warning" hidden></p>
+  </section>
+
+  <section class="card">
+    <span class="eyebrow">Aspects</span>
+    <p class="hint">Each aspect becomes one axis of the chart. Two to twelve.</p>
+    <div id="draft-aspects" class="draft-items"></div>
+    <button id="btn-add-aspect" class="btn row-plus" type="button" aria-label="Add aspect">+</button>
+    <p id="setup-aspect-warning" class="setup-warning" hidden>Choose between 2 and 12 aspects to launch a session.</p>
   </section>
 
   <section class="card">
     <span class="eyebrow">Point range</span>
     <div class="control-group">
-      <label class="field range-field">
-        <span>Points per aspect</span>
-        <input id="setup-max" class="mono" type="number" min="2" max="100" step="1" value="8">
-      </label>
-      <p class="hint">Every aspect uses the same whole-number range: 1 to this value.</p>
+      <span class="field-label">Points per aspect</span>
+      <div class="point-range-control">
+        <button id="btn-setup-max-minus" class="btn row-minus" type="button" aria-label="Remove highest point">-</button>
+        <output id="setup-max-display" class="mono" for="btn-setup-max-minus btn-setup-max-plus">8</output>
+        <button id="btn-setup-max-plus" class="btn row-plus" type="button" aria-label="Add point">+</button>
+        <input id="setup-max" type="hidden" value="8">
+      </div>
+      <p class="hint">Start with eight points. Add or remove the highest point to change the shared range.</p>
     </div>
     <div class="control-group">
       <span class="eyebrow">Point hover labels</span>

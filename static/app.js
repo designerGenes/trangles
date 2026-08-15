@@ -427,9 +427,9 @@ function renderIntake() {
 function showSettings(from, record) {
   S.settingsReturn = from || S.view || "intake";
   showView("settings", record);
-  $("btn-close-settings").textContent = S.settingsReturn === "session"
-    ? "Back to session"
-    : "Launch pointing session";
+  const liveSession = S.settingsReturn === "session";
+  $("btn-settings-back").textContent = liveSession ? "Back to session" : "Back";
+  setHidden($("btn-close-settings"), liveSession);
   if (!S.settingsEdited && $("draft-aspects").children.length === 0) {
     const seed = (S.state && S.state.axes) || ["Uncertainty", "Complexity", "Toil"];
     seed.forEach((aspect) => addDraftAspect(aspect, false));
@@ -441,6 +441,11 @@ function showSettings(from, record) {
 function closeSettings(record) {
   if (S.settingsReturn === "session") showSession(record);
   else launchDrafts();
+}
+
+function backFromSettings() {
+  if (S.settingsReturn === "session") showSession(true);
+  else showIntake("first", true);
 }
 
 function toLanding(message) {
@@ -1083,6 +1088,9 @@ function renderPointLabelRows() {
   const max = setupMax();
   const current = Array.from($("setup-point-labels").querySelectorAll("input")).map((input) => input.value);
   $("setup-point-labels").innerHTML = "";
+  $("setup-max-display").textContent = max || "—";
+  $("btn-setup-max-minus").disabled = !max || max <= 2;
+  $("btn-setup-max-plus").disabled = !max || max >= 100;
   if (!max) return;
   for (let value = 1; value <= max; value++) {
     const row = document.createElement("label");
@@ -1096,6 +1104,14 @@ function renderPointLabelRows() {
     row.append(number, input);
     $("setup-point-labels").appendChild(row);
   }
+}
+
+function adjustSetupMax(delta) {
+  const current = setupMax() || 8;
+  const next = Math.max(2, Math.min(100, current + delta));
+  if (next === current) return;
+  $("setup-max").value = String(next);
+  renderSetupRange();
 }
 
 function setupPointLabels() {
@@ -1765,6 +1781,7 @@ window.addEventListener("beforeunload", (event) => {
 $("btn-add-aspect").onclick = () => addDraftAspect();
 $("btn-open-settings").onclick = () => showSettings("intake", true);
 $("btn-session-settings").onclick = () => showSettings("session", true);
+$("btn-settings-back").onclick = backFromSettings;
 $("btn-close-settings").onclick = () => closeSettings(true);
 $("btn-intake-results").onclick = () => send({ type: "show_final_summary" });
 $("btn-intake-back").onclick = () => {
@@ -1777,6 +1794,11 @@ $("btn-intake-back").onclick = () => {
 function launchDrafts() {
   const items = draftItemValues();
   if (items.length === 0) {
+    if (S.view === "settings") {
+      $("settings-items-warning").textContent = "Session requires at least one issue.";
+      setHidden($("settings-items-warning"), false);
+      return;
+    }
     $("intake-warning").textContent = "Enter an issue before launching.";
     setHidden($("intake-warning"), false);
     return;
@@ -1793,6 +1815,7 @@ function launchDrafts() {
     renderProspectivePlot();
     return;
   }
+  setHidden($("settings-items-warning"), true);
   setHidden($("intake-warning"), true);
   if (S.intakeStage === "more") {
     // The session is already configured; these issues join the queue behind it.
@@ -1806,6 +1829,8 @@ function launchDrafts() {
 }
 $("btn-launch").onclick = launchDrafts;
 $("setup-max").oninput = renderSetupRange;
+$("btn-setup-max-minus").onclick = () => adjustSetupMax(-1);
+$("btn-setup-max-plus").onclick = () => adjustSetupMax(1);
 $("btn-live-overlay").onclick = () => {
   S.liveView = "overlay";
   const round = S.state && S.state.round;
@@ -1888,7 +1913,10 @@ function draftRow(draft, index, context) {
   input.placeholder = mode.label;
   input.setAttribute("aria-label", mode.label);
   input.value = draft[mode.key];
-  input.oninput = () => { draft[mode.key] = input.value; };
+  input.oninput = () => {
+    draft[mode.key] = input.value;
+    if (mode.key === "title" && input.value.trim()) setHidden($("settings-items-warning"), true);
+  };
   const modeButton = document.createElement("button");
   modeButton.type = "button";
   modeButton.className = "field-mode-toggle";
@@ -2049,8 +2077,9 @@ function addDraftAspect(value = "", edited = true) {
   input.oninput = () => { S.settingsEdited = true; renderProspectivePlot(); };
   const remove = document.createElement("button");
   remove.type = "button";
-  remove.className = "btn btn-quiet";
-  remove.textContent = "Remove";
+  remove.className = "btn row-minus";
+  remove.textContent = "-";
+  remove.setAttribute("aria-label", "Remove aspect");
   remove.onclick = () => { S.settingsEdited = true; row.remove(); renderProspectivePlot(); };
   row.append(input, remove);
   $("draft-aspects").appendChild(row);

@@ -167,6 +167,7 @@ main { max-width: var(--column); margin: 0 auto; padding: 8px 16px 48px; }
 /* Session settings ---------------------------------------------------- */
 #view-settings { max-width: 720px; }
 .settings-head { align-items: flex-start; display: flex; gap: 16px; justify-content: space-between; margin: 20px 0 14px; }
+.settings-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .setup-title {
   font-family: "Bricolage Grotesque", sans-serif;
   font-size: 1.5rem;
@@ -185,15 +186,16 @@ main { max-width: var(--column); margin: 0 auto; padding: 8px 16px 48px; }
 .draft-item-meta .draft-meta-fields { padding-top: 10px; }
 .draft-meta-fields { display: flex; flex-direction: column; gap: 8px; }
 #draft-aspects .draft-item { background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 7px; }
-#draft-aspects .draft-item:nth-child(odd) { background: #E1F3DE; border-color: #A9CCA8; }
-#draft-aspects .draft-item:nth-child(even) { background: #F0FAEE; border-color: #C4DEC1; }
+#draft-aspects .draft-item:nth-child(odd) { background: #F1EDFA; border-color: #CFC2E8; }
+#draft-aspects .draft-item:nth-child(even) { background: #F8F5FD; border-color: #DED5F0; }
 .caret { border-bottom: 2px solid var(--muted); border-right: 2px solid var(--muted); height: 7px; margin: 0 4px; transform: rotate(45deg); transition: transform 120ms; width: 7px; }
 details[open] > summary .caret { transform: rotate(225deg); }
 .setup-warning { color: var(--pencil); font-size: 0.85rem; font-weight: 600; margin: 10px 0 0; }
-.range-field { max-width: 8rem; }
-.range-field input { margin-top: 4px; }
 .control-group { display: flex; flex-direction: column; gap: 6px; }
 .control-group + .control-group { border-top: 1px solid var(--grid); margin-top: 16px; padding-top: 14px; }
+.field-label { color: var(--muted); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.point-range-control { align-items: center; display: flex; gap: 8px; }
+.point-range-control output { font-size: 1.3rem; font-weight: 700; min-width: 2ch; text-align: center; }
 #setup-point-labels { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; max-height: 320px; overflow-y: auto; }
 .point-label-row { align-items: center; display: grid; gap: 8px; grid-template-columns: 2rem 1fr; }
 .point-label-row span { color: var(--muted); font-family: "Spline Sans Mono", monospace; text-align: right; }

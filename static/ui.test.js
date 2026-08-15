@@ -963,13 +963,49 @@ const historyEntry = (n, title) => ({
   T.showIntake("first");
   T.addDraftItem({ title: "PROJ-2" });
   T.showSettings("intake");
-  Array.from(win.document.querySelectorAll("#draft-aspects .btn-quiet")).forEach((button) => button.click());
+  Array.from(win.document.querySelectorAll("#draft-aspects .row-minus")).forEach((button) => button.click());
   win.document.getElementById("btn-launch").click();
   check("deliberately removing every aspect blocks launch", shown(win, "view-settings")
     && shown(win, "setup-aspect-warning"));
   check("prelaunch settings says it launches", win.document.getElementById("btn-close-settings").textContent === "Launch pointing session");
   T.showSettings("session");
-  check("live session settings returns instead of relaunching", win.document.getElementById("btn-close-settings").textContent === "Back to session");
+  check("live session settings returns instead of relaunching", !shown(win, "btn-close-settings")
+    && win.document.getElementById("btn-settings-back").textContent === "Back to session");
+}
+
+/* ── 28b. Settings put issues first and use shared row controls ──────── */
+{
+  const win = boot();
+  const T = win.__test;
+  T.S.organizer = true; T.S.code = "ABCDE"; T.S.selfId = "o";
+  T.showIntake("first");
+  T.showSettings("intake");
+  const firstCard = win.document.querySelector("#view-settings .card");
+  check("issue details are the first settings container", /Issue details/.test(firstCard.textContent));
+  check("settings offers Back beside Launch", !!win.document.getElementById("btn-settings-back")
+    && shown(win, "btn-close-settings"));
+  check("point range starts at eight with row controls", win.document.getElementById("setup-max-display").textContent === "8"
+    && !win.document.getElementById("btn-setup-max-minus").disabled);
+
+  win.document.getElementById("btn-setup-max-plus").click();
+  check("point range plus adds the next label row", win.document.getElementById("setup-max-display").textContent === "9"
+    && win.document.querySelectorAll("#setup-point-labels input").length === 9);
+  win.document.getElementById("btn-setup-max-minus").click();
+  check("point range minus removes the highest label row", win.document.getElementById("setup-max-display").textContent === "8"
+    && win.document.querySelectorAll("#setup-point-labels input").length === 8);
+
+  const initialAspects = win.document.querySelectorAll("#draft-aspects .draft-item").length;
+  win.document.getElementById("btn-add-aspect").click();
+  check("aspects use a plus control", win.document.querySelectorAll("#draft-aspects .draft-item").length === initialAspects + 1
+    && win.document.getElementById("btn-add-aspect").textContent === "+");
+  check("aspect rows use matching minus controls", win.document.querySelectorAll("#draft-aspects .row-minus").length === initialAspects + 1);
+
+  win.document.getElementById("btn-close-settings").click();
+  const warning = win.document.getElementById("settings-items-warning");
+  check("settings launch validates its own issue details", shown(win, "view-settings") && shown(win, "settings-items-warning")
+    && /at least one issue/.test(warning.textContent) && warning.closest(".card") === firstCard);
+  win.document.getElementById("btn-settings-back").click();
+  check("settings Back returns to the launch intake", shown(win, "view-intake"));
 }
 
 /* ── 29. Individual view explains an empty room ──────────────────────── */
