@@ -4,6 +4,5 @@ static/*.test.js
 node_modules
 .git
 .gitignore
-fly.toml
 README.md
 *.md

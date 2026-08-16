@@ -1,4 +1,4 @@
-module triangulate
+module trangles
 
 go 1.22.2
 

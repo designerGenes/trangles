@@ -2,7 +2,12 @@
   "name": "trangles-deploy",
   "private": true,
   "description": "Deploy tooling only. The app itself is the Go binary built by Dockerfile; nothing here ships in the runtime image.",
+  "scripts": {
+    "test:ui": "node static/ui.test.js",
+    "deploy": "wrangler deploy"
+  },
   "devDependencies": {
+    "jsdom": "^30.0.1",
     "wrangler": "^4.123.0"
   },
   "dependencies": {

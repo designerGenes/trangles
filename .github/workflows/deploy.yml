@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch: {}
 
+concurrency:
+  group: trangles-production-deploy
+  cancel-in-progress: false
+
 jobs:
   # The same two checks a person runs locally: go test for the server and
   # session logic, node static/ui.test.js for the client. Deploy only
@@ -21,10 +25,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: npm install --no-save jsdom
-        working-directory: static
-      - run: node ui.test.js
-        working-directory: static
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:ui
 
   deploy:
     needs: test
@@ -33,6 +38,13 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - run: pnpm install --frozen-lockfile
       # wrangler deploy builds the Dockerfile image and pushes it to
       # Cloudflare's managed registry itself; the ubuntu-latest runner
       # already has a Docker daemon, so no separate build/push step is
@@ -42,4 +54,6 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: pnpm
+          wranglerVersion: "4.123.0"
           command: deploy

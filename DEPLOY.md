@@ -18,8 +18,8 @@ fan-out layer, and doesn't change this. Real horizontal scaling would mean
 putting the session code in the `/ws` URL so the Worker can hash-route
 deterministically — a real change, not a config flip, and out of scope here.
 
-One instance is what the app already runs today on Fly.io, so this is a
-platform move, not a behavior change.
+The one-instance limit is a current application constraint, not a capacity
+setting to tune independently.
 
 ## One-time setup
 
@@ -40,17 +40,17 @@ platform move, not a behavior change.
    - `CLOUDFLARE_ACCOUNT_ID` — the ID from step 3
 
 5. **Install the deploy tooling** (not part of the runtime image — see
-   `package.json`):
-   ```
-   npm install
+    `package.json`):
+    ```
+    pnpm install --frozen-lockfile
    ```
 
 6. **First deploy.** Either push to `main` and let the workflow run, or do
    it once by hand to see it work locally (needs Docker running — `docker
    info` should succeed first):
    ```
-   npx wrangler login
-   npx wrangler deploy
+    pnpm exec wrangler login
+    pnpm deploy
    ```
    The first deploy provisions the container, the Durable Object, and —
    because of `custom_domain: true` in `wrangler.jsonc` — the DNS record and
@@ -60,12 +60,12 @@ platform move, not a behavior change.
 ## Every deploy after that
 
 Push to `main`. The workflow runs `go test ./...` and
-`node static/ui.test.js`; only if both pass does it run `wrangler deploy`,
+`pnpm test:ui`; only if both pass does it run `wrangler deploy`,
 which rebuilds the image, pushes it to Cloudflare's registry, and rolls the
-container. A pointing session mid-round survives a redeploy as long as it's
-still connected when the new instance takes over — `sleepAfter: "30m"` on
-the container keeps it warm between rounds so a quiet room doesn't cold-start
-mid-session.
+container. A rollout stops the old Go process, so clients must reconnect after
+a deploy and an in-progress in-memory round is lost unless Redis recovery is
+enabled. `sleepAfter: "30m"` keeps an otherwise idle container warm between
+rounds; it does not preserve process memory across a stop or rollout.
 
 ## www.trangles.com
 
@@ -84,7 +84,7 @@ crash doesn't erase an in-progress round — it's off unless `REDIS_URL` is
 set. To turn it on:
 
 ```
-npx wrangler secret put REDIS_URL
+pnpm exec wrangler secret put REDIS_URL
 ```
 
 then uncomment the `envVars` block and the `cloudflare:workers` import in
@@ -94,6 +94,6 @@ then uncomment the `envVars` block and the `cloudflare:workers` import in
 ## Rolling back
 
 ```
-npx wrangler deployments list
-npx wrangler rollback [deployment-id]
+pnpm exec wrangler deployments list
+pnpm exec wrangler rollback [deployment-id]
 ```

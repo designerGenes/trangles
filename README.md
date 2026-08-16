@@ -1,4 +1,4 @@
-# Triangulate
+# Trangles
 
 Estimate the *shape* of the work, not a number to defend.
 
@@ -52,7 +52,7 @@ Set `REDIS_URL` to a `redis://...` URL to enable the optional cache.
 ./install.sh
 ```
 
-This builds the `triangulate` binary into `~/.local/bin`. Use
+This builds the `trangles` binary into `~/.local/bin`. Use
 `./install.sh --bump-version` or `./install.sh --set-version X.Y.Z` to update
 the project version before installing.
 
@@ -61,7 +61,7 @@ the project version before installing.
 ```sh
 go test ./...
 node static/radar.test.js
-node scripts/generate_radar_screenshots.js /tmp/triangulate-radars
+node scripts/generate_radar_screenshots.js /tmp/trangles-radars
 ```
 
 The Go suite covers issue loading, default and custom aspect validation,
@@ -74,44 +74,13 @@ shape from 2 through 12 aspects before writing PNG and SVG reference images.
 
 ## Deploy (single instance required)
 
-All state is in RAM, so run exactly **one** instance. That constraint is also
-what makes hosting nearly free.
+Trangles runs on Cloudflare Containers at `https://trangles.com`. The Worker
+routes every HTTP and WebSocket request to one named container instance, because
+session state is held in that Go process's memory. Do not increase the one
+instance limit without implementing deterministic session routing.
 
-**Fly.io** (~free hobby usage):
-
-```sh
-fly launch --no-deploy     # accept defaults; it detects the Dockerfile
-fly scale count 1
-fly deploy
-```
-
-**Any $4–6/mo VPS** (Hetzner CX22, DO droplet, etc.):
-
-```sh
-CGO_ENABLED=0 GOOS=linux go build -o triangulate .
-scp triangulate static/ user@host:/opt/triangulate/
-```
-
-systemd unit:
-
-```ini
-[Unit]
-Description=Triangulate
-After=network.target
-
-[Service]
-WorkingDirectory=/opt/triangulate
-ExecStart=/opt/triangulate/triangulate
-Environment=PORT=8080
-Restart=on-failure
-DynamicUser=yes
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Put Caddy or the platform's proxy in front for TLS — WebSockets upgrade
-through both without extra config.
+Follow [DEPLOY.md](DEPLOY.md) for the Cloudflare account setup, GitHub secrets,
+custom-domain route, deployment, and rollback procedure.
 
 ## Notes
 

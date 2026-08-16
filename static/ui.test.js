@@ -1492,7 +1492,7 @@ const historyEntry = (n, title) => ({
     seen.size >= 1 && [...seen].every((name) => typeof name === "string" && name.length > 0));
 }
 
-/* ── 36. Rebrand: Trangles replaces Triangulate everywhere ───────────── */
+/* ── 36. Rebrand enforcement ─────────────────────────────────────────── */
 {
   const win = boot();
   const home = win.document.getElementById("home-link");

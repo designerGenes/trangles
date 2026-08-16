@@ -1,11 +1,11 @@
-FROM golang:1.22-alpine AS build
+FROM --platform=linux/amd64 golang:1.22-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY *.go ./
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /trangles .
 
-FROM gcr.io/distroless/static-debian12
+FROM --platform=linux/amd64 gcr.io/distroless/static-debian12
 COPY --from=build /trangles /trangles
 # .dockerignore keeps static/*.test.js out of the runtime image; they are
 # development assets and would otherwise be served publicly.

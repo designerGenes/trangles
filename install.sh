@@ -31,5 +31,5 @@ esac
 printf '%s\n' "$version" > "$version_file"
 mkdir -p "$target_dir"
 cd "$root"
-go build -ldflags "-X main.version=$version" -o "$target_dir/triangulate" .
-printf '%s\n' "Installed triangulate $version to $target_dir/triangulate"
+go build -ldflags "-X main.version=$version" -o "$target_dir/trangles" .
+printf '%s\n' "Installed trangles $version to $target_dir/trangles"
