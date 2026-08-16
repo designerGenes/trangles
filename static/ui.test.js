@@ -668,7 +668,7 @@ const historyEntry = (n, title) => ({
   const css = read("style.css");
 
   const TOKENS = (() => {
-    const block = /TRIANGULATE-TOKENS:START([\s\S]*?)TRIANGULATE-TOKENS:END/.exec(css);
+    const block = /TRANGLES-TOKENS:START([\s\S]*?)TRANGLES-TOKENS:END/.exec(css);
     const found = {};
     if (!block) return found;
     const decl = /--([a-zA-Z0-9-]+):\s*([^;]+);/g;
@@ -759,7 +759,7 @@ const historyEntry = (n, title) => ({
     new Set(axes.map((c) => c.toLowerCase())).size === axes.length, axes);
 
   // The lab can only be authoritative if nothing outside the block paints.
-  const afterBlock = css.slice(css.indexOf("TRIANGULATE-TOKENS:END"));
+  const afterBlock = css.slice(css.indexOf("TRANGLES-TOKENS:END"));
   const strays = afterBlock.match(/#[0-9a-fA-F]{3,8}\b|\brgba?\(/g) || [];
   check("no colour is hard-coded outside the token block", strays.length === 0, strays.slice(0, 6));
 
@@ -1490,6 +1490,20 @@ const historyEntry = (n, title) => ({
   for (let i = 0; i < 400; i++) seen.add(T.randomNickname());
   check("the fallback pool still yields a name before config arrives",
     seen.size >= 1 && [...seen].every((name) => typeof name === "string" && name.length > 0));
+}
+
+/* ── 36. Rebrand: Trangles replaces Triangulate everywhere ───────────── */
+{
+  const win = boot();
+  const home = win.document.getElementById("home-link");
+  check("wordmark reads Trangles with the triangle standing in for the a",
+    home.textContent.trim() === "Tr▲ngles"
+    && home.querySelector(".wordmark-angle").textContent === "▲");
+  check("the tab title carries the new name",
+    win.document.title === "Trangles");
+  check("no stray reference to the old name survives the rename",
+    !/triangulat/i.test(read("index.html")) && !/triangulat/i.test(read("app.js"))
+    && !/triangulat/i.test(read("style.css")));
 }
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURES`);

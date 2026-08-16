@@ -1,7 +1,7 @@
-# Triangulate Color Rules
+# Trangles Color Rules
 
 **Status:** Current palette, tokenised.
-**Source of truth:** the `TRIANGULATE-TOKENS` block at the top of `static/style.css`. This document explains that block; it does not duplicate its authority.
+**Source of truth:** the `TRANGLES-TOKENS` block at the top of `static/style.css`. This document explains that block; it does not duplicate its authority.
 **Use:** change a value in the colour lab (below) or in the token block directly. Never write a colour anywhere else — `static/ui.test.js` fails the build if a hex or `rgba()` appears outside the block.
 
 ## How the palette is organised
@@ -74,12 +74,12 @@ Two of these were failing before this pass and are fixed by it: the participant 
 A local-only page that renders a specimen of every element below, lets you edit any token with live preview, and writes the result back into `static/style.css` as a normal one-line-per-change diff you can review and ship.
 
 ```
-TRIANGULATE_DEV=1 go run .    # then open http://localhost:8080/dev/colors
+TRANGLES_DEV=1 go run .    # then open http://localhost:8080/dev/colors
 ```
 
 It is gated three ways, deliberately independently:
 
-1. the route is a flat 404 unless `TRIANGULATE_DEV=1`, so a deploy never mounts it;
+1. the route is a flat 404 unless `TRANGLES_DEV=1`, so a deploy never mounts it;
 2. even mounted, it answers loopback only, ignoring proxy headers — an env var set by accident still does not expose a file writer;
 3. `devtools/` is not copied into the Docker image at all.
 

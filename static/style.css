@@ -1,6 +1,6 @@
-/* Triangulate — a deliberately quiet estimation tool. */
+/* Trangles — a deliberately quiet estimation tool. */
 
-/* == TRIANGULATE-TOKENS:START ==
+/* == TRANGLES-TOKENS:START ==
    Every colour the interface paints is named in this block, and nothing below
    it may hard-code a colour value. The local colour lab reads and rewrites
    the block verbatim, so keep its shape when editing by hand:
@@ -9,7 +9,7 @@
      - "@group" comments open a section in the lab
      - "@label" comments name the swatch in the lab
 
-   Run the lab with TRIANGULATE_DEV=1 and open /dev/colors. It never ships:
+   Run the lab with TRANGLES_DEV=1 and open /dev/colors. It never ships:
    the route is registered only in dev mode and only answers loopback.
    == */
 :root {
@@ -144,7 +144,7 @@
   --panel-angle: 145deg;                       /* @label Panel ramp angle */
   --panel-sheen-angle: 160deg;                 /* @label Panel sheen angle */
 }
-/* == TRIANGULATE-TOKENS:END == */
+/* == TRANGLES-TOKENS:END == */
 
 /* Layout scale. Deliberately outside the token block: the colour lab does not
    own geometry. */

@@ -6,7 +6,7 @@
 // the palette becomes dynamic in production, and the running server keeps no
 // theme state.
 //
-// It is off unless TRIANGULATE_DEV=1, and even then it answers loopback only.
+// It is off unless TRANGLES_DEV=1, and even then it answers loopback only.
 // Both gates matter: the env var keeps the route off a Fly deploy, and the
 // loopback check means an accidentally-set env var still cannot expose a file
 // writer to the internet.
@@ -25,12 +25,12 @@ import (
 )
 
 const (
-	tokenBlockStart = "== TRIANGULATE-TOKENS:START =="
-	tokenBlockEnd   = "== TRIANGULATE-TOKENS:END =="
+	tokenBlockStart = "== TRANGLES-TOKENS:START =="
+	tokenBlockEnd   = "== TRANGLES-TOKENS:END =="
 )
 
 // ColorLabEnabled reports whether the lab should be mounted at all.
-func ColorLabEnabled() bool { return os.Getenv("TRIANGULATE_DEV") == "1" }
+func ColorLabEnabled() bool { return os.Getenv("TRANGLES_DEV") == "1" }
 
 func devDir() string {
 	if d := os.Getenv("DEVTOOLS_DIR"); d != "" {

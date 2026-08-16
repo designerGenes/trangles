@@ -1,4 +1,4 @@
-/* Triangulate client — no framework, one WebSocket, one SVG. */
+/* Trangles client — no framework, one WebSocket, one SVG. */
 "use strict";
 
 const $ = (id) => document.getElementById(id);

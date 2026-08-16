@@ -12,7 +12,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const redisKeyPrefix = "triangulate:session:"
+const redisKeyPrefix = "trangles:session:"
 
 // SessionStore mirrors a session outside the process. The in-memory session
 // remains the source of truth for connected WebSocket clients.

@@ -1,0 +1,11 @@
+{
+  "name": "trangles-deploy",
+  "private": true,
+  "description": "Deploy tooling only. The app itself is the Go binary built by Dockerfile; nothing here ships in the runtime image.",
+  "devDependencies": {
+    "wrangler": "^4.123.0"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "^0.3.7"
+  }
+}

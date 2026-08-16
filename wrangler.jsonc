@@ -1,0 +1,49 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "trangles",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-08-14",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // The container is the existing Go binary, unchanged apart from the rename
+  // in the Dockerfile. The Worker below is a pass-through: it does not parse
+  // requests, it hands every one of them to the container, which still owns
+  // static files, /ws, /api/config, /resources, and /healthz exactly as it
+  // does today.
+  "containers": [
+    {
+      "class_name": "TranglesContainer",
+      "image": "./Dockerfile",
+      // Deliberately 1, not the default of several. A session's code is
+      // chosen inside the first WebSocket message, not the connection URL
+      // (see session.go's HandleWS), so nothing before the Go process itself
+      // can route two people in the same session to the same instance.
+      // session.go's Hub holds all sessions in one process's memory; a
+      // second instance would mean a coin flip on which container a given
+      // room's participants land on. REDIS_URL (see cache.go) mirrors a
+      // session out for restart recovery — it is not a fan-out layer, and
+      // does not change this. Raise this only alongside a routing change
+      // that puts the session code in the /ws URL so the Worker can hash to
+      // the right instance deterministically.
+      "max_instances": 1,
+      "instance_type": "basic"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "class_name": "TranglesContainer", "name": "TRANGLES_CONTAINER" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["TranglesContainer"] }
+  ],
+
+  // Cloudflare provisions the DNS record and the TLS certificate for a
+  // custom_domain route automatically — this is the whole of "connecting
+  // DNS" for a zone Trangles.com already sits on. www is not routed here
+  // deliberately: see DEPLOY.md for why that is a dashboard redirect rule
+  // instead of a second route.
+  "routes": [
+    { "pattern": "trangles.com", "custom_domain": true }
+  ]
+}

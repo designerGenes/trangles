@@ -117,7 +117,7 @@ func TestApplyTokensRefusesUnsafeInput(t *testing.T) {
 }
 
 func TestColorLabIsAbsentUnlessDevModeIsOn(t *testing.T) {
-	t.Setenv("TRIANGULATE_DEV", "")
+	t.Setenv("TRANGLES_DEV", "")
 	mux := http.NewServeMux()
 	RegisterColorLab(mux)
 
@@ -136,7 +136,7 @@ func TestColorLabIsAbsentUnlessDevModeIsOn(t *testing.T) {
 // accident still does not expose a file writer. Proxy headers are ignored on
 // purpose, so spoofing one must not help.
 func TestColorLabRefusesNonLoopbackCallers(t *testing.T) {
-	t.Setenv("TRIANGULATE_DEV", "1")
+	t.Setenv("TRANGLES_DEV", "1")
 	mux := http.NewServeMux()
 	RegisterColorLab(mux)
 
@@ -153,7 +153,7 @@ func TestColorLabRefusesNonLoopbackCallers(t *testing.T) {
 }
 
 func TestColorLabServesTokensToLoopback(t *testing.T) {
-	t.Setenv("TRIANGULATE_DEV", "1")
+	t.Setenv("TRANGLES_DEV", "1")
 	mux := http.NewServeMux()
 	RegisterColorLab(mux)
 
@@ -174,7 +174,7 @@ func TestColorLabServesTokensToLoopback(t *testing.T) {
 }
 
 func TestColorLabSaveRejectsGet(t *testing.T) {
-	t.Setenv("TRIANGULATE_DEV", "1")
+	t.Setenv("TRANGLES_DEV", "1")
 	mux := http.NewServeMux()
 	RegisterColorLab(mux)
 

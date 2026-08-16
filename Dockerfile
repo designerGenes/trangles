@@ -3,10 +3,10 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY *.go ./
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /triangulate .
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /trangles .
 
 FROM gcr.io/distroless/static-debian12
-COPY --from=build /triangulate /triangulate
+COPY --from=build /trangles /trangles
 # .dockerignore keeps static/*.test.js out of the runtime image; they are
 # development assets and would otherwise be served publicly.
 COPY static /static
@@ -21,4 +21,4 @@ ENV STATIC_DIR=/static
 ENV RESOURCES_DIR=/resources
 ENV CONFIG_PATH=/config/app.json
 EXPOSE 8080
-ENTRYPOINT ["/triangulate"]
+ENTRYPOINT ["/trangles"]

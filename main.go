@@ -1,4 +1,4 @@
-// Triangulate — shape-based issue estimation.
+// Trangles — shape-based issue estimation.
 // Single binary, in-memory sessions, no database, no auth.
 package main
 
@@ -40,7 +40,7 @@ func main() {
 			"nicknameParts": cfg.Parts,
 		})
 	})
-	// Local-only theme editor. Registers a flat 404 unless TRIANGULATE_DEV=1,
+	// Local-only theme editor. Registers a flat 404 unless TRANGLES_DEV=1,
 	// so /dev/ can never fall through to the static file server.
 	RegisterColorLab(mux)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -62,7 +62,7 @@ func main() {
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
-	log.Printf("triangulate %s listening on :%s", version, port)
+	log.Printf("trangles %s listening on :%s", version, port)
 	if ColorLabEnabled() {
 		log.Printf("colour lab enabled (loopback only): http://localhost:%s/dev/colors", port)
 	}
