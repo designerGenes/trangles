@@ -674,7 +674,14 @@ func (s *Session) handle(c *Client, msg *inboundMsg) {
 			c.trySend(errMsg("There is no open issue to remind people about."))
 			return
 		}
-		reminder := mustJSON(map[string]string{"type": "reminder", "message": "A gentle reminder: please submit your estimate when you are ready."})
+		// Tagged as an alert so the client can give it the attention-grabbing
+		// treatment; notifyLocked below reuses the same channel for ordinary
+		// status notes, which stay quiet.
+		reminder := mustJSON(map[string]string{
+			"type":    "reminder",
+			"kind":    "alert",
+			"message": "A gentle reminder: please submit your estimate when you are ready.",
+		})
 		for participant := range s.clients {
 			if participant.organizer {
 				continue
@@ -1673,14 +1680,28 @@ func closeWith(conn *websocket.Conn, msg string) {
 const codeAlphabet = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
 
 func randCode(n int) string {
-	b := make([]byte, n)
-	if _, err := rand.Read(b); err != nil {
-		log.Fatalf("crypto/rand unavailable: %v", err)
+	// A byte reduced modulo the alphabet is not uniform: 256 is not a multiple
+	// of 31, so the first eight symbols would come up ~12% more often than the
+	// rest — exactly the skew that makes short codes feel repetitive. Draw in
+	// blocks and discard the values that land in the ragged tail instead.
+	limit := 256 - (256 % len(codeAlphabet))
+	out := make([]byte, 0, n)
+	buf := make([]byte, n)
+	for len(out) < n {
+		if _, err := rand.Read(buf); err != nil {
+			log.Fatalf("crypto/rand unavailable: %v", err)
+		}
+		for _, b := range buf {
+			if int(b) >= limit {
+				continue
+			}
+			out = append(out, codeAlphabet[int(b)%len(codeAlphabet)])
+			if len(out) == n {
+				break
+			}
+		}
 	}
-	for i := range b {
-		b[i] = codeAlphabet[int(b[i])%len(codeAlphabet)]
-	}
-	return string(b)
+	return string(out)
 }
 
 func defaultAxisValues(value float64) []float64 {

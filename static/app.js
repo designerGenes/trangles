@@ -46,9 +46,22 @@ const palette = () => SERVER_PALETTE || axisColors();
    adding names never means touching JS. These few keep the placeholder
    working if the fetch fails or has not landed yet. */
 let SILLY_NICKNAMES = ["Cosmic Badger", "Waffle Wizard", "Laser Pigeon"];
+/* The generative half: every adjective/noun pair is a name too, which is what
+   takes the pool from hundreds to tens of thousands. */
+let NICKNAME_PARTS = { adjectives: [], nouns: [] };
 
+/* Draws uniformly across the curated names and every generated pair at once,
+   rather than picking a half first: the hand-written names stay reachable
+   while the far larger generated space carries the variety. */
 function randomNickname() {
-  return SILLY_NICKNAMES[Math.floor(Math.random() * SILLY_NICKNAMES.length)];
+  const { adjectives, nouns } = NICKNAME_PARTS;
+  const generated = adjectives.length * nouns.length;
+  const total = SILLY_NICKNAMES.length + generated;
+  if (total === 0) return "";
+  const pick = Math.floor(Math.random() * total);
+  if (pick < SILLY_NICKNAMES.length) return SILLY_NICKNAMES[pick];
+  const index = pick - SILLY_NICKNAMES.length;
+  return `${adjectives[Math.floor(index / nouns.length)]} ${nouns[index % nouns.length]}`;
 }
 
 async function loadRemoteConfig() {
@@ -58,11 +71,17 @@ async function loadRemoteConfig() {
     const config = await response.json();
     if (Array.isArray(config.nicknames) && config.nicknames.length) {
       SILLY_NICKNAMES = config.nicknames;
-      // The placeholder is already on screen by now; refresh it so the wider
-      // pool is visible on first load rather than only after a reload.
-      const field = $("in-name");
-      if (field && !field.value) field.placeholder = randomNickname();
     }
+    const parts = config.nicknameParts;
+    // Both banks or neither — one empty list means no pairs at all.
+    if (parts && Array.isArray(parts.adjectives) && parts.adjectives.length
+      && Array.isArray(parts.nouns) && parts.nouns.length) {
+      NICKNAME_PARTS = { adjectives: parts.adjectives, nouns: parts.nouns };
+    }
+    // The placeholder is already on screen by now; refresh it so the wider
+    // pool is visible on first load rather than only after a reload.
+    const field = $("in-name");
+    if (field && !field.value) field.placeholder = randomNickname();
   } catch (_) {
     /* Offline or blocked — the built-in fallback above still works. */
   }
@@ -77,6 +96,7 @@ const S = {
   orgToken: null,
   name: "",
   hadParticipants: false, // once a participant has joined, leaving them all gone keeps the organizer's view intact
+  codeCalloutSeen: false, // the "share this code" pointer is shown once per session
   axes: ["Uncertainty", "Complexity", "Toil"],
   axisMins: [1, 1, 1],
   axisMaxes: [8, 8, 8],
@@ -370,8 +390,12 @@ function handleMessage(msg) {
       sessionStorage.setItem("tri", JSON.stringify({
         code: S.code, name: S.name, token: S.orgToken || "", color: S.color || "",
       }));
-      if (S.organizer) showIntake("first", true);
-      else showSession();
+      if (S.organizer) {
+        showIntake("first", true);
+        showCodeCallout();
+      } else {
+        showSession();
+      }
       break;
     case "state":
       S.state = msg;
@@ -382,7 +406,7 @@ function handleMessage(msg) {
       if (msg.fatal) toLanding();
       break;
     case "reminder":
-      toast(msg.message);
+      toast(msg.message, msg.kind === "alert");
       break;
     case "closed":
       S.leftDeliberately = true;
@@ -415,10 +439,31 @@ function showView(name, record) {
   setHidden($("view-intake"), name !== "intake");
   setHidden($("view-settings"), name !== "settings");
   setHidden($("view-session"), name !== "session");
-  setHidden($("code-chip"), name === "landing" || !S.code || !!S.demo);
+  const chipHidden = name === "landing" || !S.code || !!S.demo;
+  setHidden($("code-chip"), chipHidden);
+  // The callout describes the chip, so it never outlives it on screen.
+  if (chipHidden) dismissCodeCallout();
   setHidden($("btn-demo"), name !== "landing" || !!S.demo);
   if (S.code) $("code-text").textContent = S.code;
   if (record) recordView(name);
+}
+
+/* The organizer is the only person who can hand the code out, and the chip
+   alone does not say so. Point at it once per session, then get out of the
+   way — copying the link, leaving the session or a quiet minute all count as
+   the message having landed. */
+let codeCalloutTimer = null;
+function showCodeCallout() {
+  if (!S.organizer || S.demo || S.codeCalloutSeen) return;
+  S.codeCalloutSeen = true;
+  setHidden($("code-callout"), false);
+  clearTimeout(codeCalloutTimer);
+  codeCalloutTimer = setTimeout(dismissCodeCallout, 15000);
+}
+
+function dismissCodeCallout() {
+  clearTimeout(codeCalloutTimer);
+  setHidden($("code-callout"), true);
 }
 
 function showSession(record) {
@@ -510,6 +555,9 @@ function toLanding(message) {
   S.reviewing = false;
   S.feedbackVote = null;
   S.settingsEdited = false;
+  // A new session gets a new code, so the callout is owed again.
+  S.codeCalloutSeen = false;
+  dismissCodeCallout();
   $("intake-items").innerHTML = "";
   $("draft-aspects").innerHTML = "";
   $("settings-items").innerHTML = "";
@@ -981,7 +1029,7 @@ function selfSubmitted(state) {
 
 function renderPeople(st) {
   $("people").innerHTML = st.participants.map((p) => `
-    <span class="person ${p.submitted ? "submitted" : ""}">
+    <span class="person ${p.submitted ? "submitted" : ""} ${p.organizer ? "is-organizer" : ""}">
       <span class="check" style="color:${p.organizer || !p.color ? "" : escapeHTML(p.color)}">✓</span>${escapeHTML(p.name)}${p.id === S.selfId ? " (you)" : ""}
       ${p.organizer ? '<span class="org">org</span>' : ""}
       ${S.organizer && p.submitted && !p.responded ? '<span class="default-vote">default</span>' : ""}
@@ -1305,10 +1353,11 @@ function renderLiveInputs(shapes, scores = [], loading = false) {
   setHidden($("live-empty"), !emptyStage);
   $("live-stage").classList.toggle("has-empty", emptyStage);
   if (emptyStage) {
-    // Avoid implying who has or has not supplied a private estimate.
+    // Avoid implying who has or has not supplied a private estimate. Both
+    // read as "still waiting", which is what the pulse says too.
     $("live-empty").textContent = S.privacy
-      ? "No live estimates are available yet."
-      : "No participants are here to estimate yet.";
+      ? t("liveEmptyPrivate", "Waiting for estimates...")
+      : t("liveEmptyWaiting", "Waiting for participants...");
   }
   $("live-toggles").innerHTML = "";
   active.forEach((shape) => {
@@ -1668,13 +1717,25 @@ function showTimerFloat(visible, running) {
 }
 
 /* ── misc ──────────────────────────────────────────────────────────── */
+/* Copy that is written imperatively still comes from resources/strings.json,
+   the same file the data-i18n attributes resolve against; the fallback covers
+   a fetch that failed or has not landed. */
+function t(key, fallback) {
+  const strings = window.__I18N_STRINGS;
+  return (strings && strings[key]) || fallback;
+}
+
 let toastTimer = null;
-function toast(text) {
-  const t = $("toast");
-  t.textContent = text;
-  t.hidden = false;
+/* `alert` is for the one message that expects a response rather than merely
+   reporting something, so it takes the honey plate and holds twice as long. */
+function toast(text, alert = false) {
+  const el = $("toast");
+  el.textContent = text;
+  el.classList.toggle("panel", !!alert);
+  el.classList.toggle("alert-box", !!alert);
+  el.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { t.hidden = true; }, 4000);
+  toastTimer = setTimeout(() => { el.hidden = true; }, alert ? 8000 : 4000);
 }
 
 function escapeHTML(s) {
@@ -1839,11 +1900,20 @@ $("btn-close").onclick = () => {
   }
 };
 $("code-chip").onclick = () => {
+  dismissCodeCallout();
   const link = `${location.origin}/?code=${S.code}`;
+  // navigator.clipboard is absent entirely on an insecure origin — a LAN
+  // address or a plain-http preview — so a missing API has to be a path
+  // rather than an exception. The .catch below only covers a rejection.
+  if (!navigator.clipboard) {
+    toast(`Invite link: ${link}`);
+    return;
+  }
   navigator.clipboard.writeText(link)
     .then(() => toast("Invite link copied"))
     .catch(() => toast(`Invite link: ${link}`));
 };
+$("code-callout").onclick = dismissCodeCallout;
 
 function confirmSessionDeparture() {
   return !!S.demo || !S.code || confirm("Leave this session? You can rejoin with the saved session code while it remains active.");
@@ -2197,6 +2267,7 @@ function savedCreds() {
   if (saved && saved.name) $("in-name").value = saved.name;
   if (saved && saved.color) S.color = saved.color;
   $("in-name").placeholder = randomNickname();
+  $("attribution-year").textContent = `, \u00A9 ${new Date().getFullYear()}`;
   updateEntryActions();
   if (history.replaceState) history.replaceState({ view: "landing" }, "", location.pathname + location.search);
   loadRemoteConfig();
@@ -2211,5 +2282,6 @@ if (["localhost", "127.0.0.1", "[::1]", ""].includes(location.hostname)) {
     S, render, showSession, showIntake, showSettings, closeSettings, renderHistory, stepHistory,
     setHidden, addDraftItem, renderSettingsItems, safeLink, parseDuration, setSimple, roundAxes,
     startDemo, stopDemo, runDemoStep, stepDemo, switchDemoRole,
+    toast, showCodeCallout, dismissCodeCallout, randomNickname,
   };
 }

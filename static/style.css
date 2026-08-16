@@ -212,10 +212,13 @@ body {
   cursor: pointer;
 }
 .masthead-actions { align-items: center; display: flex; gap: 10px; }
+/* Coral, not violet: this is a standing alert about what the room can see,
+   and coral-on-white is the pairing this app uses for anything that alerts or
+   moves the session forward. */
 .privacy-badge {
-  background: var(--violet);
+  background: var(--pencil);
   border-radius: 999px;
-  color: var(--paper);
+  color: var(--on-pencil);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -226,6 +229,38 @@ body {
 .code-chip:hover { border-color: var(--violet); box-shadow: 0 0 0 3px var(--violet-halo); }
 .code-chip:active { background: var(--ink); border-color: var(--ink); color: var(--paper); }
 .code-chip:active .mono { color: var(--paper); }
+/* The chip is the only way into the session, and the organizer is the only
+   person who can hand it out. Say so once on arrival rather than leaving it to
+   be noticed; it dismisses itself the moment the code is copied. */
+.code-chip-wrap { position: relative; }
+.code-callout {
+  background: var(--pencil);
+  border-radius: 10px;
+  box-shadow: 0 10px 24px var(--pencil-cast);
+  color: var(--on-pencil);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 0;
+  max-width: 15rem;
+  padding: 9px 12px;
+  position: absolute;
+  right: 0;
+  text-align: left;
+  top: calc(100% + 10px);
+  width: max-content;
+  z-index: 5;
+}
+/* Points back at the chip it is describing. */
+.code-callout::before {
+  border: 6px solid transparent;
+  border-bottom-color: var(--pencil);
+  bottom: 100%;
+  content: "";
+  position: absolute;
+  right: 18px;
+}
 
 /* Landing ------------------------------------------------------------ */
 main { max-width: var(--column); margin: 0 auto; padding: 8px 16px 48px; }
@@ -295,6 +330,10 @@ main { max-width: var(--column); margin: 0 auto; padding: 8px 16px 48px; }
 .issues-box { --panel-lit: var(--honey-lit); --panel-deep: var(--honey-deep); --panel-rim: var(--honey-rim); }
 .aspects-box { --panel-lit: var(--orange-lit); --panel-deep: var(--orange-deep); --panel-rim: var(--orange-rim); }
 .point-labels-box { --panel-lit: var(--blue-lit); --panel-deep: var(--blue-deep); --panel-rim: var(--blue-rim); }
+/* Not a control surface, but the same plate: honey is already what this app
+   uses to mean "this one wants your attention", so an alert borrows it rather
+   than inventing a fifth family. */
+.alert-box { --panel-lit: var(--honey-lit); --panel-deep: var(--honey-deep); --panel-rim: var(--honey-rim); }
 /* Quiet copy on a lit surface. Same intent as --muted, opposite direction. */
 .panel .hint,
 .panel .eyebrow,
@@ -694,6 +733,10 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 }
 .person .check { color: var(--border); font-weight: 700; }
 .person.submitted .check { color: var(--pencil); }
+/* The organizer contributes no estimate, so their tick can never mean
+   "submitted". It takes the wordmark's coral as identity instead of sitting
+   greyed out as though they were still deciding. */
+.person.is-organizer .check { color: var(--pencil); }
 .person .org { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
 .person .default-vote { color: var(--muted); font-size: 0.68rem; letter-spacing: 0.04em; text-transform: uppercase; }
 
@@ -713,7 +756,12 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .live-stage { min-height: min(573px, 87vw); }
 .live-stage.is-loading { align-items: center; display: flex; justify-content: center; }
 .live-stage.has-empty { align-items: center; display: flex; justify-content: center; min-height: 5rem; }
-.live-empty { max-width: 26rem; padding: 12px 0; text-align: center; }
+/* An empty stage is a waiting state, not an error, so it reads exactly like a
+   chart that has not drawn yet — same pulse, same casing, same rhythm. */
+.live-empty { animation: chart-pulse 1.1s ease-in-out infinite; letter-spacing: 0.08em; max-width: 26rem; padding: 12px 0; text-align: center; text-transform: uppercase; }
+/* This one can sit on screen for minutes rather than the moment a chart takes,
+   so it holds still for anyone who asked motion to stop. */
+@media (prefers-reduced-motion: reduce) { .live-empty { animation: none; } }
 .live-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(170px, 200px)); justify-content: center; margin-top: 12px; }
 .live-mini { text-align: center; }
 .live-mini svg { display: block; width: 100%; }
@@ -841,13 +889,21 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
    they sit next to, and align them to the same baseline as the buttons. */
 .console-row .scope-select { flex: 0 0 auto; }
 
+/* Attribution --------------------------------------------------------- */
+.site-footer { margin: 0 auto; max-width: var(--column); padding: 0 16px 28px; text-align: center; }
+.attribution { color: var(--ink-quiet); font-size: 0.78rem; margin: 0; }
+.attribution-link { color: var(--ink-soft); text-decoration: none; }
+.attribution-link:hover { color: var(--ink); text-decoration: underline; }
+
 /* Toast -------------------------------------------------------------- */
 .toast {
   position: fixed;
   left: 50%;
   bottom: 24px;
   transform: translateX(-50%);
-  background: var(--card-raised);
+  /* Longhand, deliberately: the shorthand would reset background-image and
+     the alert variant below paints with the shared panel gradient. */
+  background-color: var(--card-raised);
   border: 1px solid var(--border);
   color: var(--ink);
   padding: 8px 18px;
@@ -855,6 +911,10 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
   font-size: 0.9rem;
   max-width: 90vw;
 }
+/* A reminder is an alert, not a status line. It takes the issue panel's honey
+   plate and its dark ink, so the one message that expects a response looks
+   like the surface the organizer already associates with acting. */
+.toast.panel { border-color: var(--panel-rim); color: var(--panel-ink); }
 
 /* Guided demo --------------------------------------------------------- */
 /* The guide is deliberately a compact companion instead of a modal. The
@@ -889,6 +949,7 @@ input:focus-visible, button:focus-visible, .handle:focus-visible {
 .demo-guide-actions .btn:disabled { opacity: 0.35; }
 .demo-guide-actions .hint { color: var(--ink-soft); text-align: right; }
 .is-demo #code-chip,
+.is-demo #code-callout,
 .is-demo #timer-float,
 .is-demo #organizer-shelf,
 .is-demo #end-rail,

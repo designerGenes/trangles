@@ -14,9 +14,23 @@ import (
 // built-in defaults below apply, so a bad edit degrades to "still serving"
 // rather than "will not boot".
 type Config struct {
-	Limits    Limits   `json:"limits"`
-	Nicknames []string `json:"nicknames"`
+	Limits    Limits        `json:"limits"`
+	Nicknames []string      `json:"nicknames"`
+	Parts     NicknameParts `json:"nicknameParts"`
 }
+
+// NicknameParts is the generative half of the nickname pool: a curated list is
+// finite, and combining two banks gives the placeholder a space orders of
+// magnitude larger than anyone would hand-write. The client draws uniformly
+// across the curated names and every pair, so neither half is starved.
+type NicknameParts struct {
+	Adjectives []string `json:"adjectives"`
+	Nouns      []string `json:"nouns"`
+}
+
+// A generated name is "<adjective> <noun>", so each part gets half of the join
+// budget and the pair can never exceed what a join would accept.
+const maxNamePartLen = (maxNameLen - 1) / 2
 
 // Limits bound how much memory an anonymous caller can cause the process to
 // allocate. Sessions live in RAM, so each of these is a memory ceiling as much
@@ -42,6 +56,13 @@ var DefaultLimits = Limits{
 // FallbackNicknames keep the placeholder working if the config file is missing.
 var FallbackNicknames = []string{"Cosmic Badger", "Waffle Wizard", "Laser Pigeon"}
 
+// FallbackNicknameParts are the same safety net for the generated half. The
+// shipped banks live in config/app.json; these only cover a missing file.
+var FallbackNicknameParts = NicknameParts{
+	Adjectives: []string{"Cosmic", "Waffle", "Laser", "Turbo", "Velvet"},
+	Nouns:      []string{"Badger", "Wizard", "Pigeon", "Otter", "Comet"},
+}
+
 func configPath() string {
 	if p := os.Getenv("CONFIG_PATH"); p != "" {
 		return p
@@ -53,7 +74,7 @@ func configPath() string {
 // individual limits so a Fly deploy can be retuned with `fly secrets set`
 // instead of a rebuild.
 func LoadConfig() Config {
-	cfg := Config{Limits: DefaultLimits, Nicknames: FallbackNicknames}
+	cfg := Config{Limits: DefaultLimits, Nicknames: FallbackNicknames, Parts: FallbackNicknameParts}
 
 	path := configPath()
 	data, err := os.ReadFile(path)
@@ -87,8 +108,17 @@ func LoadConfig() Config {
 	if names := cleanNicknames(parsed.Nicknames); len(names) > 0 {
 		cfg.Nicknames = names
 	}
+	// Both banks or neither: one empty list collapses the generated space to
+	// zero, and a half-configured pool that silently stops generating is worse
+	// than keeping the built-in one.
+	adjectives := cleanNameParts(parsed.Parts.Adjectives)
+	nouns := cleanNameParts(parsed.Parts.Nouns)
+	if len(adjectives) > 0 && len(nouns) > 0 {
+		cfg.Parts = NicknameParts{Adjectives: adjectives, Nouns: nouns}
+	}
 
-	log.Printf("config %s: %d nicknames, %d max sessions", path, len(cfg.Nicknames), cfg.Limits.MaxSessions)
+	log.Printf("config %s: %d nicknames (+%d generated), %d max sessions",
+		path, len(cfg.Nicknames), len(cfg.Parts.Adjectives)*len(cfg.Parts.Nouns), cfg.Limits.MaxSessions)
 	return applyEnvOverrides(cfg)
 }
 
@@ -116,6 +146,27 @@ func envInt(key string, fallback int) int {
 		return fallback
 	}
 	return value
+}
+
+// cleanNameParts is cleanNicknames with the tighter per-part budget: a word
+// that cannot fit inside a joined pair is dropped rather than truncated,
+// because a clipped word reads as a bug rather than as a nickname.
+func cleanNameParts(words []string) []string {
+	clean := make([]string, 0, len(words))
+	seen := make(map[string]bool)
+	for _, word := range words {
+		word = strings.TrimSpace(word)
+		if word == "" || len(word) > maxNamePartLen || strings.ContainsAny(word, " \t") {
+			continue
+		}
+		key := strings.ToLower(word)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		clean = append(clean, word)
+	}
+	return clean
 }
 
 func cleanNicknames(names []string) []string {

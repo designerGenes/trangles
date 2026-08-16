@@ -1286,7 +1286,9 @@ const historyEntry = (n, title) => ({
   check("empty Sum view shows only its centered explanation", shown(win, "live-empty")
     && !visible(win, "live-overlay") && !visible(win, "live-grid"));
   win.document.getElementById("btn-live-grid").click();
-  check("empty individual view names the missing participants", /No participants/.test(win.document.getElementById("live-empty").textContent));
+  check("empty individual view says the room is still being waited on",
+    /Waiting for participants/.test(win.document.getElementById("live-empty").textContent)
+    && /\.live-empty \{[^}]*animation: chart-pulse/.test(read("style.css")));
   check("empty individual view keeps the centered stage clear", win.document.getElementById("live-stage").classList.contains("has-empty")
     && !visible(win, "live-overlay") && !visible(win, "live-grid"));
 }
@@ -1389,6 +1391,105 @@ const historyEntry = (n, title) => ({
   check("exit demo uses the coral commitment action",
     win.document.getElementById("btn-demo-exit").classList.contains("btn-session-commit"));
   T.stopDemo();
+}
+
+/* ── 32. The organizer is told what the session code is for ──────────── */
+{
+  const win = boot();
+  const T = win.__test;
+  check("no callout before there is a code to share", !visible(win, "code-callout"));
+  T.S.organizer = true; T.S.code = "ABCDE"; T.S.selfId = "o";
+  T.showIntake("first", true);
+  T.showCodeCallout();
+  check("organizer is pointed at the code chip on arrival", visible(win, "code-callout")
+    && /Give this code to participants/.test(win.document.getElementById("code-callout").textContent));
+  check("the callout points back at the chip it describes",
+    /\.code-callout::before \{[^}]*border-bottom-color: var\(--pencil\)/.test(read("style.css"))
+    && /\.code-chip-wrap \{[^}]*position: relative/.test(read("style.css")));
+  win.document.getElementById("code-chip").click();
+  check("copying the link retires the callout", !visible(win, "code-callout"));
+  // jsdom has no navigator.clipboard, which is also true of any insecure
+  // origin — the chip has to offer the link rather than throw.
+  check("a missing clipboard falls back to showing the link",
+    /ABCDE/.test(win.document.getElementById("toast").textContent));
+  T.showCodeCallout();
+  check("the callout is owed only once per session", !visible(win, "code-callout"));
+  // A new session earns a new pointer; leaving one retires it with the chip.
+  T.S.codeCalloutSeen = false;
+  T.showCodeCallout();
+  check("a fresh session is pointed at its own code", visible(win, "code-callout"));
+  T.S.code = null;
+  T.showIntake("first", true);
+  check("leaving the session takes the callout with the chip", !visible(win, "code-callout"));
+}
+
+/* ── 33. Attribution sits at the foot of the page, dated at runtime ──── */
+{
+  const win = boot();
+  const link = win.document.querySelector(".site-footer .attribution-link");
+  const footer = win.document.querySelector(".site-footer");
+  check("the footer credits DesignerGenes and links out", !!link
+    && link.getAttribute("href") === "https://designergen.es"
+    && /Powered by/.test(footer.textContent));
+  check("the copyright year is filled in at runtime, not baked into markup",
+    new RegExp(`\u00A9 ${new Date().getFullYear()}`).test(footer.textContent)
+    && !/\u00A9/.test(read("index.html")));
+  check("an outbound link cannot reach back through the opener",
+    /noopener/.test(link.getAttribute("rel")));
+}
+
+/* ── 34. Alerts are coral or honey, never the quiet dark surfaces ────── */
+{
+  const win = boot();
+  const T = win.__test;
+  const css = read("style.css");
+  check("the privacy badge alerts in coral on white",
+    /\.privacy-badge \{[^}]*background: var\(--pencil\)[^}]*color: var\(--on-pencil\)/.test(css));
+
+  T.toast("A gentle reminder", true);
+  const el = win.document.getElementById("toast");
+  check("a reminder takes the honey plate and its dark ink",
+    el.classList.contains("panel") && el.classList.contains("alert-box")
+    && /\.alert-box \{[^}]*--panel-lit: var\(--honey-lit\)/.test(css)
+    && /\.toast\.panel \{[^}]*color: var\(--panel-ink\)/.test(css));
+  // The shorthand would reset background-image and drop the panel gradient.
+  check("the toast leaves the panel gradient room to paint",
+    /\.toast \{[^}]*background-color: var\(--card-raised\)/.test(css)
+    && !/\.toast \{[^}]*[^-]background: /.test(css));
+  T.toast("Invite link copied");
+  check("an ordinary status line stays on the quiet surface",
+    !el.classList.contains("panel") && !el.classList.contains("alert-box"));
+
+  T.S.organizer = true; T.S.code = "ABCDE"; T.S.selfId = "o";
+  T.showSession();
+  T.S.state = stateMsg();
+  T.render();
+  const organizer = win.document.querySelector(".person.is-organizer");
+  check("the organizer's tick is coral rather than an unsubmitted grey",
+    !!organizer && /\.person\.is-organizer \.check \{[^}]*color: var\(--pencil\)/.test(css));
+  check("everyone else's tick still tracks their own submission",
+    win.document.querySelectorAll(".person.is-organizer").length === 1);
+}
+
+/* ── 35. The nickname pool is generated, not just curated ────────────── */
+{
+  const win = boot();
+  const T = win.__test;
+  const config = JSON.parse(fs.readFileSync(path.join(DIR, "..", "config", "app.json"), "utf8"));
+  const parts = config.nicknameParts;
+  check("the shipped config carries both banks", !!parts
+    && parts.adjectives.length > 0 && parts.nouns.length > 0);
+  check("no generated pair can exceed what a join accepts",
+    Math.max(...parts.adjectives.map((w) => w.length))
+    + 1 + Math.max(...parts.nouns.map((w) => w.length)) <= 24);
+  check("the pool is larger than any hand-written list",
+    config.nicknames.length + (parts.adjectives.length * parts.nouns.length) > 5000);
+
+  // Whatever the pool, a name has to come out before /api/config lands.
+  const seen = new Set();
+  for (let i = 0; i < 400; i++) seen.add(T.randomNickname());
+  check("the fallback pool still yields a name before config arrives",
+    seen.size >= 1 && [...seen].every((name) => typeof name === "string" && name.length > 0));
 }
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURES`);

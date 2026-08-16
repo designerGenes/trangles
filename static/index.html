@@ -19,9 +19,14 @@
   <a id="home-link" class="wordmark" href="/">Tri<span class="wordmark-angle">▲</span>ngulate</a>
   <div class="masthead-actions">
     <span id="privacy-badge" class="privacy-badge" data-i18n="privacyBadge" hidden></span>
-    <button id="code-chip" class="code-chip" hidden title="" data-i18n-title="copyInviteLink">
-      <span data-i18n="sessionLabel"></span> <span id="code-text" class="mono"></span>
-    </button>
+    <div class="code-chip-wrap">
+      <button id="code-chip" class="code-chip" hidden title="" data-i18n-title="copyInviteLink">
+        <span data-i18n="sessionLabel"></span> <span id="code-text" class="mono"></span>
+      </button>
+      <!-- Shown once, to the organizer only: nobody else can hand the code
+           out, and nothing else on screen says what the chip is for. -->
+      <p id="code-callout" class="code-callout" role="status" data-i18n="codeCalloutHint" hidden></p>
+    </div>
     <button id="btn-demo" class="demo-help" type="button" title="" data-i18n-title="landingExploreDemo" aria-label="" data-i18n-aria-label="landingExploreDemo">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M9.7 9a2.4 2.4 0 0 1 4.6.9c0 1.6-1.8 2.1-2.3 3.2"></path><path d="M12 17h.01"></path></svg>
     </button>
@@ -356,6 +361,15 @@
  </section>
 
 </main>
+
+<!-- Attribution. The year is filled in at runtime so it never goes stale in
+     the markup. -->
+<footer class="site-footer">
+  <p class="attribution">
+    <span data-i18n="attributionPoweredBy"></span>
+    <a class="attribution-link" href="https://designergen.es" target="_blank" rel="noopener noreferrer">DesignerGenes</a><span id="attribution-year"></span>
+  </p>
+</footer>
 
 <div id="toast" class="toast" role="status" hidden></div>
 

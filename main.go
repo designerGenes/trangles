@@ -35,7 +35,10 @@ func main() {
 	mux.HandleFunc("/api/config", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "public, max-age=300")
-		_ = json.NewEncoder(w).Encode(map[string]any{"nicknames": cfg.Nicknames})
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"nicknames":     cfg.Nicknames,
+			"nicknameParts": cfg.Parts,
+		})
 	})
 	// Local-only theme editor. Registers a flat 404 unless TRIANGULATE_DEV=1,
 	// so /dev/ can never fall through to the static file server.

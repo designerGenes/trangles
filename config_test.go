@@ -100,8 +100,43 @@ func TestShippedConfigIsValid(t *testing.T) {
 			t.Fatalf("%q exceeds maxNameLen and would be truncated on join", name)
 		}
 	}
+	// The curated list is finite; the generated pairs are what make the pool
+	// deep enough that a room rarely sees the same suggestion twice.
+	if pairs := len(cfg.Parts.Adjectives) * len(cfg.Parts.Nouns); pairs < 1000 {
+		t.Fatalf("shipped nickname parts yield only %d pairs", pairs)
+	}
+	for _, word := range append(append([]string{}, cfg.Parts.Adjectives...), cfg.Parts.Nouns...) {
+		if len(word) > maxNamePartLen {
+			t.Fatalf("%q exceeds maxNamePartLen and would be dropped", word)
+		}
+	}
 	if cfg.Limits.MaxSessions <= 0 || cfg.Limits.MaxClientsPerSession <= 0 ||
 		cfg.Limits.MaxConnectionsPerIP <= 0 || cfg.Limits.MaxSessionsPerIP <= 0 {
 		t.Fatalf("shipped limits must all be positive: %+v", cfg.Limits)
+	}
+}
+
+// A generated name is joined with a space, so both halves have to fit inside
+// the same budget a typed nickname does.
+func TestNicknamePartsFitTheJoinBudget(t *testing.T) {
+	if maxNamePartLen*2+1 > maxNameLen {
+		t.Fatalf("maxNamePartLen %d cannot pair within maxNameLen %d", maxNamePartLen, maxNameLen)
+	}
+	long := strings.Repeat("x", maxNamePartLen+1)
+	writeConfig(t, `{"nicknameParts": {"adjectives": ["Turbo", " Turbo ", "turbo", "", "`+long+`", "Two Words"], "nouns": ["Otter"]}}`)
+	parts := LoadConfig().Parts
+	if len(parts.Adjectives) != 1 || parts.Adjectives[0] != "Turbo" {
+		t.Fatalf("adjectives = %v", parts.Adjectives)
+	}
+}
+
+// One empty bank means no pairs at all, so a half-configured pool must not
+// silently replace the built-in one.
+func TestOneEmptyNicknameBankKeepsTheDefaults(t *testing.T) {
+	writeConfig(t, `{"nicknameParts": {"adjectives": ["Turbo"], "nouns": []}}`)
+	parts := LoadConfig().Parts
+	if len(parts.Adjectives) != len(FallbackNicknameParts.Adjectives) ||
+		len(parts.Nouns) != len(FallbackNicknameParts.Nouns) {
+		t.Fatalf("a half-configured pool replaced the defaults: %+v", parts)
 	}
 }

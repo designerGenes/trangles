@@ -25,6 +25,19 @@ Control panels **invert**. This is forced, not stylistic: a genuinely bright hon
 
 An active round (`.round-card .chart-box`, `.live-inputs`) is deliberately neutral `--card`. Several participant colours share that surface and a tint would bias how they read against each other.
 
+### Two colours carry meaning outside their own tier
+
+Coral (`--pencil`, the wordmark's triangle) and honey (`--honey-*`, the issue family) both mean something on their own, anywhere in the interface:
+
+| Colour | Means | Where |
+| --- | --- | --- |
+| Coral on white | Act, or know this is on | Primary actions, the session-code callout, the privacy badge, the organizer's roster tick |
+| Honey plate with dark ink | This one expects a response | The issue panel, and the reminder alert (`.alert-box`) |
+
+`.alert-box` is a fourth panel family that maps to the honey ramp. It is not a control surface, so it does not appear in the tier table above — it exists so an alert can borrow the plate rather than a fifth colour being invented for it. The toast declares `background-color` rather than the `background` shorthand for this reason: the shorthand resets `background-image` and the panel gradient would never paint.
+
+The organizer's roster tick is coral rather than `--border` because the organizer never submits an estimate. Grey there would read as "still deciding" forever, when the truth is that there is nothing for them to decide.
+
 ### The raised-plastic construction
 
 A panel is two stacked gradients in one `background-image`, not a pseudo-element — so nothing competes with the panel's children for stacking order:
@@ -98,8 +111,8 @@ Generated from `static/style.css`. If this table and the stylesheet disagree, th
 | `--ink` | `#F4F1E8` | Primary text (on dark). |
 | `--muted` | `#AEB7C8` | Secondary text (on dark). |
 | `--on-primary` | `#FFFFFF` | White text on coral primary actions outside bright panels. |
-| `--on-pencil` | `#22161B` | Text on coral controls. |
-| `--on-pending` | `#241A22` | Text on pending control. |
+| `--on-pencil` | `#FFFFFF` | Text on coral controls. |
+| `--on-pending` | `#FFFFFF` | Text on pending control. |
 
 ### Control panels — shared plastic
 
@@ -239,3 +252,4 @@ Generated from `static/style.css`. If this table and the stylesheet disagree, th
 - The favicon in `static/index.html` inlines `--card` and `--pencil`. It is a data URI and cannot read tokens; update it by hand if either changes.
 - The result family — per-round summary, completed-issue history, and the session capstone — is intentionally one look. Splitting them would imply a distinction the session does not have.
 - Adding a colour means adding a token, with an `@group` and an `@label`. There is no other supported way, and the suite enforces it.
+- `.live-empty` and `.chart-loading` share the `chart-pulse` animation: an empty stage and an undrawn chart are the same "not yet" state and should not read as two different conditions. `.live-empty` alone is stilled under `prefers-reduced-motion`, because it can sit on screen for the length of a round rather than the moment a chart takes.

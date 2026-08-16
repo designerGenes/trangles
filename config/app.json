@@ -42,5 +42,47 @@
     "Bombastic Newt", "Quixotic Beaver", "Wily Persimmon", "Drowsy Falcon",
     "Truculent Muffin", "Effervescent Tapir", "Somber Kazoo", "Jubilant Ocelot",
     "Cantankerous Fig", "Peculiar Starling", "Resolute Dumpling", "Nefarious Puffin"
-  ]
+  ],
+
+  "nicknameParts": {
+    "_comment": "The curated list above is finite; these are combined as \"<adjective> <noun>\" to give the placeholder a pool orders of magnitude larger without anyone hand-writing 10,000 names. The client draws uniformly across the curated names and every pair, so both stay reachable. Each part is capped at half the join budget (see maxNamePartLen in config.go) — longer words are dropped, not truncated, because a clipped word reads as a bug rather than a nickname.",
+    "adjectives": [
+      "Cosmic", "Waffle", "Laser", "Turbo", "Velvet", "Neon",
+      "Quantum", "Rusty", "Feral", "Bashful", "Nimble", "Grumpy",
+      "Radiant", "Salty", "Brisk", "Plucky", "Sleepy", "Dapper",
+      "Wired", "Molten", "Crooked", "Humble", "Jolly", "Sonic",
+      "Vivid", "Frosty", "Glacial", "Amber", "Copper", "Mellow",
+      "Rowdy", "Stoic", "Zesty", "Marbled", "Gilded", "Bramble",
+      "Thunder", "Twilight", "Prism", "Lucid", "Candid", "Curious",
+      "Restless", "Tidy", "Rogue", "Solar", "Lunar", "Tidal",
+      "Hollow", "Static", "Analog", "Rustic", "Spiral", "Pixel",
+      "Granite", "Emerald", "Crimson", "Indigo", "Saffron", "Cobalt",
+      "Ivory", "Onyx", "Silent", "Wobbly", "Cheerful", "Fearless",
+      "Whimsical", "Sullen", "Scrappy", "Steadfast", "Gallant", "Serene",
+      "Errant", "Wily", "Drowsy", "Jubilant", "Peculiar", "Resolute",
+      "Sardonic", "Prickly", "Clumsy", "Kinetic", "Nocturnal", "Opalescent",
+      "Titanium", "Groovy", "Spicy", "Chrome", "Disco", "Vagabond",
+      "Astro", "Plaid", "Fuzzy", "Sassy", "Reckless", "Tactical",
+      "Stormy", "Wistful", "Obsidian", "Fickle"
+    ],
+    "nouns": [
+      "Badger", "Wizard", "Pigeon", "Otter", "Sparrow", "Comet",
+      "Lantern", "Compass", "Marmot", "Falcon", "Ferret", "Walrus",
+      "Heron", "Magpie", "Puffin", "Narwhal", "Pangolin", "Axolotl",
+      "Gecko", "Ibex", "Lemur", "Manatee", "Meerkat", "Ocelot",
+      "Okapi", "Quokka", "Tapir", "Wombat", "Beacon", "Anchor",
+      "Kettle", "Ladder", "Mandolin", "Sextant", "Sundial", "Trombone",
+      "Turbine", "Anvil", "Dynamo", "Harbor", "Meridian", "Monsoon",
+      "Nebula", "Obelisk", "Orchard", "Prairie", "Quarry", "Ravine",
+      "Sequoia", "Thicket", "Tundra", "Vortex", "Zephyr", "Bagel",
+      "Biscuit", "Crumpet", "Dumpling", "Gumbo", "Muffin", "Noodle",
+      "Pancake", "Pickle", "Pretzel", "Scone", "Sorbet", "Tangerine",
+      "Persimmon", "Pomelo", "Turnip", "Radish", "Kraken", "Basilisk",
+      "Yeti", "Phantom", "Bandit", "Knight", "Barista", "Librarian",
+      "Alchemist", "Ferryman", "Alpaca", "Capybara", "Hedgehog", "Raccoon",
+      "Hamster", "Weasel", "Llama", "Viper", "Sloth", "Gopher",
+      "Ninja", "Newt", "Moth", "Snail", "Numbat", "Beaver",
+      "Buffalo", "Starling", "Platypus", "Cyclone"
+    ]
+  }
 }

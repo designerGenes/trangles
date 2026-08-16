@@ -4,6 +4,11 @@
 function applyStrings(strings) {
   if (!strings) return;
 
+  // Copy that app.js writes imperatively (empty states, toasts) has to come
+  // from the same file as the declarative text, so publish the map rather
+  // than keeping it local to this pass.
+  window.__I18N_STRINGS = strings;
+
   // Populate data-i18n text content
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');

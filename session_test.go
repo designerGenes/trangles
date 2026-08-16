@@ -356,6 +356,52 @@ func TestAppendingQueuePreservesCurrentAndQueuedIssues(t *testing.T) {
 	}
 }
 
+// randCode used to reduce a random byte modulo the alphabet. Because 256 is
+// not a multiple of 31, the first 256%31 symbols each absorbed one extra byte
+// value and came up 12.5% more often than the rest — invisible by eye, and
+// exactly the skew that makes short codes feel repetitive.
+//
+// Per-symbol counts are too noisy to assert on individually, so compare the
+// two groups the old bias would have split the alphabet into. A 12.5% gap is
+// several standard deviations clear of sampling noise in either direction.
+func TestRandCodeDoesNotFavourTheStartOfTheAlphabet(t *testing.T) {
+	const draws = 62000
+	counts := make(map[rune]int, len(codeAlphabet))
+	for i := 0; i < draws/5; i++ {
+		for _, symbol := range randCode(5) {
+			counts[symbol]++
+		}
+	}
+	if len(counts) != len(codeAlphabet) {
+		t.Fatalf("drew %d distinct symbols, want the whole %d-symbol alphabet",
+			len(counts), len(codeAlphabet))
+	}
+
+	skewed := 256 % len(codeAlphabet)
+	var favoured, rest int
+	for i, symbol := range codeAlphabet {
+		if i < skewed {
+			favoured += counts[symbol]
+		} else {
+			rest += counts[symbol]
+		}
+	}
+	favouredMean := float64(favoured) / float64(skewed)
+	restMean := float64(rest) / float64(len(codeAlphabet)-skewed)
+	if ratio := favouredMean / restMean; ratio > 1.05 || ratio < 0.95 {
+		t.Fatalf("first %d symbols averaged %.0f draws against %.0f for the rest (ratio %.3f)",
+			skewed, favouredMean, restMean, ratio)
+	}
+}
+
+func TestRandCodeReturnsTheRequestedLength(t *testing.T) {
+	for _, n := range []int{1, 5, 12, 20} {
+		if got := randCode(n); len(got) != n {
+			t.Fatalf("randCode(%d) = %q, length %d", n, got, len(got))
+		}
+	}
+}
+
 func TestWebSocketRequiresNickname(t *testing.T) {
 	hub := NewHub()
 	server := httptest.NewServer(http.HandlerFunc(hub.HandleWS))
